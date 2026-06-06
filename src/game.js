@@ -75,6 +75,104 @@ const scratchVec2 = new THREE.Vector2();
 const scratchVec3 = new THREE.Vector3();
 const pixelGeo = new THREE.BoxGeometry(0.13, 0.13, 0.13);
 
+/* ---- 纹理缓存 ---- */
+const textureCache = { floor: {}, wall: {} };
+
+/* ---- 音效系统 (Web Audio API) ---- */
+let audioCtx = null;
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playTone(freq, duration, type, volume, detune) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type || "sine";
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  if (detune) osc.detune.setValueAtTime(detune, audioCtx.currentTime);
+  gain.gain.setValueAtTime(volume || 0.3, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function playNoise(duration, volume) {
+  if (!audioCtx) return;
+  const bufferSize = audioCtx.sampleRate * duration;
+  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buffer;
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.setValueAtTime(2000, audioCtx.currentTime);
+  gain.gain.setValueAtTime(volume || 0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+  src.stop(audioCtx.currentTime + duration);
+}
+
+function sfxPunch() {
+  ensureAudio();
+  playNoise(0.08, 0.25);
+  playTone(180, 0.1, "sawtooth", 0.2);
+}
+
+function sfxHit() {
+  ensureAudio();
+  playTone(260, 0.15, "square", 0.25);
+  playTone(520, 0.12, "sine", 0.18);
+  playNoise(0.12, 0.2);
+  setTimeout(() => playTone(380, 0.1, "sine", 0.15), 60);
+}
+
+function sfxMiss() {
+  ensureAudio();
+  playTone(120, 0.22, "sawtooth", 0.15);
+  playTone(80, 0.3, "sine", 0.1);
+}
+
+function sfxWin() {
+  ensureAudio();
+  [0, 100, 200, 350].forEach((delay, i) => {
+    setTimeout(() => playTone([523, 659, 784, 1047][i], 0.25, "sine", 0.2), delay);
+  });
+}
+
+function sfxLose() {
+  ensureAudio();
+  [0, 150, 300].forEach((delay, i) => {
+    setTimeout(() => playTone([330, 262, 196][i], 0.35, "sine", 0.18), delay);
+  });
+}
+
+/* ---- 打击反馈：hitstop + 屏幕震动 ---- */
+let hitstopTimer = 0;
+let shakeTimer = 0;
+let shakeIntensity = 0;
+const cameraBasePos = new THREE.Vector3(0, 19.5, 17.2);
+
+function triggerHitstop(duration) {
+  hitstopTimer = Math.max(hitstopTimer, duration);
+}
+
+function triggerShake(intensity, duration) {
+  shakeIntensity = intensity;
+  shakeTimer = duration;
+}
+
 boot();
 
 function boot() {
@@ -186,7 +284,41 @@ function resize() {
   renderer.setSize(width, height, false);
 }
 
+function disposeScene() {
+  if (!scene) return;
+  // 清理粒子和打击特效
+  particles.forEach((p) => {
+    scene.remove(p.mesh);
+    p.mesh.material.dispose();
+  });
+  punchEffects.forEach((e) => {
+    scene.remove(e.mesh);
+    e.mesh.geometry.dispose();
+    e.mesh.material.dispose();
+  });
+
+  scene.traverse((obj) => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((mat) => {
+        if (mat.map) mat.map.dispose();
+        mat.dispose();
+      });
+    }
+  });
+}
+
+function getCachedTexture(cache, key, factory) {
+  if (cache[key]) return cache[key];
+  cache[key] = factory();
+  return cache[key];
+}
+
 function resetLevel(index) {
+  // 先清理旧场景资源
+  disposeScene();
+
   currentLevelIndex = index;
   const level = LEVELS[index];
 
@@ -197,6 +329,8 @@ function resetLevel(index) {
   punchEffects = [];
   punchCooldown = 0;
   totalTime = 0;
+  hitstopTimer = 0;
+  shakeTimer = 0;
   gameStatus = "briefing";
 
   levelState = {
@@ -250,10 +384,11 @@ function buildWorld(level) {
   sun.shadow.camera.bottom = -16;
   scene.add(sun);
 
+  const floorTex = getCachedTexture(textureCache.floor, level.id, () => makeFloorTexture(level.id));
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(28, 28),
     new THREE.MeshStandardMaterial({
-      map: makeFloorTexture(level.id),
+      map: floorTex,
       roughness: 0.78,
       metalness: 0.02,
     }),
@@ -328,8 +463,9 @@ function makeFloorTexture(kind) {
 }
 
 function buildGamingRoom() {
+  const wallTex = getCachedTexture(textureCache.wall, "gaming", () => makeWallTexture("gaming"));
   const wallMaterial = new THREE.MeshStandardMaterial({
-    map: makeWallTexture("gaming"),
+    map: wallTex,
     color: 0x2d374f,
     roughness: 0.72,
   });
@@ -411,8 +547,9 @@ function buildGamingRoom() {
 }
 
 function buildLibrary() {
+  const wallTex = getCachedTexture(textureCache.wall, "library", () => makeWallTexture("library"));
   const wallMaterial = new THREE.MeshStandardMaterial({
-    map: makeWallTexture("library"),
+    map: wallTex,
     color: 0xf0dfbf,
     roughness: 0.62,
   });
@@ -726,7 +863,18 @@ function makeFaceDot(material, x, y, z, radius) {
 
 function tick() {
   const rawDt = clock.getDelta();
-  const dt = Math.min(rawDt, 0.033);
+  const clampedDt = Math.min(rawDt, 0.033);
+
+  // hitstop：命中时冻结游戏几帧
+  if (hitstopTimer > 0) {
+    hitstopTimer -= clampedDt;
+    // hitstop 期间只渲染，不更新游戏逻辑
+    updateShake(clampedDt);
+    renderer.render(scene, camera);
+    return;
+  }
+
+  const dt = clampedDt;
   totalTime += dt;
 
   if (gameStatus === "playing") {
@@ -743,7 +891,20 @@ function tick() {
 
   updatePunchEffects(dt);
   updateParticles(dt);
+  updateShake(dt);
   renderer.render(scene, camera);
+}
+
+function updateShake(dt) {
+  if (shakeTimer > 0) {
+    shakeTimer -= dt;
+    const decay = Math.max(0, shakeTimer / 0.2);
+    const offsetX = (Math.random() - 0.5) * 2 * shakeIntensity * decay;
+    const offsetY = (Math.random() - 0.5) * 2 * shakeIntensity * decay * 0.5;
+    camera.position.set(cameraBasePos.x + offsetX, cameraBasePos.y + offsetY, cameraBasePos.z);
+  } else {
+    camera.position.copy(cameraBasePos);
+  }
 }
 
 function updatePlayer(dt) {
@@ -1035,6 +1196,7 @@ function triggerAttack() {
   punchCooldown = 0.38;
   player.punchTimer = 0.26;
   createPunchEffect();
+  sfxPunch();
 
   const hit = findHitTarget();
   if (!hit) return;
@@ -1045,12 +1207,19 @@ function triggerAttack() {
     } else {
       dissolveNpc(hit.npc);
     }
+    // 命中正确目标：强 hitstop + 强震动 + 命中音效
+    triggerHitstop(0.08);
+    triggerShake(0.35, 0.2);
+    sfxHit();
     gameStatus = "settling";
     window.setTimeout(() => finishRound(true), 760);
     return;
   }
 
+  // 打错了：弱震动 + 失败音效
   dissolveNpc(hit.npc);
+  triggerShake(0.12, 0.1);
+  sfxMiss();
   levelState.attempts = Math.max(0, levelState.attempts - 1);
   updateHud();
   if (levelState.attempts <= 0) {
@@ -1193,6 +1362,7 @@ function finishRound(won) {
   if (gameStatus === "won" || gameStatus === "lost") return;
   gameStatus = won ? "won" : "lost";
   player.cheer = won;
+  if (won) sfxWin(); else sfxLose();
   ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
   ui.resultCopy.textContent = won ? levelState.level.success : levelState.level.failure;
   ui.resultModal.classList.add("visible");
