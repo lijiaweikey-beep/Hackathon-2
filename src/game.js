@@ -10,6 +10,7 @@ const NPC_SPEED = 3;
 const ROUND_SECONDS = 90;
 const ATTEMPTS = 3;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
+const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
   {
@@ -87,7 +88,6 @@ let currentLevelIndex = 0;
 let levelState;
 let npcs = [];
 let particles = [];
-let punchEffects = [];
 let gameStatus = "briefing";
 let punchCooldown = 0;
 let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
@@ -138,7 +138,7 @@ function renderTargetPreview(level) {
   previewScene.background = new THREE.Color(bg);
 
   if (level.id === "gaming") {
-    const npc = createPerson({ body: 0x64748b, pants: 0x293241, hair: 0x16181e });
+    const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
     // 渲染黑眼圈效果
     npc.group.userData.blackMarks.forEach((m) => {
       m.material = m.material.clone();
@@ -148,8 +148,8 @@ function renderTargetPreview(level) {
     previewScene.add(npc.group);
   } else {
     // 情侣：两个人面对面
-    const a = createPerson({ body: 0x64748b, pants: 0x293241, hair: 0x16181e });
-    const b = createPerson({ body: 0x5b6b7f, pants: 0x24303e, hair: 0x16181e });
+    const a = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
+    const b = createLowPolyPerson(LOW_POLY_NPC_PALETTES[1]);
     a.group.position.set(-0.32, 0, 0);
     b.group.position.set(0.32, 0, 0);
     a.group.rotation.y = 0.5;
@@ -497,14 +497,9 @@ function resize() {
 
 function disposeScene() {
   if (!scene) return;
-  // 清理粒子（材质是共享缓存的，不 dispose）和打击特效
+  // 清理粒子（材质是共享缓存的，不 dispose）
   particles.forEach((p) => {
     scene.remove(p.mesh);
-  });
-  punchEffects.forEach((e) => {
-    scene.remove(e.mesh);
-    e.mesh.geometry.dispose();
-    e.mesh.material.dispose();
   });
 
   scene.traverse((obj) => {
@@ -543,7 +538,6 @@ function resetLevel(index) {
   scene.userData.cleanups = [];
   npcs = [];
   particles = [];
-  punchEffects = [];
   punchCooldown = 0;
   punchTier = 0;
   punchResetTimer = 0;
@@ -560,11 +554,12 @@ function resetLevel(index) {
     computers: [],
     pair: null,
     startTime: 0,
+    obstacles: [],
   };
 
   buildWorld(level);
   player = createPlayer();
-  player.group.position.set(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+  player.group.position.copy(randomOpenPosition());
   scene.add(player.group);
   spawnNpcs(level);
   updateHud();
@@ -827,6 +822,7 @@ function buildLibrary() {
       table.castShadow = true;
       table.receiveShadow = true;
       scene.add(table);
+      registerObstacle(x, z, 1.35, 0.675);
 
       const lamp = new THREE.PointLight(0xffe0a8, 0.48, 5.2);
       lamp.position.set(x, 1.6, z);
@@ -990,7 +986,7 @@ function updateDecoy(npc, dt) {
     npc.walking = true;
     npc.group.position.x += npc.decoyDir.x * NPC_SPEED * dt;
     npc.group.position.z += npc.decoyDir.y * NPC_SPEED * dt;
-    clampToWorld(npc.group.position);
+    clampActorPosition(npc.group.position);
 
     // 碰到边界就转向
     if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.3) npc.decoyDir.x *= -1;
@@ -1016,23 +1012,189 @@ function updateDecoy(npc, dt) {
   }
 }
 
+function registerObstacle(x, z, halfW, halfD) {
+  levelState.obstacles.push({ x, z, halfW, halfD });
+}
+
+function collidesWithObstacle(pos, radius = ACTOR_COLLISION_RADIUS) {
+  if (!levelState?.obstacles?.length) return false;
+  for (const obs of levelState.obstacles) {
+    if (
+      Math.abs(pos.x - obs.x) < obs.halfW + radius &&
+      Math.abs(pos.z - obs.z) < obs.halfD + radius
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function resolveObstacleCollisions(position, radius = ACTOR_COLLISION_RADIUS) {
+  if (!levelState?.obstacles?.length) return;
+  for (let pass = 0; pass < 4; pass += 1) {
+    let resolved = false;
+    for (const obs of levelState.obstacles) {
+      const dx = position.x - obs.x;
+      const dz = position.z - obs.z;
+      const overlapX = obs.halfW + radius - Math.abs(dx);
+      const overlapZ = obs.halfD + radius - Math.abs(dz);
+      if (overlapX <= 0 || overlapZ <= 0) continue;
+      if (overlapX < overlapZ) {
+        position.x += dx >= 0 ? overlapX : -overlapX;
+      } else {
+        position.z += dz >= 0 ? overlapZ : -overlapZ;
+      }
+      resolved = true;
+    }
+    if (!resolved) break;
+  }
+}
+
+function clampActorPosition(position) {
+  clampToWorld(position);
+  resolveObstacleCollisions(position);
+}
+
 function randomOpenPosition() {
   let pos;
   let tries = 0;
+  const playerPos = player?.group?.position ?? new THREE.Vector3();
   do {
     pos = new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
     tries += 1;
-  } while (tries < 30 && pos.distanceTo(player?.group?.position ?? new THREE.Vector3()) < 2.2);
+  } while (tries < 40 && (pos.distanceTo(playerPos) < 2.2 || collidesWithObstacle(pos)));
   return pos;
 }
 
-function createPlayer() {
-  const actor = createPerson({
-    body: 0x64748b,
-    pants: 0x293241,
-    hair: 0x16181e,
-  });
+const LOW_POLY_PLAYER_PALETTE = {
+  jacket: 0x3ddc68,
+  jacketDark: 0x2ab84f,
+  shorts: 0xa16207,
+  shortsDark: 0x854d0e,
+  cap: 0x3b82f6,
+  capAccent: 0xf97316,
+  sock: 0x7dd3fc,
+};
 
+const LOW_POLY_NPC_PALETTES = [
+  { jacket: 0x60a5fa, jacketDark: 0x2563eb, shorts: 0x57534e, shortsDark: 0x44403c, cap: 0xef4444, capAccent: 0xfbbf24, sock: 0xf9a8d4 },
+  { jacket: 0xf472b6, jacketDark: 0xdb2777, shorts: 0x78350f, shortsDark: 0x57230a, cap: 0x8b5cf6, capAccent: 0x22d3ee, sock: 0xa5f3fc },
+  { jacket: 0xfbbf24, jacketDark: 0xf59e0b, shorts: 0x1e40af, shortsDark: 0x1e3a8a, cap: 0x10b981, capAccent: 0xf43f5e, sock: 0xe2e8f0 },
+  { jacket: 0xa78bfa, jacketDark: 0x7c3aed, shorts: 0x166534, shortsDark: 0x14532d, cap: 0x0ea5e9, capAccent: 0xfcd34d, sock: 0xbae6fd },
+];
+
+function makeLowPolyMat(color, roughness = 0.62) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0.04,
+    flatShading: true,
+  });
+}
+
+function addFacetedBox(parent, w, h, d, material, x, y, z, rx = 0, ry = 0, rz = 0) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  mesh.position.set(x, y, z);
+  mesh.rotation.set(rx, ry, rz);
+  mesh.castShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
+  const group = new THREE.Group();
+  const visual = new THREE.Group();
+  group.add(visual);
+
+  const skin = makeLowPolyMat(0xf0b88c);
+  const jacket = makeLowPolyMat(palette.jacket);
+  const jacketDark = makeLowPolyMat(palette.jacketDark);
+  const shirt = makeLowPolyMat(0xf8fafc, 0.55);
+  const shorts = makeLowPolyMat(palette.shorts);
+  const shortsDark = makeLowPolyMat(palette.shortsDark);
+  const boot = makeLowPolyMat(0x7c4a1e);
+  const sock = makeLowPolyMat(palette.sock);
+  const cap = makeLowPolyMat(palette.cap);
+  const capAccent = makeLowPolyMat(palette.capAccent);
+  const eye = makeLowPolyMat(0x111111, 0.4);
+  const mouth = makeLowPolyMat(0x1a1a1a, 0.5);
+  const blackEyeMat = new THREE.MeshBasicMaterial({ color: 0x09090b, transparent: true, opacity: 0 });
+  const lipMat = new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0 });
+
+  addFacetedBox(visual, 0.54, 0.5, 0.48, skin, 0, 1.44, 0);
+  addFacetedBox(visual, 0.58, 0.07, 0.34, cap, 0, 1.7, 0.1);
+  addFacetedBox(visual, 0.5, 0.16, 0.46, cap, 0, 1.78, -0.03);
+  addFacetedBox(visual, 0.5, 0.16, 0.1, capAccent, 0, 1.78, 0.24);
+  addFacetedBox(visual, 0.11, 0.13, 0.05, eye, -0.13, 1.46, 0.26);
+  addFacetedBox(visual, 0.11, 0.13, 0.05, eye, 0.13, 1.46, 0.26);
+  addFacetedBox(visual, 0.2, 0.06, 0.04, mouth, 0, 1.3, 0.26);
+  const blackLeft = addFacetedBox(visual, 0.12, 0.1, 0.03, blackEyeMat, -0.13, 1.42, 0.27);
+  const blackRight = addFacetedBox(visual, 0.12, 0.1, 0.03, blackEyeMat.clone(), 0.13, 1.42, 0.27);
+  const lipMark = addFacetedBox(visual, 0.16, 0.08, 0.03, lipMat, 0, 1.28, 0.27);
+  addFacetedBox(visual, 0.56, 0.4, 0.22, jacketDark, 0, 1.52, -0.3, 0.18, 0, 0);
+
+  const torso = addFacetedBox(visual, 0.46, 0.44, 0.34, jacket, 0, 1.04, 0);
+  addFacetedBox(visual, 0.2, 0.3, 0.05, shirt, 0, 1.06, 0.18);
+  addFacetedBox(visual, 0.13, 0.34, 0.12, jacketDark, -0.15, 1.06, 0.1, 0, 0.22, 0);
+  addFacetedBox(visual, 0.13, 0.34, 0.12, jacketDark, 0.15, 1.06, 0.1, 0, -0.22, 0);
+  addFacetedBox(visual, 0.44, 0.24, 0.36, shorts, 0, 0.74, 0);
+  addFacetedBox(visual, 0.46, 0.08, 0.38, shortsDark, 0, 0.62, 0);
+
+  const leftArm = new THREE.Group();
+  const rightArm = new THREE.Group();
+  leftArm.position.set(-0.3, 1.1, 0);
+  rightArm.position.set(0.3, 1.1, 0);
+  addFacetedBox(leftArm, 0.13, 0.38, 0.13, jacket, 0, -0.2, 0);
+  addFacetedBox(rightArm, 0.13, 0.38, 0.13, jacket, 0, -0.2, 0);
+  addFacetedBox(leftArm, 0.11, 0.11, 0.11, skin, 0, -0.42, 0);
+  addFacetedBox(rightArm, 0.11, 0.11, 0.11, skin, 0, -0.42, 0);
+  leftArm.rotation.z = 0.35;
+  rightArm.rotation.z = -0.35;
+  visual.add(leftArm, rightArm);
+
+  const leftLeg = new THREE.Group();
+  const rightLeg = new THREE.Group();
+  leftLeg.position.set(-0.12, 0.6, 0);
+  rightLeg.position.set(0.12, 0.6, 0);
+  addFacetedBox(leftLeg, 0.15, 0.18, 0.15, shorts, 0, -0.09, 0);
+  addFacetedBox(rightLeg, 0.15, 0.18, 0.15, shorts, 0, -0.09, 0);
+  addFacetedBox(leftLeg, 0.14, 0.26, 0.14, skin, 0, -0.31, 0);
+  addFacetedBox(rightLeg, 0.14, 0.26, 0.14, skin, 0, -0.31, 0);
+  addFacetedBox(leftLeg, 0.15, 0.1, 0.15, sock, 0, -0.48, 0);
+  addFacetedBox(rightLeg, 0.15, 0.1, 0.15, sock, 0, -0.48, 0);
+  addFacetedBox(leftLeg, 0.17, 0.13, 0.22, boot, 0, -0.58, 0.04);
+  addFacetedBox(rightLeg, 0.17, 0.13, 0.22, boot, 0, -0.58, 0.04);
+  visual.add(leftLeg, rightLeg);
+
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.48, 8),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false }),
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.02;
+  group.add(shadow);
+
+  group.userData = {
+    visual,
+    body: torso,
+    leftArm,
+    rightArm,
+    leftLeg,
+    rightLeg,
+    blackMarks: [blackLeft, blackRight],
+    lipMarks: [lipMark],
+    baseArmRotations: {
+      leftZ: leftArm.rotation.z,
+      rightZ: rightArm.rotation.z,
+    },
+    colors: [palette.jacket, palette.shorts, 0xf0b88c, palette.cap, palette.capAccent, 0xf8fafc],
+  };
+
+  return { group };
+}
+
+function createPlayer() {
+  const actor = createLowPolyPerson(LOW_POLY_PLAYER_PALETTE);
   actor.speed = PLAYER_SPEED;
   actor.punchTimer = 0;
   actor.cheer = false;
@@ -1040,18 +1202,7 @@ function createPlayer() {
 }
 
 function createNpc(id, flags) {
-  const palette = [
-    [0x64748b, 0x293241],
-    [0x5b6b7f, 0x24303e],
-    [0x6d7a8d, 0x2d3748],
-    [0x59687c, 0x1f2937],
-  ][id % 4];
-  const actor = createPerson({
-    body: palette[0],
-    pants: palette[1],
-    hair: 0x16181e,
-    isPlayer: false,
-  });
+  const actor = createLowPolyPerson(LOW_POLY_NPC_PALETTES[id % LOW_POLY_NPC_PALETTES.length]);
   actor.id = id;
   actor.isGamingTarget = Boolean(flags.gamingTarget);
   actor.isLover = Boolean(flags.lover);
@@ -1064,106 +1215,6 @@ function createNpc(id, flags) {
   actor.walking = false;
   actor.walkCycle = Math.random() * 10;
   return actor;
-}
-
-function createPerson(options) {
-  const group = new THREE.Group();
-  const visual = new THREE.Group();
-  group.add(visual);
-
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xf0b88c, roughness: 0.72 });
-  const bodyMat = new THREE.MeshStandardMaterial({ color: options.body, roughness: 0.76 });
-  const pantsMat = new THREE.MeshStandardMaterial({ color: options.pants, roughness: 0.82 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: options.hair, roughness: 0.92 });
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.7 });
-  const blackEyeMat = new THREE.MeshBasicMaterial({ color: 0x09090b, transparent: true, opacity: 0 });
-  const lipMat = new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0 });
-
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.62, 4, 12), bodyMat);
-  body.position.y = 0.86;
-  body.castShadow = true;
-  visual.add(body);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 16), skinMat);
-  head.position.y = 1.54;
-  head.castShadow = true;
-  visual.add(head);
-
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 8), hairMat);
-  hair.scale.set(1, 0.6, 1);
-  hair.position.set(0, 1.68, -0.02);
-  hair.castShadow = true;
-  visual.add(hair);
-
-  const leftEye = makeFaceDot(eyeMat, -0.115, 1.56, 0.314, 0.036);
-  const rightEye = makeFaceDot(eyeMat, 0.115, 1.56, 0.314, 0.036);
-  visual.add(leftEye, rightEye);
-
-  const blackLeft = makeFaceDot(blackEyeMat.clone(), -0.115, 1.51, 0.318, 0.078);
-  const blackRight = makeFaceDot(blackEyeMat.clone(), 0.115, 1.51, 0.318, 0.078);
-  visual.add(blackLeft, blackRight);
-
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.026, 0.012), lipMat.clone());
-  mouth.position.set(0, 1.43, 0.33);
-  visual.add(mouth);
-
-  const leftArm = new THREE.Group();
-  const rightArm = new THREE.Group();
-  const armGeo = new THREE.CapsuleGeometry(0.07, 0.46, 3, 8);
-  const armL = new THREE.Mesh(armGeo, skinMat);
-  const armR = new THREE.Mesh(armGeo, skinMat);
-  armL.position.y = -0.24;
-  armR.position.y = -0.24;
-  leftArm.add(armL);
-  rightArm.add(armR);
-  leftArm.position.set(-0.39, 1.06, 0.02);
-  rightArm.position.set(0.39, 1.06, 0.02);
-  leftArm.rotation.z = 0.38;
-  rightArm.rotation.z = -0.38;
-  leftArm.castShadow = true;
-  rightArm.castShadow = true;
-  visual.add(leftArm, rightArm);
-
-  const legGeo = new THREE.CapsuleGeometry(0.08, 0.42, 3, 8);
-  const leftLeg = new THREE.Mesh(legGeo, pantsMat);
-  const rightLeg = new THREE.Mesh(legGeo, pantsMat);
-  leftLeg.position.set(-0.14, 0.27, 0);
-  rightLeg.position.set(0.14, 0.27, 0);
-  leftLeg.castShadow = true;
-  rightLeg.castShadow = true;
-  visual.add(leftLeg, rightLeg);
-
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.48, 24),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false }),
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.02;
-  group.add(shadow);
-
-  group.userData = {
-    visual,
-    body,
-    leftArm,
-    rightArm,
-    leftLeg,
-    rightLeg,
-    blackMarks: [blackLeft, blackRight],
-    lipMarks: [mouth],
-    baseArmRotations: {
-      leftZ: leftArm.rotation.z,
-      rightZ: rightArm.rotation.z,
-    },
-    colors: [options.body, options.pants, 0xf0b88c, options.hair],
-  };
-
-  return { group };
-}
-
-function makeFaceDot(material, x, y, z, radius) {
-  const dot = new THREE.Mesh(new THREE.CircleGeometry(radius, 16), material);
-  dot.position.set(x, y, z);
-  return dot;
 }
 
 function tick() {
@@ -1202,7 +1253,6 @@ function tick() {
     animateCheer(dt);
   }
 
-  updatePunchEffects(dt);
   updateParticles(dt);
   updateShake(dt);
   renderer.render(scene, camera);
@@ -1231,7 +1281,7 @@ function updatePlayer(dt) {
   if (moving) {
     player.group.position.x += playerInputVel.x * player.speed * dt;
     player.group.position.z += playerInputVel.y * player.speed * dt;
-    clampToWorld(player.group.position);
+    clampActorPosition(player.group.position);
     const targetRotation = Math.atan2(playerInputVel.x, playerInputVel.y);
     player.group.rotation.y = lerpAngle(player.group.rotation.y, targetRotation, 0.24);
   }
@@ -1390,7 +1440,13 @@ function updateLovers(dt) {
 }
 
 function randomMeetingPoint() {
-  return new THREE.Vector3(randomRange(-5.5, 5.5), 0, randomRange(-4.5, 5.8));
+  let point;
+  let tries = 0;
+  do {
+    point = new THREE.Vector3(randomRange(-5.5, 5.5), 0, randomRange(-4.5, 5.8));
+    tries += 1;
+  } while (tries < 30 && collidesWithObstacle(point));
+  return point;
 }
 
 function setBlackEye(npc, intensity) {
@@ -1427,7 +1483,7 @@ function updateWander(npc, dt) {
   npc.walking = true;
   npc.group.position.x += npc.velocity.x * NPC_SPEED * dt;
   npc.group.position.z += npc.velocity.y * NPC_SPEED * dt;
-  clampToWorld(npc.group.position);
+  clampActorPosition(npc.group.position);
 
   if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.2) npc.velocity.x *= -1;
   if (Math.abs(npc.group.position.z) >= WORLD_LIMIT - 0.2) npc.velocity.y *= -1;
@@ -1453,7 +1509,7 @@ function moveNpcToward(npc, waypoint, speed, dt) {
   scratchVec3.normalize();
   npc.group.position.x += scratchVec3.x * speed * dt;
   npc.group.position.z += scratchVec3.z * speed * dt;
-  clampToWorld(npc.group.position);
+  clampActorPosition(npc.group.position);
   const targetRotation = Math.atan2(scratchVec3.x, scratchVec3.z);
   npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.12);
   npc.walking = true;
@@ -1548,8 +1604,8 @@ function pushApart(a, b, minDistance, strength) {
   a.z += nz * push;
   b.x -= nx * push;
   b.z -= nz * push;
-  clampToWorld(a);
-  clampToWorld(b);
+  clampActorPosition(a);
+  clampActorPosition(b);
 }
 
 function triggerAttack() {
@@ -1559,7 +1615,6 @@ function triggerAttack() {
   punchTier += 1;
   punchResetTimer = PUNCH_RESET_DELAY;
   player.punchTimer = 0.26;
-  createPunchEffect();
   sfxPunch();
 
   const hit = findHitTarget();
@@ -1640,34 +1695,6 @@ function isFacingTarget(facing, toTarget) {
 
 function getFacingVector(rotationY) {
   return new THREE.Vector2(Math.sin(rotationY), Math.cos(rotationY));
-}
-
-function createPunchEffect() {
-  const facing = getFacingVector(player.group.rotation.y);
-  const mesh = new THREE.Mesh(
-    new THREE.TorusGeometry(0.36, 0.035, 8, 32, Math.PI * 1.25),
-    new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95 }),
-  );
-  mesh.rotation.x = Math.PI / 2;
-  mesh.rotation.z = -player.group.rotation.y + 0.6;
-  mesh.position.set(player.group.position.x + facing.x * 0.74, 0.22, player.group.position.z + facing.y * 0.74);
-  scene.add(mesh);
-  punchEffects.push({ mesh, life: 0.22, maxLife: 0.22 });
-}
-
-function updatePunchEffects(dt) {
-  for (let i = punchEffects.length - 1; i >= 0; i -= 1) {
-    const effect = punchEffects[i];
-    effect.life -= dt;
-    effect.mesh.scale.multiplyScalar(1 + dt * 4.2);
-    effect.mesh.material.opacity = Math.max(0, effect.life / effect.maxLife);
-    if (effect.life <= 0) {
-      scene.remove(effect.mesh);
-      effect.mesh.geometry.dispose();
-      effect.mesh.material.dispose();
-      punchEffects.splice(i, 1);
-    }
-  }
 }
 
 function dissolveNpc(npc) {
