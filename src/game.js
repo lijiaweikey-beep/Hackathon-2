@@ -3,6 +3,7 @@ import {
   initMultiplayer,
   syncPosition,
   syncPunch,
+  syncHp,
   syncGameState,
   syncGuestReady,
   clearGuestReady,
@@ -24,6 +25,13 @@ const PLAYER_SPEED = 3;
 const NPC_SPEED = 3;
 const ROUND_SECONDS = 90;
 const ATTEMPTS = 3;
+const DUEL_NPC_COUNT = 40;
+const DUEL_HP = 3;
+const NPC_KNIFE_MIN = 5;
+const NPC_KNIFE_MAX = 10;
+const NPC_KNIFE_RANGE = 1.65;
+const NPC_KNIFE_SWING = 0.42;
+const HIT_INVULN = 0.55;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
 const ACTOR_COLLISION_RADIUS = 0.38;
 
@@ -53,6 +61,23 @@ const LEVELS = [
     success: "精准命中，图书馆恢复了该有的安静。",
     failure: "这对情侣亲爽了",
     lighting: "library",
+  },
+  {
+    id: "library_duel",
+    mapId: "library",
+    sceneName: "图书馆决斗",
+    emoji: "⚔️",
+    cardDesc: "在挥刀人群中击败对手",
+    mission: "图书馆里挤满了挥刀的读者，击败你的对手！",
+    hudMission: "击败对手，同时躲避 NPC 的挥刀攻击",
+    clue: "NPC 每 5–10 秒随机挥刀一次，靠近会很危险",
+    hudClue: "NPC 随机挥刀 · 击败对手获胜",
+    targetDesc: "对手",
+    difficulty: 3,
+    success: "你击败了对手，图书馆归于“平静”。",
+    failure: "你被击败了",
+    lighting: "library",
+    duelMode: true,
   },
   {
     id: "temple",
@@ -111,6 +136,10 @@ const ui = {
   mpStatusText: document.querySelector("#mpStatusText"),
   mpLinkInput: document.querySelector("#mpLinkInput"),
   mpCopyBtn: document.querySelector("#mpCopyBtn"),
+  duelLobbyPanel: document.querySelector("#duelLobbyPanel"),
+  soloModeStack: document.querySelector("#soloModeStack"),
+  duelStartBtn: document.querySelector("#duelStartBtn"),
+  attemptLabel: document.querySelector("#attemptLabel"),
   joystick: document.querySelector("#joystick"),
   joystickKnob: document.querySelector("#joystickKnob"),
   attackButton: document.querySelector("#attackButton"),
@@ -128,6 +157,7 @@ let guestReady = false;
 let guestConfirmed = false;
 let stateRevision = 0;
 let lastRemoteStateRevision = -1;
+let gameMode = "duel";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
@@ -186,6 +216,14 @@ function renderTargetPreview(level) {
     const npc = createNpc(0, { gamingTarget: true });
     setBlackEye(npc, 1);
     previewScene.add(npc.group);
+  } else if (level.duelMode) {
+    const local = createLowPolyPerson(LOW_POLY_PLAYER_PALETTE);
+    const remote = createLowPolyPerson(LOW_POLY_REMOTE_PALETTE);
+    local.group.position.set(-0.5, 0, 0);
+    remote.group.position.set(0.5, 0, 0);
+    local.group.rotation.y = 0.4;
+    remote.group.rotation.y = -0.4;
+    previewScene.add(local.group, remote.group);
   } else if (level.id === "library") {
     // 情侣：两个人面对面
     const a = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
@@ -287,8 +325,32 @@ function onNpcCountInputChange() {
 }
 
 /* ---- 关卡选择 ---- */
+function getDuelLevelIndex() {
+  return LEVELS.findIndex((level) => level.duelMode);
+}
+
+function isDuelLevel(level = levelState?.level) {
+  return Boolean(level?.duelMode);
+}
+
+function isDuelActive() {
+  return gameMode === "duel" || isDuelLevel();
+}
+
 function canHostPickLevel() {
   return !isConnected() || (getIsHost() && mpStatus === "connected");
+}
+
+function updateDuelLobbyUI() {
+  const inDuel = gameMode === "duel";
+  if (ui.duelLobbyPanel) ui.duelLobbyPanel.hidden = !inDuel;
+  if (ui.soloModeStack) ui.soloModeStack.hidden = inDuel;
+
+  if (!inDuel || !ui.duelStartBtn) return;
+
+  const showStart = isConnected() && getIsHost() && mpStatus === "connected" && gameStatus === "levelSelect";
+  ui.duelStartBtn.style.display = showStart ? "" : "none";
+  ui.duelStartBtn.disabled = !showStart;
 }
 
 function buildLevelCards() {
@@ -342,7 +404,8 @@ function showLevelSelect() {
     pushGameState({ phase: "lobby", levelIndex: null, started: false });
   }
   syncNpcCountInput();
-  buildLevelCards();
+  if (gameMode === "duel") updateDuelLobbyUI();
+  else buildLevelCards();
   updateMpUI();
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
@@ -360,7 +423,7 @@ function updateMpUI() {
       ui.mpCopyBtn.style.display = "none";
       if (gameStatus === "levelSelect") {
         ui.mpStatusText.textContent = mpStatus === "connected"
-          ? "✅ 已加入房间，等待房主选择关卡..."
+          ? "✅ 已加入房间，等待队长开始对战..."
           : "🔗 正在加入房间...";
       } else {
         ui.mpStatusText.textContent = "✅ 已加入对战";
@@ -370,7 +433,9 @@ function updateMpUI() {
       ui.mpLinkInput.style.display = "";
       ui.mpCopyBtn.style.display = "";
       if (mpStatus === "connected") {
-        ui.mpStatusText.textContent = "✅ 选手已加入！请选择关卡";
+        ui.mpStatusText.textContent = gameMode === "duel"
+          ? "✅ 选手已加入！点击「开始对战」"
+          : "✅ 选手已加入！请选择关卡";
         ui.mpStatusText.style.color = "#4ade80";
       } else {
         ui.mpStatusText.textContent = "🔗 等待选手加入...（请分享下方链接）";
@@ -383,6 +448,7 @@ function updateMpUI() {
     ui.mpLinkInput.style.display = "";
     ui.mpCopyBtn.style.display = "";
   }
+  updateDuelLobbyUI();
 }
 
 function pushGameState(extra = {}) {
@@ -390,9 +456,10 @@ function pushGameState(extra = {}) {
   stateRevision += 1;
   syncGameState({
     revision: stateRevision,
+    mode: gameMode,
     phase: gameStatus === "levelSelect" ? "lobby" : gameStatus === "playing" ? "playing" : "briefing",
     levelIndex: gameStatus === "levelSelect" ? null : currentLevelIndex,
-    npcCount: matchNpcCount,
+    npcCount: isDuelActive() ? DUEL_NPC_COUNT : matchNpcCount,
     started: gameStatus === "playing",
     ...extra,
   });
@@ -404,12 +471,14 @@ function applyRemoteGameState(state) {
   if (state.revision != null && state.revision <= lastRemoteStateRevision) return;
   if (state.revision != null) lastRemoteStateRevision = state.revision;
 
+  if (state.mode) gameMode = state.mode;
+
   if (state.phase === "lobby" || state.levelIndex == null) {
     if (gameStatus !== "levelSelect") showLevelSelect();
     return;
   }
 
-  if (state.npcCount != null) {
+  if (state.npcCount != null && state.mode !== "duel") {
     matchNpcCount = clampNpcCount(state.npcCount);
     syncNpcCountInput();
     saveMatchNpcCount();
@@ -443,11 +512,11 @@ function updateTaskMpUI() {
   ui.taskMpHint.hidden = false;
 
   if (getIsHost()) {
-    ui.startButton.textContent = "开始行动";
+    ui.startButton.textContent = isDuelActive() ? "开始决斗" : "开始行动";
     ui.startButton.disabled = !guestReady;
     ui.taskMpHint.textContent = guestReady
       ? "✅ 选手已确认，可以开始对战"
-      : "⏳ 等待选手阅读任务并点击「确认就绪」";
+      : "⏳ 等待选手阅读规则并点击「确认就绪」";
   } else {
     ui.startButton.textContent = guestConfirmed ? "已确认" : "确认就绪";
     ui.startButton.disabled = guestConfirmed;
@@ -463,20 +532,32 @@ function createMpCallbacks() {
       if (remotePlayer) {
         remotePlayer.group.position.set(data.x, 0, data.z);
         remotePlayer.group.rotation.y = data.rotation || 0;
+        if (data.hp != null) {
+          remotePlayer.hp = data.hp;
+          if (isDuelActive() && data.hp <= 0 && gameStatus === "playing") {
+            gameStatus = "settling";
+            window.setTimeout(() => finishRound(true), 500);
+          }
+        }
       }
     },
-    onRemotePunch() {
+    onRemotePunch(data) {
       if (remotePlayer) remotePlayer.punchTimer = 0.26;
+      if (isDuelActive() && data?.hit) {
+        applyPlayerDamage(1, "对手出拳");
+      }
     },
     onRemoteWin() {
       if (gameStatus === "playing" || gameStatus === "settling") {
         gameStatus = "settling";
-        window.setTimeout(() => finishRound(false, "对手先命中目标！"), 400);
+        const msg = isDuelActive() ? "对手将你击败！" : "对手先命中目标！";
+        window.setTimeout(() => finishRound(false, msg), 400);
       }
     },
     onGuestJoined() {
       mpStatus = "connected";
-      buildLevelCards();
+      if (gameMode === "duel") updateDuelLobbyUI();
+      else buildLevelCards();
       updateMpUI();
       // 仅当房主已选关时才同步，避免把默认关卡 0 推给选手
       if (gameStatus !== "levelSelect") {
@@ -485,7 +566,8 @@ function createMpCallbacks() {
     },
     onRoomReady() {
       mpStatus = "connected";
-      buildLevelCards();
+      if (gameMode === "duel") updateDuelLobbyUI();
+      else buildLevelCards();
       updateMpUI();
     },
     onGuestReady() {
@@ -510,11 +592,17 @@ function selectLevel(index) {
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
   pushGameState({
+    mode: gameMode,
     phase: "briefing",
     levelIndex: index,
-    npcCount: matchNpcCount,
+    npcCount: isDuelLevel(LEVELS[index]) ? DUEL_NPC_COUNT : matchNpcCount,
     started: false,
   });
+}
+
+function startDuelBriefing() {
+  if (gameMode !== "duel" || !canHostPickLevel()) return;
+  selectLevel(getDuelLevelIndex());
 }
 
 const input = {
@@ -692,6 +780,7 @@ function setupUi() {
     gameStatus = "playing";
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
+    if (isDuelActive()) syncHp(player.hp);
     pushGameState({ phase: "playing", started: true });
   });
 
@@ -739,6 +828,8 @@ function setupUi() {
     mpStatus = "waiting";
     updateMpUI();
   });
+
+  ui.duelStartBtn?.addEventListener("click", () => startDuelBriefing());
 
   ui.mpCopyBtn.addEventListener("click", () => {
     const link = getShareLink();
@@ -872,26 +963,32 @@ function resetLevel(index) {
   playerInputVel.set(0, 0);
   gameStatus = "briefing";
 
+  const duel = isDuelLevel(level);
   levelState = {
     level,
-    remaining: ROUND_SECONDS,
-    attempts: ATTEMPTS,
+    remaining: duel ? 9999 : ROUND_SECONDS,
+    attempts: duel ? DUEL_HP : ATTEMPTS,
     computers: [],
     pair: null,
     startTime: 0,
     obstacles: [],
+    playerHp: DUEL_HP,
+    hitInvuln: 0,
   };
 
   buildWorld(level);
   player = createPlayer();
-  player.group.position.copy(randomOpenPosition());
+  player.hp = duel ? DUEL_HP : ATTEMPTS;
+  player.hitInvuln = 0;
+  player.group.position.copy(duel ? duelSpawnPosition(true) : randomOpenPosition());
   scene.add(player.group);
 
   // 创建对手角色（多人模式）
   remotePlayer = null;
   if (isConnected()) {
     remotePlayer = createRemotePlayer();
-    remotePlayer.group.position.set(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+    remotePlayer.hp = DUEL_HP;
+    remotePlayer.group.position.copy(duel ? duelSpawnPosition(false) : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8)));
     scene.add(remotePlayer.group);
   }
 
@@ -902,14 +999,15 @@ function resetLevel(index) {
 
 function showTask() {
   const level = levelState.level;
+  const duel = isDuelLevel(level);
   ui.taskEmoji.textContent = level.emoji;
   ui.taskTitle.textContent = level.sceneName;
   ui.taskCopy.textContent = level.mission;
   ui.taskClue.textContent = "🔍 " + level.clue;
-  ui.taskNpcCount.textContent = getMatchNpcCount();
-  ui.taskTime.textContent = ROUND_SECONDS;
-  ui.taskAttempts.textContent = ATTEMPTS;
-  ui.targetLabel.textContent = level.targetDesc;
+  ui.taskNpcCount.textContent = duel ? DUEL_NPC_COUNT : getMatchNpcCount();
+  ui.taskTime.textContent = duel ? "∞" : ROUND_SECONDS;
+  ui.taskAttempts.textContent = duel ? DUEL_HP : ATTEMPTS;
+  ui.targetLabel.textContent = duel ? "对手" : level.targetDesc;
   ui.levelSelectModal.classList.remove("visible");
   ui.taskModal.classList.add("visible");
   ui.resultModal.classList.remove("visible");
@@ -947,7 +1045,8 @@ function buildWorld(level) {
   sun.shadow.camera.bottom = -16;
   scene.add(sun);
 
-  const floorTex = getCachedTexture(textureCache.floor, level.id, () => makeFloorTexture(level.id));
+  const mapId = level.mapId || level.id;
+  const floorTex = getCachedTexture(textureCache.floor, mapId, () => makeFloorTexture(mapId));
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(28, 28),
     new THREE.MeshStandardMaterial({
@@ -962,7 +1061,7 @@ function buildWorld(level) {
 
   if (level.id === "gaming") {
     buildGamingRoom();
-  } else if (level.id === "library") {
+  } else if (level.id === "library" || level.mapId === "library") {
     buildLibrary();
   } else {
     buildTempleCourtyard();
@@ -1435,6 +1534,11 @@ function addWall(x, z, rotationY, material) {
 }
 
 function spawnNpcs(level) {
+  if (level.duelMode) {
+    spawnDuelNpcs();
+    return;
+  }
+
   if (level.id === "gaming") {
     const target = createNpc(0, { gamingTarget: true });
     const computer = levelState.computers[2];
@@ -1515,6 +1619,142 @@ function addWanderNpc(id) {
   npc.walking = false;
   npcs.push(npc);
   scene.add(npc.group);
+}
+
+function spawnDuelNpcs() {
+  for (let i = 0; i < DUEL_NPC_COUNT; i += 1) {
+    const npc = createNpc(i, { duelKnife: true });
+    const pos = randomOpenPosition();
+    npc.group.position.set(pos.x, 0, pos.z);
+    nudgeActorFromObstacles(npc);
+    npc.wanderTimer = randomRange(0.6, 2.2);
+    npc.pauseTimer = randomRange(0.2, 1.3);
+    npc.walking = false;
+    npc.knifeTimer = randomRange(NPC_KNIFE_MIN, NPC_KNIFE_MAX);
+    npc.knifeSwing = 0;
+    npc.knifeHitDone = false;
+    attachKnifeToNpc(npc);
+    npcs.push(npc);
+    scene.add(npc.group);
+  }
+}
+
+function attachKnifeToNpc(npc) {
+  const ud = npc.group.userData;
+  if (!ud?.rightArm) return;
+  const knife = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.24, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.7, roughness: 0.35 }),
+  );
+  knife.position.set(0.02, -0.34, 0.1);
+  knife.rotation.x = -0.4;
+  ud.rightArm.add(knife);
+  ud.knife = knife;
+}
+
+function duelSpawnPosition(isLocal) {
+  const fakeNpc = { group: { position: new THREE.Vector3(isLocal ? -4.2 : 4.2, 0, 0) } };
+  nudgeActorFromObstacles(fakeNpc);
+  return fakeNpc.group.position.clone();
+}
+
+function updateDuelNpcKnife(npc, dt) {
+  if (npc.knifeSwing > 0) {
+    npc.knifeSwing = Math.max(0, npc.knifeSwing - dt);
+    const swingT = 1 - npc.knifeSwing / NPC_KNIFE_SWING;
+    if (!npc.knifeHitDone && swingT > 0.42 && swingT < 0.72) {
+      npc.knifeHitDone = true;
+      tryNpcKnifeHit(npc);
+    }
+    if (npc.knifeSwing <= 0) {
+      npc.knifeTimer = randomRange(NPC_KNIFE_MIN, NPC_KNIFE_MAX);
+      npc.knifeHitDone = false;
+    }
+    return;
+  }
+
+  npc.knifeTimer -= dt;
+  if (npc.knifeTimer <= 0) {
+    npc.knifeSwing = NPC_KNIFE_SWING;
+    npc.knifeHitDone = false;
+    npc.walking = false;
+    npc.pauseTimer = NPC_KNIFE_SWING;
+  }
+}
+
+function animateNpcKnifePose(npc, dt) {
+  const ud = npc.group.userData;
+  if (!ud?.rightArm) return;
+  if (npc.knifeSwing > 0) {
+    const t = 1 - npc.knifeSwing / NPC_KNIFE_SWING;
+    const swing = Math.sin(t * Math.PI);
+    ud.rightArm.rotation.x = -1.5 * swing;
+    ud.rightArm.rotation.z = ud.baseArmRotations.rightZ - 0.9 * swing;
+  }
+}
+
+function tryNpcKnifeHit(npc) {
+  const npcPos = npc.group.position;
+  const facing = getFacingVector(npc.group.rotation.y);
+  const targets = [player];
+  if (remotePlayer) targets.push(remotePlayer);
+
+  targets.forEach((actor) => {
+    if (!actor?.group || actor.hp <= 0) return;
+    const toTarget = new THREE.Vector2(
+      actor.group.position.x - npcPos.x,
+      actor.group.position.z - npcPos.z,
+    );
+    if (toTarget.length() > NPC_KNIFE_RANGE || !isFacingTarget(facing, toTarget)) return;
+    if (actor === player) {
+      applyPlayerDamage(1, "NPC 挥刀");
+    }
+  });
+}
+
+function applyPlayerDamage(amount, reason) {
+  if (gameStatus !== "playing" || !isDuelActive()) return;
+  if (player.hitInvuln > 0 || player.hp <= 0) return;
+
+  player.hitInvuln = HIT_INVULN;
+  player.hp = Math.max(0, player.hp - amount);
+  levelState.playerHp = player.hp;
+  levelState.attempts = player.hp;
+  updateHud();
+  triggerShake(0.18, 0.12);
+  sfxMiss();
+  syncHp(player.hp);
+
+  if (player.hp <= 0) {
+    gameStatus = "settling";
+    window.setTimeout(() => finishRound(false, reason || "你被击败了"), 500);
+  }
+}
+
+function tryPvpHit() {
+  if (!remotePlayer?.group || remotePlayer.hp <= 0) return false;
+  const playerPos = player.group.position;
+  const toRemote = new THREE.Vector2(
+    remotePlayer.group.position.x - playerPos.x,
+    remotePlayer.group.position.z - playerPos.z,
+  );
+  const facing = getFacingVector(player.group.rotation.y);
+  if (toRemote.length() > HIT_RANGE || !isFacingTarget(facing, toRemote)) return false;
+
+  remotePlayer.hp = Math.max(0, (remotePlayer.hp ?? DUEL_HP) - 1);
+  syncPunch(
+    player.group.position.x,
+    player.group.position.z,
+    player.group.rotation.y,
+    { hit: true },
+  );
+
+  if (remotePlayer.hp <= 0) {
+    gameStatus = "settling";
+    syncWin({ reason: "pvp" });
+    window.setTimeout(() => finishRound(true), 500);
+  }
+  return true;
 }
 
 /* ---- 替身 NPC 系统 ---- */
@@ -1955,10 +2195,13 @@ function tick() {
   totalTime += dt;
 
   if (gameStatus === "playing") {
-    levelState.remaining = Math.max(0, levelState.remaining - dt);
-    if (levelState.remaining <= 0) {
-      finishRound(false);
+    if (!isDuelActive()) {
+      levelState.remaining = Math.max(0, levelState.remaining - dt);
+      if (levelState.remaining <= 0) {
+        finishRound(false);
+      }
     }
+    if (player.hitInvuln > 0) player.hitInvuln = Math.max(0, player.hitInvuln - dt);
     updatePlayer(dt);
     updateNpcs(dt);
     updateHud();
@@ -2076,6 +2319,17 @@ function updateRemotePlayerAnim(dt) {
 }
 
 function updateNpcs(dt) {
+  if (isDuelLevel()) {
+    npcs.forEach((npc) => {
+      if (!npc.alive) return;
+      updateWander(npc, dt);
+      updateDuelNpcKnife(npc, dt);
+      animateActor(npc, dt, npc.walking);
+      animateNpcKnifePose(npc, dt);
+    });
+    return;
+  }
+
   if (levelState.level.id === "gaming") {
     updateGamingTarget(dt);
   } else if (levelState.level.id === "library") {
@@ -2501,6 +2755,18 @@ function triggerAttack() {
   player.punchTimer = 0.26;
   sfxPunch();
 
+  if (isDuelActive()) {
+    const pvpHit = tryPvpHit();
+    if (pvpHit) {
+      triggerHitstop(0.06);
+      triggerShake(0.22, 0.14);
+      sfxHit();
+    } else if (isConnected()) {
+      syncPunch(player.group.position.x, player.group.position.z, player.group.rotation.y);
+    }
+    return;
+  }
+
   // 同步出拳事件给对手
   if (isConnected()) {
     syncPunch(player.group.position.x, player.group.position.z, player.group.rotation.y);
@@ -2648,15 +2914,23 @@ function finishRound(won, failMessage) {
   if (won) sfxWin(); else sfxLose();
 
   const timeUsed = Math.round(totalTime - levelState.startTime);
-  const attemptsLeft = levelState.attempts;
-  const rating = calcRating(won, timeUsed, attemptsLeft);
+  const attemptsLeft = isDuelActive() ? player.hp : levelState.attempts;
+  const rating = isDuelActive()
+    ? { grade: won ? "S" : "F", rating: won ? 100 : 0 }
+    : calcRating(won, timeUsed, attemptsLeft);
 
-  ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
-  ui.resultCopy.textContent = won ? levelState.level.success : (failMessage || levelState.level.failure);
+  ui.resultTitle.textContent = isDuelActive()
+    ? (won ? "决斗胜利" : "决斗失败")
+    : (won ? "任务成功" : "任务失败");
+  ui.resultCopy.textContent = won
+    ? levelState.level.success
+    : (failMessage || levelState.level.failure);
   ui.resultRating.textContent = rating.grade;
   ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
   ui.statTime.textContent = timeUsed + " 秒";
-  ui.statAttempts.textContent = attemptsLeft + " 次";
+  ui.statAttempts.textContent = isDuelActive()
+    ? (won ? "对手 HP 归零" : `剩余 ${attemptsLeft} 生命`)
+    : `${attemptsLeft} 次`;
 
   ui.resultModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
@@ -2675,11 +2949,15 @@ function finishRound(won, failMessage) {
 }
 
 function updateHud() {
+  const duel = isDuelActive();
   ui.sceneName.textContent = levelState.level.sceneName;
   ui.missionText.textContent = levelState.level.hudMission || levelState.level.mission;
-  ui.timerText.textContent = Math.ceil(levelState.remaining).toString();
-  ui.attemptText.textContent = levelState.attempts.toString();
-  ui.clueBar.textContent = "🔍 " + (levelState.level.hudClue || levelState.level.clue);
+  ui.timerText.textContent = duel ? "∞" : Math.ceil(levelState.remaining).toString();
+  ui.attemptLabel.textContent = duel ? "生命" : "出拳";
+  ui.attemptText.textContent = duel ? String(player.hp ?? levelState.playerHp) : levelState.attempts.toString();
+  ui.clueBar.textContent = duel
+    ? `⚔️ 击败对手 · 对手 HP ${remotePlayer?.hp ?? "?"} · 躲避 NPC 挥刀`
+    : "🔍 " + (levelState.level.hudClue || levelState.level.clue);
 
   // 出拳冷却动画
   if (punchCooldown > 0 && punchCooldownMax > 0) {

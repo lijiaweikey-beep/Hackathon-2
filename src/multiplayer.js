@@ -202,10 +202,18 @@ export function syncPosition(x, z, rotation) {
 /**
  * 同步出拳事件
  */
-export function syncPunch(x, z, rotation) {
+export function syncPunch(x, z, rotation, extra = {}) {
   if (!roomId) return;
   const punchRef = ref(db, `rooms/${roomId}/${playerId}Punch`);
-  set(punchRef, { x, z, rotation, t: serverTimestamp() });
+  set(punchRef, { x, z, rotation, ...extra, t: serverTimestamp() });
+}
+
+/**
+ * 同步当前生命值
+ */
+export function syncHp(hp) {
+  if (!myRef) return;
+  update(myRef, { hp });
 }
 
 /**

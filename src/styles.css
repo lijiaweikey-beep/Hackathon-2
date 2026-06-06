@@ -757,6 +757,45 @@ button {
   }
 }
 
+/* ---- 双人决斗大厅 ---- */
+.duel-lobby-panel {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  border-radius: 12px;
+  background: rgba(45, 212, 191, 0.06);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.duel-lobby-title {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.duel-lobby-desc {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.duel-lobby-rules {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.duel-start-btn {
+  margin-bottom: 10px;
+  border-color: rgba(45, 212, 191, 0.45);
+  background: rgba(45, 212, 191, 0.12);
+}
+
 /* ---- 多人联机 ---- */
 .mp-section {
   margin-top: 20px;
