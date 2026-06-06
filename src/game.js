@@ -30,7 +30,8 @@ const NPC_SPEED = 3;
 const ROUND_SECONDS = 90;
 const ATTEMPTS = 3;
 const DUEL_NPC_COUNT = 40;
-const DUEL_HP = 3;
+const DUEL_PLAYER_HP = 5;
+const DUEL_NPC_HP = 3;
 const PUNCH_SWING = 0.32;
 const NPC_PUNCH_INTERVAL = 10;
 const NPC_PUNCH_RANGE = 1.65;
@@ -93,7 +94,7 @@ const LEVELS = [
     mission: "图书馆里挤满了出拳的读者，击败你的对手！",
     hudMission: "击败对手，同时躲避 NPC 的拳头",
     clue: "NPC 每 10 秒挥拳一次；每 1.5 分钟需到集合圈报到，否则扣 1 滴血",
-    hudClue: "NPC 每 10 秒挥拳 · 1.5 分钟集合 · 所有人 3 滴血",
+    hudClue: "NPC 每 10 秒挥拳 · 1.5 分钟集合 · 双方各 5 滴血",
     targetDesc: "对手",
     difficulty: 3,
     success: "你击败了对手，图书馆归于“平静”。",
@@ -442,7 +443,7 @@ function isDuelActive() {
   return ["briefing", "playing", "paused", "settling"].includes(gameStatus);
 }
 
-function formatHearts(hp, max = DUEL_HP) {
+function formatHearts(hp, max = DUEL_PLAYER_HP) {
   const safe = Math.max(0, Math.min(max, Number(hp) || 0));
   let out = "";
   for (let i = 0; i < max; i += 1) {
@@ -512,7 +513,7 @@ function collectDuelSnapshot() {
     duelNpcs: npcs.map((n) => ({
       x: n.group.position.x,
       z: n.group.position.z,
-      hp: n.hp ?? DUEL_HP,
+      hp: n.hp ?? DUEL_NPC_HP,
       alive: n.alive,
       punchDelay: n.punchDelay ?? NPC_PUNCH_INTERVAL,
       punchTimer: n.punchTimer ?? 0,
@@ -779,7 +780,7 @@ function applyDuelSnapshot(snapshot, options = {}) {
       if (!npc) return;
       npc.group.position.set(data.x, 0, data.z);
       clampToWorld(npc.group.position);
-      npc.hp = data.hp ?? DUEL_HP;
+      npc.hp = data.hp ?? DUEL_NPC_HP;
       npc.alive = data.alive !== false;
       npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
       npc.punchTimer = data.punchTimer ?? 0;
@@ -840,7 +841,7 @@ function applyRemoteGameState(state) {
       duelSpawns: state.duelSpawns,
       duelNpcs: state.duelNpcs,
       elapsed: 0,
-      playerHp: state.guestHp ?? DUEL_HP,
+      playerHp: state.guestHp ?? DUEL_PLAYER_HP,
       skipBriefing: false,
     });
     updateMpUI();
@@ -1482,12 +1483,12 @@ function resetLevel(index, options = {}) {
   levelState = {
     level,
     remaining: duel ? 9999 : ROUND_SECONDS,
-    attempts: duel ? DUEL_HP : ATTEMPTS,
+    attempts: duel ? DUEL_PLAYER_HP : ATTEMPTS,
     computers: [],
     pair: null,
     startTime: 0,
     obstacles: [],
-    playerHp: options.playerHp ?? DUEL_HP,
+    playerHp: options.playerHp ?? DUEL_PLAYER_HP,
     hitInvuln: 0,
     worldSeed,
     duelSpawns: null,
@@ -1510,7 +1511,7 @@ function resetLevel(index, options = {}) {
   removeGatherMarker();
 
   player = createPlayer();
-  player.hp = duel ? (options.playerHp ?? DUEL_HP) : ATTEMPTS;
+  player.hp = duel ? (options.playerHp ?? DUEL_PLAYER_HP) : ATTEMPTS;
   player.hitInvuln = 0;
   player.group.position.copy(duel ? duelActorSpawn(true) : randomOpenPosition());
   scene.add(player.group);
@@ -1519,7 +1520,7 @@ function resetLevel(index, options = {}) {
   remotePlayer = null;
   if (isConnected()) {
     remotePlayer = createRemotePlayer();
-    remotePlayer.hp = DUEL_HP;
+    remotePlayer.hp = DUEL_PLAYER_HP;
     const remoteSpawn = duel
       ? duelActorSpawn(false)
       : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(PLAY_Z_MIN + 0.8, 7.8));
@@ -1553,7 +1554,7 @@ function updateTaskAttemptsChip(duel) {
   const chip = document.querySelector("#taskAttemptsChip");
   if (!chip) return;
   if (duel) {
-    chip.innerHTML = `生命 <span id="taskAttempts" class="hearts-display">${formatHearts(DUEL_HP)}</span>`;
+    chip.innerHTML = `生命 <span id="taskAttempts" class="hearts-display">${formatHearts(DUEL_PLAYER_HP)}</span>`;
   } else {
     chip.innerHTML = `🥊 <span id="taskAttempts">${ATTEMPTS}</span> 次机会`;
   }
@@ -2225,7 +2226,7 @@ function spawnDuelNpcs() {
     npc.wanderTimer = randomRange(0.6, 2.2);
     npc.pauseTimer = randomRange(0.2, 1.3);
     npc.walking = false;
-    npc.hp = DUEL_HP;
+    npc.hp = DUEL_NPC_HP;
     npc.canPunch = punchers.has(i);
     npc.punchDelay = NPC_PUNCH_INTERVAL * ((i % 12) / 12);
     npc.punchTimer = 0;
@@ -2242,7 +2243,7 @@ function spawnDuelNpcsFromSnapshot(snapshot) {
   snapshot.duelNpcs.forEach((data, i) => {
     const npc = createNpc(i, { duelPunch: true });
     npc.group.position.set(data.x, 0, data.z);
-    npc.hp = data.hp ?? DUEL_HP;
+    npc.hp = data.hp ?? DUEL_NPC_HP;
     npc.alive = data.alive !== false;
     npc.canPunch = punchers.has(i);
     npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
@@ -2741,7 +2742,7 @@ function findDuelPunchTarget() {
 function damageRemotePlayer() {
   if (!remotePlayer?.group || remotePlayer.hp <= 0) return false;
   if (isConnected()) return true;
-  remotePlayer.hp = Math.max(0, (remotePlayer.hp ?? DUEL_HP) - 1);
+  remotePlayer.hp = Math.max(0, (remotePlayer.hp ?? DUEL_PLAYER_HP) - 1);
 
   if (remotePlayer.hp <= 0) {
     dissolveActor(remotePlayer);
@@ -2752,7 +2753,7 @@ function damageRemotePlayer() {
 
 function damageDuelNpc(npc) {
   if (!npc?.alive || npc.hp <= 0) return false;
-  npc.hp = Math.max(0, (npc.hp ?? DUEL_HP) - 1);
+  npc.hp = Math.max(0, (npc.hp ?? DUEL_NPC_HP) - 1);
   if (npc.hp <= 0) {
     dissolveNpc(npc);
   }
@@ -4069,7 +4070,7 @@ function updateHud() {
   ui.clueBar.textContent = duel
     ? (() => {
         const gatherHint = getDuelGatherHudHint();
-        const base = `生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_HP)}`;
+        const base = `生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_PLAYER_HP)}`;
         return gatherHint ? `${gatherHint} · ${base}` : `⚔️ ${base} · 每 1.5 分钟需到集合圈报到`;
       })()
     : "🔍 " + (levelState.level.hudClue || levelState.level.clue);
