@@ -7,6 +7,7 @@ import {
   syncGameState,
   syncGuestReady,
   clearGuestReady,
+  clearRoundSignals,
   getShareLink,
   getIsHost,
   isConnected,
@@ -27,10 +28,10 @@ const ROUND_SECONDS = 90;
 const ATTEMPTS = 3;
 const DUEL_NPC_COUNT = 40;
 const DUEL_HP = 3;
-const NPC_KNIFE_MIN = 5;
-const NPC_KNIFE_MAX = 10;
-const NPC_KNIFE_RANGE = 1.65;
-const NPC_KNIFE_SWING = 0.42;
+const NPC_PUNCH_MIN = 5;
+const NPC_PUNCH_MAX = 10;
+const NPC_PUNCH_RANGE = 1.65;
+const NPC_PUNCH_SWING = 0.42;
 const HIT_INVULN = 0.55;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
 const ACTOR_COLLISION_RADIUS = 0.38;
@@ -67,11 +68,11 @@ const LEVELS = [
     mapId: "library",
     sceneName: "图书馆决斗",
     emoji: "⚔️",
-    cardDesc: "在挥刀人群中击败对手",
-    mission: "图书馆里挤满了挥刀的读者，击败你的对手！",
-    hudMission: "击败对手，同时躲避 NPC 的挥刀攻击",
-    clue: "NPC 每 5–10 秒随机挥刀一次，靠近会很危险",
-    hudClue: "NPC 随机挥刀 · 击败对手获胜",
+    cardDesc: "在出拳人群中击败对手",
+    mission: "图书馆里挤满了出拳的读者，击败你的对手！",
+    hudMission: "击败对手，同时躲避 NPC 的拳头",
+    clue: "NPC 每 5–10 秒随机挥拳一次，靠近会很危险；所有人都有 3 滴血",
+    hudClue: "NPC 随机挥拳 · 所有人 3 滴血 · 击败对手获胜",
     targetDesc: "对手",
     difficulty: 3,
     success: "你击败了对手，图书馆归于“平静”。",
@@ -162,6 +163,10 @@ let guestReady = false;
 let guestConfirmed = false;
 let stateRevision = 0;
 let lastRemoteStateRevision = -1;
+let duelRoundId = 0;
+let localEventSeq = 0;
+let lastRemotePunchId = null;
+let lastRemoteWinId = null;
 let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
@@ -394,6 +399,19 @@ function isDuelActive() {
   return isDuelLevel() || (gameMode === "duel" && isConnected());
 }
 
+function nextDuelRoundId() {
+  duelRoundId += 1;
+  lastRemotePunchId = null;
+  lastRemoteWinId = null;
+  if (isConnected()) clearRoundSignals();
+  return duelRoundId;
+}
+
+function nextLocalEventId(type) {
+  localEventSeq += 1;
+  return `${type}-${duelRoundId}-${localEventSeq}`;
+}
+
 function hasRoomInUrl() {
   return Boolean(new URLSearchParams(window.location.search).get("room"));
 }
@@ -411,6 +429,9 @@ function leaveDuelLobby() {
   mpStatus = "none";
   guestReady = false;
   guestConfirmed = false;
+  duelRoundId = 0;
+  lastRemotePunchId = null;
+  lastRemoteWinId = null;
   remotePlayer = null;
   showLevelSelect();
 }
@@ -566,6 +587,7 @@ function pushGameState(extra = {}) {
     phase: gameStatus === "levelSelect" ? "lobby" : gameStatus === "playing" ? "playing" : "briefing",
     levelIndex: gameStatus === "levelSelect" ? null : currentLevelIndex,
     npcCount: isDuelActive() ? DUEL_NPC_COUNT : matchNpcCount,
+    roundId: duelRoundId,
     started: gameStatus === "playing",
     ...extra,
   });
@@ -590,9 +612,17 @@ function applyRemoteGameState(state) {
     saveMatchNpcCount();
   }
 
+  const remoteRoundId = state.roundId ?? 0;
+  const roundChanged = remoteRoundId !== duelRoundId;
   const levelChanged = state.levelIndex !== currentLevelIndex;
 
-  if (levelChanged) {
+  if (state.mode === "duel" && roundChanged) {
+    duelRoundId = remoteRoundId;
+    lastRemotePunchId = null;
+    lastRemoteWinId = null;
+  }
+
+  if (levelChanged || (state.mode === "duel" && roundChanged)) {
     guestConfirmed = false;
     resetLevel(state.levelIndex);
     updateMpUI();
@@ -641,6 +671,7 @@ function createMpCallbacks() {
         if (data.hp != null) {
           remotePlayer.hp = data.hp;
           if (isDuelActive() && data.hp <= 0 && gameStatus === "playing") {
+            dissolveActor(remotePlayer);
             gameStatus = "settling";
             window.setTimeout(() => finishRound(true), 500);
           }
@@ -648,12 +679,19 @@ function createMpCallbacks() {
       }
     },
     onRemotePunch(data) {
+      if (!data) return;
+      if (isDuelActive() && data.roundId !== duelRoundId) return;
+      if (data.punchId && data.punchId === lastRemotePunchId) return;
+      if (data.punchId) lastRemotePunchId = data.punchId;
       if (remotePlayer) remotePlayer.punchTimer = 0.26;
       if (isDuelActive() && data?.hit) {
         applyPlayerDamage(1, "对手出拳");
       }
     },
-    onRemoteWin() {
+    onRemoteWin(data) {
+      if (isDuelActive() && data?.roundId !== duelRoundId) return;
+      if (data?.winId && data.winId === lastRemoteWinId) return;
+      if (data?.winId) lastRemoteWinId = data.winId;
       if (gameStatus === "playing" || gameStatus === "settling") {
         gameStatus = "settling";
         const msg = isDuelActive() ? "对手将你击败！" : "对手先命中目标！";
@@ -694,6 +732,7 @@ function selectLevel(index) {
   guestReady = false;
   guestConfirmed = false;
   if (isConnected() && getIsHost()) clearGuestReady();
+  if (isConnected() && getIsHost() && isDuelLevel(LEVELS[index])) nextDuelRoundId();
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
   pushGameState({
@@ -701,6 +740,7 @@ function selectLevel(index) {
     phase: "briefing",
     levelIndex: index,
     npcCount: isDuelLevel(LEVELS[index]) ? DUEL_NPC_COUNT : matchNpcCount,
+    roundId: duelRoundId,
     started: false,
   });
 }
@@ -885,7 +925,7 @@ function setupUi() {
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
     if (isDuelActive()) syncHp(player.hp);
-    pushGameState({ phase: "playing", started: true });
+    pushGameState({ phase: "playing", started: true, roundId: duelRoundId });
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -912,11 +952,13 @@ function setupUi() {
   });
 
   ui.retryButton.addEventListener("click", () => {
+    if (isConnected() && !getIsHost()) return;
+    if (isConnected() && getIsHost() && isDuelActive()) nextDuelRoundId();
     resetLevel(currentLevelIndex);
     if (isConnected() && getIsHost()) {
       guestReady = false;
       clearGuestReady();
-      pushGameState({ phase: "briefing", started: false });
+      pushGameState({ phase: "briefing", started: false, roundId: duelRoundId });
     }
   });
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
@@ -1089,6 +1131,7 @@ function resetLevel(index) {
   player.hitInvuln = 0;
   player.group.position.copy(duel ? duelSpawnPosition(true) : randomOpenPosition());
   scene.add(player.group);
+  if (duel && isConnected()) syncHp(player.hp);
 
   // 创建对手角色（多人模式）
   remotePlayer = null;
@@ -1118,6 +1161,8 @@ function showTask() {
   ui.levelSelectModal.classList.remove("visible");
   ui.taskModal.classList.add("visible");
   ui.resultModal.classList.remove("visible");
+  ui.retryButton.disabled = false;
+  ui.retryButton.textContent = "再来一局";
 
   // 渲染 3D 目标预览
   renderTargetPreview(level);
@@ -1730,33 +1775,20 @@ function addWanderNpc(id) {
 
 function spawnDuelNpcs() {
   for (let i = 0; i < DUEL_NPC_COUNT; i += 1) {
-    const npc = createNpc(i, { duelKnife: true });
+    const npc = createNpc(i, { duelPunch: true });
     const pos = randomOpenPosition();
     npc.group.position.set(pos.x, 0, pos.z);
     nudgeActorFromObstacles(npc);
     npc.wanderTimer = randomRange(0.6, 2.2);
     npc.pauseTimer = randomRange(0.2, 1.3);
     npc.walking = false;
-    npc.knifeTimer = randomRange(NPC_KNIFE_MIN, NPC_KNIFE_MAX);
-    npc.knifeSwing = 0;
-    npc.knifeHitDone = false;
-    attachKnifeToNpc(npc);
+    npc.hp = DUEL_HP;
+    npc.punchDelay = randomRange(NPC_PUNCH_MIN, NPC_PUNCH_MAX);
+    npc.punchTimer = 0;
+    npc.punchHitDone = false;
     npcs.push(npc);
     scene.add(npc.group);
   }
-}
-
-function attachKnifeToNpc(npc) {
-  const ud = npc.group.userData;
-  if (!ud?.rightArm) return;
-  const knife = new THREE.Mesh(
-    new THREE.BoxGeometry(0.05, 0.24, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.7, roughness: 0.35 }),
-  );
-  knife.position.set(0.02, -0.34, 0.1);
-  knife.rotation.x = -0.4;
-  ud.rightArm.add(knife);
-  ud.knife = knife;
 }
 
 function duelSpawnPosition(isLocal) {
@@ -1765,42 +1797,43 @@ function duelSpawnPosition(isLocal) {
   return fakeNpc.group.position.clone();
 }
 
-function updateDuelNpcKnife(npc, dt) {
-  if (npc.knifeSwing > 0) {
-    npc.knifeSwing = Math.max(0, npc.knifeSwing - dt);
-    const swingT = 1 - npc.knifeSwing / NPC_KNIFE_SWING;
-    if (!npc.knifeHitDone && swingT > 0.42 && swingT < 0.72) {
-      npc.knifeHitDone = true;
-      tryNpcKnifeHit(npc);
+function updateDuelNpcPunch(npc, dt) {
+  if (npc.punchTimer > 0) {
+    npc.punchTimer = Math.max(0, npc.punchTimer - dt);
+    const punchT = 1 - npc.punchTimer / NPC_PUNCH_SWING;
+    if (!npc.punchHitDone && punchT > 0.42 && punchT < 0.72) {
+      npc.punchHitDone = true;
+      tryNpcPunchHit(npc);
     }
-    if (npc.knifeSwing <= 0) {
-      npc.knifeTimer = randomRange(NPC_KNIFE_MIN, NPC_KNIFE_MAX);
-      npc.knifeHitDone = false;
+    if (npc.punchTimer <= 0) {
+      npc.punchDelay = randomRange(NPC_PUNCH_MIN, NPC_PUNCH_MAX);
+      npc.punchHitDone = false;
     }
     return;
   }
 
-  npc.knifeTimer -= dt;
-  if (npc.knifeTimer <= 0) {
-    npc.knifeSwing = NPC_KNIFE_SWING;
-    npc.knifeHitDone = false;
+  npc.punchDelay -= dt;
+  if (npc.punchDelay <= 0) {
+    npc.punchTimer = NPC_PUNCH_SWING;
+    npc.punchHitDone = false;
     npc.walking = false;
-    npc.pauseTimer = NPC_KNIFE_SWING;
+    npc.pauseTimer = NPC_PUNCH_SWING;
   }
 }
 
-function animateNpcKnifePose(npc, dt) {
+function animateNpcPunchPose(npc) {
   const ud = npc.group.userData;
   if (!ud?.rightArm) return;
-  if (npc.knifeSwing > 0) {
-    const t = 1 - npc.knifeSwing / NPC_KNIFE_SWING;
+  if (npc.punchTimer > 0) {
+    const t = 1 - npc.punchTimer / NPC_PUNCH_SWING;
     const swing = Math.sin(t * Math.PI);
     ud.rightArm.rotation.x = -1.5 * swing;
-    ud.rightArm.rotation.z = ud.baseArmRotations.rightZ - 0.9 * swing;
+    ud.rightArm.rotation.z = ud.baseArmRotations.rightZ - 0.72 * swing;
+    ud.leftArm.rotation.z = ud.baseArmRotations.leftZ + 0.22 * swing;
   }
 }
 
-function tryNpcKnifeHit(npc) {
+function tryNpcPunchHit(npc) {
   const npcPos = npc.group.position;
   const facing = getFacingVector(npc.group.rotation.y);
   const targets = [player];
@@ -1812,9 +1845,9 @@ function tryNpcKnifeHit(npc) {
       actor.group.position.x - npcPos.x,
       actor.group.position.z - npcPos.z,
     );
-    if (toTarget.length() > NPC_KNIFE_RANGE || !isFacingTarget(facing, toTarget)) return;
+    if (toTarget.length() > NPC_PUNCH_RANGE || !isFacingTarget(facing, toTarget)) return;
     if (actor === player) {
-      applyPlayerDamage(1, "NPC 挥刀");
+      applyPlayerDamage(1, "NPC 出拳");
     }
   });
 }
@@ -1833,33 +1866,58 @@ function applyPlayerDamage(amount, reason) {
   syncHp(player.hp);
 
   if (player.hp <= 0) {
+    dissolveActor(player);
     gameStatus = "settling";
     window.setTimeout(() => finishRound(false, reason || "你被击败了"), 500);
   }
 }
 
-function tryPvpHit() {
-  if (!remotePlayer?.group || remotePlayer.hp <= 0) return false;
+function findDuelPunchTarget() {
   const playerPos = player.group.position;
-  const toRemote = new THREE.Vector2(
-    remotePlayer.group.position.x - playerPos.x,
-    remotePlayer.group.position.z - playerPos.z,
-  );
   const facing = getFacingVector(player.group.rotation.y);
-  if (toRemote.length() > HIT_RANGE || !isFacingTarget(facing, toRemote)) return false;
+  let best = null;
+  let bestDistance = Infinity;
 
+  function testTarget(type, actor) {
+    if (!actor?.group || actor.group.visible === false || actor.hp <= 0) return;
+    const toTarget = new THREE.Vector2(
+      actor.group.position.x - playerPos.x,
+      actor.group.position.z - playerPos.z,
+    );
+    const distance = toTarget.length();
+    if (distance > HIT_RANGE || !isFacingTarget(facing, toTarget)) return;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = { type, actor };
+    }
+  }
+
+  testTarget("remote", remotePlayer);
+  npcs.forEach((npc) => {
+    if (npc.alive) testTarget("npc", npc);
+  });
+
+  return best;
+}
+
+function damageRemotePlayer() {
+  if (!remotePlayer?.group || remotePlayer.hp <= 0) return false;
   remotePlayer.hp = Math.max(0, (remotePlayer.hp ?? DUEL_HP) - 1);
-  syncPunch(
-    player.group.position.x,
-    player.group.position.z,
-    player.group.rotation.y,
-    { hit: true },
-  );
 
   if (remotePlayer.hp <= 0) {
+    dissolveActor(remotePlayer);
     gameStatus = "settling";
-    syncWin({ reason: "pvp" });
+    syncWin({ reason: "pvp", roundId: duelRoundId, winId: nextLocalEventId("win") });
     window.setTimeout(() => finishRound(true), 500);
+  }
+  return true;
+}
+
+function damageDuelNpc(npc) {
+  if (!npc?.alive || npc.hp <= 0) return false;
+  npc.hp = Math.max(0, (npc.hp ?? DUEL_HP) - 1);
+  if (npc.hp <= 0) {
+    dissolveNpc(npc);
   }
   return true;
 }
@@ -2430,9 +2488,9 @@ function updateNpcs(dt) {
     npcs.forEach((npc) => {
       if (!npc.alive) return;
       updateWander(npc, dt);
-      updateDuelNpcKnife(npc, dt);
+      updateDuelNpcPunch(npc, dt);
       animateActor(npc, dt, npc.walking);
-      animateNpcKnifePose(npc, dt);
+      animateNpcPunchPose(npc);
     });
     return;
   }
@@ -2863,13 +2921,25 @@ function triggerAttack() {
   sfxPunch();
 
   if (isDuelActive()) {
-    const pvpHit = tryPvpHit();
-    if (pvpHit) {
+    const hit = findDuelPunchTarget();
+    const remoteHit = hit?.type === "remote" ? damageRemotePlayer() : false;
+    const npcHit = hit?.type === "npc" ? damageDuelNpc(hit.actor) : false;
+    if (isConnected()) {
+      syncPunch(
+        player.group.position.x,
+        player.group.position.z,
+        player.group.rotation.y,
+        {
+          roundId: duelRoundId,
+          punchId: nextLocalEventId("punch"),
+          hit: remoteHit,
+        },
+      );
+    }
+    if (remoteHit || npcHit) {
       triggerHitstop(0.06);
       triggerShake(0.22, 0.14);
       sfxHit();
-    } else if (isConnected()) {
-      syncPunch(player.group.position.x, player.group.position.z, player.group.rotation.y);
     }
     return;
   }
@@ -2965,9 +3035,14 @@ function getFacingVector(rotationY) {
 
 function dissolveNpc(npc) {
   if (!npc || !npc.alive) return;
-  npc.alive = false;
-  npc.group.visible = false;
-  createPixelBurst(npc);
+  dissolveActor(npc);
+}
+
+function dissolveActor(actor) {
+  if (!actor?.group || actor.group.visible === false) return;
+  actor.alive = false;
+  actor.group.visible = false;
+  createPixelBurst(actor);
 }
 
 function createPixelBurst(npc) {
@@ -3039,6 +3114,10 @@ function finishRound(won, failMessage) {
     ? (won ? "对手 HP 归零" : `剩余 ${attemptsLeft} 生命`)
     : `${attemptsLeft} 次`;
 
+  const guestWaitingForRetry = isDuelActive() && isConnected() && !getIsHost();
+  ui.retryButton.disabled = guestWaitingForRetry;
+  ui.retryButton.textContent = guestWaitingForRetry ? "等待房主再来" : "再来一局";
+
   ui.resultModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
 
@@ -3063,7 +3142,7 @@ function updateHud() {
   ui.attemptLabel.textContent = duel ? "生命" : "出拳";
   ui.attemptText.textContent = duel ? String(player.hp ?? levelState.playerHp) : levelState.attempts.toString();
   ui.clueBar.textContent = duel
-    ? `⚔️ 击败对手 · 对手 HP ${remotePlayer?.hp ?? "?"} · 躲避 NPC 挥刀`
+    ? `⚔️ 击败对手 · 对手 HP ${remotePlayer?.hp ?? "?"} · 躲避 NPC 拳头`
     : "🔍 " + (levelState.level.hudClue || levelState.level.clue);
 
   // 出拳冷却动画

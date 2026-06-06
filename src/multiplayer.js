@@ -86,6 +86,7 @@ function createRoom() {
   // 清空上一局残留状态，避免新选手读到旧关卡
   set(ref(db, `rooms/${roomId}/gameState`), null);
   set(ref(db, `rooms/${roomId}/guestReady`), false);
+  clearRoundSignals();
 
   // 写入主机信息
   set(myRef, { x: 0, z: 0, rotation: 0, joinedAt: serverTimestamp() });
@@ -250,6 +251,17 @@ export function syncWin(data) {
   if (!roomId) return;
   const winRef = ref(db, `rooms/${roomId}/${playerId}Win`);
   set(winRef, { ...data, t: serverTimestamp() });
+}
+
+/**
+ * 清理当前房间的出拳/胜利残留信号，避免同房间下一局读到上一局事件
+ */
+export function clearRoundSignals() {
+  if (!roomId) return;
+  set(ref(db, `rooms/${roomId}/hostPunch`), null);
+  set(ref(db, `rooms/${roomId}/guestPunch`), null);
+  set(ref(db, `rooms/${roomId}/hostWin`), null);
+  set(ref(db, `rooms/${roomId}/guestWin`), null);
 }
 
 /**
