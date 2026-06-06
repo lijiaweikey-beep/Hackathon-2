@@ -3,15 +3,13 @@ import {
   getDatabase,
   ref,
   set,
+  get,
   onValue,
   onDisconnect,
-  push,
   update,
   serverTimestamp,
 } from "firebase/database";
 
-// ⚠️ 替换为你自己的 Firebase 配置
-// 去 https://console.firebase.google.com 创建项目 → 项目设置 → 添加 Web 应用 → 拿到配置
 const firebaseConfig = {
   apiKey: "AIzaSyBoejQvZ_A8pkoW4ok7lVYGhyBElQVY-mc",
   authDomain: "hackathon-2-6b4aa.firebaseapp.com",
@@ -20,11 +18,14 @@ const firebaseConfig = {
   storageBucket: "hackathon-2-6b4aa.firebasestorage.app",
   messagingSenderId: "550616375056",
   appId: "1:550616375056:web:fb184f7622a1864c930f95",
-  measurementId: "G-6GNCSW3N0G"
+  measurementId: "G-6GNCSW3N0G",
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
+const HOST_ROOM_KEY = "nightAction_hostRoom";
+const CLIENT_ID_KEY = "nightAction_clientId";
 
 let roomId = null;
 let playerId = null;
@@ -39,66 +40,53 @@ let onGuestJoined = null;
 let onRoomReady = null;
 let onGameState = null;
 let onGuestReady = null;
+let onRemoteLeft = null;
+let onJoinFailed = null;
 
-/**
- * 初始化多人联机
- * @param {object} callbacks
- * @param {function} callbacks.onRemoteUpdate - 收到对手位置更新 {x, z, rotation}
- * @param {function} callbacks.onRemotePunch - 收到对手出拳事件
- * @param {function} callbacks.onRemoteWin - 收到对手胜利事件
- * @param {function} callbacks.onGuestJoined - (host) 客人加入房间
- * @param {function} callbacks.onRoomReady - 房间就绪（两人到齐）
- * @param {function} callbacks.onGameState - (guest) 收到游戏初始状态
- * @param {function} callbacks.onGuestReady - (host) 选手确认就绪
- */
-export function initMultiplayer(callbacks) {
-  onRemoteUpdate = callbacks.onRemoteUpdate || null;
-  onRemotePunch = callbacks.onRemotePunch || null;
-  onRemoteWin = callbacks.onRemoteWin || null;
-  onGuestJoined = callbacks.onGuestJoined || null;
-  onRoomReady = callbacks.onRoomReady || null;
-  onGameState = callbacks.onGameState || null;
-  onGuestReady = callbacks.onGuestReady || null;
-
-  const params = new URLSearchParams(window.location.search);
-  const existingRoom = params.get("room");
-
-  if (existingRoom) {
-    joinRoom(existingRoom);
-  } else {
-    createRoom();
+function getOrCreateClientId() {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_KEY);
+    if (!id) {
+      id = `c_${Math.random().toString(36).slice(2, 11)}_${Date.now().toString(36)}`;
+      localStorage.setItem(CLIENT_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return `c_${Math.random().toString(36).slice(2, 11)}`;
   }
 }
 
-function createRoom() {
-  isHost = true;
-  playerId = "host";
-  roomId = generateRoomId();
+function getStoredHostRoom() {
+  try {
+    return localStorage.getItem(HOST_ROOM_KEY);
+  } catch {
+    return null;
+  }
+}
 
-  // 更新 URL（不刷新页面）
-  const url = new URL(window.location);
-  url.searchParams.set("room", roomId);
-  window.history.replaceState({}, "", url);
+function setStoredHostRoom(id) {
+  try {
+    localStorage.setItem(HOST_ROOM_KEY, id);
+  } catch { /* ignore */ }
+}
 
-  roomRef = ref(db, `rooms/${roomId}`);
-  myRef = ref(db, `rooms/${roomId}/host`);
+export function clearStoredHostRoom() {
+  try {
+    localStorage.removeItem(HOST_ROOM_KEY);
+  } catch { /* ignore */ }
+}
 
-  // 清空上一局残留状态，避免新选手读到旧关卡
-  set(ref(db, `rooms/${roomId}/gameState`), null);
-  set(ref(db, `rooms/${roomId}/guestReady`), false);
-  clearRoundSignals();
+function shouldRejoinAsHost(existingRoom, roleParam) {
+  if (roleParam === "host") return true;
+  return getStoredHostRoom() === existingRoom;
+}
 
-  // 写入主机信息
-  set(myRef, { x: 0, z: 0, rotation: 0, joinedAt: serverTimestamp() });
-
-  // 断线清理
-  onDisconnect(roomRef).remove();
-
-  // 等待客人加入
+function bindHostListeners() {
   const guestRef = ref(db, `rooms/${roomId}/guest`);
   let guestJoinNotified = false;
-  const unsub = onValue(guestRef, (snap) => {
+  const unsubGuest = onValue(guestRef, (snap) => {
     if (!snap.exists()) {
+      if (guestJoinNotified && onRemoteLeft) onRemoteLeft("guest");
       guestJoinNotified = false;
       return;
     }
@@ -108,154 +96,261 @@ function createRoom() {
       if (onRoomReady) onRoomReady();
     }
   });
-  unsubscribes.push(unsub);
+  unsubscribes.push(unsubGuest);
 
-  // 监听客人位置
   listenRemote("guest");
 
-  // 监听客人胜利
   const winRef = ref(db, `rooms/${roomId}/guestWin`);
-  const unsubWin = onValue(winRef, (snap) => {
+  unsubscribes.push(onValue(winRef, (snap) => {
     const data = snap.val();
     if (data && onRemoteWin) onRemoteWin(data);
-  });
-  unsubscribes.push(unsubWin);
+  }));
 
-  // 监听选手确认就绪
   const readyRef = ref(db, `rooms/${roomId}/guestReady`);
-  const unsubReady = onValue(readyRef, (snap) => {
+  unsubscribes.push(onValue(readyRef, (snap) => {
     if (snap.val() === true && onGuestReady) onGuestReady();
-  });
-  unsubscribes.push(unsubReady);
+  }));
 }
 
-function joinRoom(id) {
+function bindGuestListeners() {
+  listenRemote("host");
+
+  const stateRef = ref(db, `rooms/${roomId}/gameState`);
+  unsubscribes.push(onValue(stateRef, (snap) => {
+    const data = snap.val();
+    if (data && onGameState) onGameState(data);
+  }));
+
+  const winRef = ref(db, `rooms/${roomId}/hostWin`);
+  unsubscribes.push(onValue(winRef, (snap) => {
+    const data = snap.val();
+    if (data && onRemoteWin) onRemoteWin(data);
+  }));
+
+  const hostRef = ref(db, `rooms/${roomId}/host`);
+  let hostSeen = false;
+  unsubscribes.push(onValue(hostRef, (snap) => {
+    if (snap.exists()) {
+      hostSeen = true;
+      return;
+    }
+    if (hostSeen && onRemoteLeft) onRemoteLeft("host");
+    hostSeen = false;
+  }));
+}
+
+/**
+ * 初始化多人联机
+ */
+export async function initMultiplayer(callbacks) {
+  onRemoteUpdate = callbacks.onRemoteUpdate || null;
+  onRemotePunch = callbacks.onRemotePunch || null;
+  onRemoteWin = callbacks.onRemoteWin || null;
+  onGuestJoined = callbacks.onGuestJoined || null;
+  onRoomReady = callbacks.onRoomReady || null;
+  onGameState = callbacks.onGameState || null;
+  onGuestReady = callbacks.onGuestReady || null;
+  onRemoteLeft = callbacks.onRemoteLeft || null;
+  onJoinFailed = callbacks.onJoinFailed || null;
+
+  const params = new URLSearchParams(window.location.search);
+  const existingRoom = params.get("room");
+  const roleParam = params.get("role");
+
+  if (existingRoom && shouldRejoinAsHost(existingRoom, roleParam)) {
+    await rejoinAsHost(existingRoom);
+  } else if (existingRoom) {
+    await joinRoom(existingRoom);
+  } else {
+    createRoom();
+  }
+}
+
+function createRoom() {
+  isHost = true;
+  playerId = "host";
+  roomId = generateRoomId();
+  setStoredHostRoom(roomId);
+
+  const url = new URL(window.location);
+  url.searchParams.set("room", roomId);
+  url.searchParams.set("role", "host");
+  window.history.replaceState({}, "", url);
+
+  roomRef = ref(db, `rooms/${roomId}`);
+  myRef = ref(db, `rooms/${roomId}/host`);
+
+  set(ref(db, `rooms/${roomId}/gameState`), null);
+  set(ref(db, `rooms/${roomId}/guestReady`), false);
+  clearRoundSignals();
+
+  set(myRef, {
+    x: 0,
+    z: 0,
+    rotation: 0,
+    clientId: getOrCreateClientId(),
+    joinedAt: serverTimestamp(),
+  });
+
+  onDisconnect(roomRef).remove();
+  bindHostListeners();
+}
+
+async function rejoinAsHost(id) {
+  isHost = true;
+  playerId = "host";
+  roomId = id;
+  setStoredHostRoom(roomId);
+
+  const url = new URL(window.location);
+  url.searchParams.set("room", roomId);
+  url.searchParams.set("role", "host");
+  window.history.replaceState({}, "", url);
+
+  roomRef = ref(db, `rooms/${roomId}`);
+  myRef = ref(db, `rooms/${roomId}/host`);
+
+  const hostSnap = await get(myRef);
+  if (!hostSnap.exists()) {
+    set(ref(db, `rooms/${roomId}/gameState`), null);
+    set(ref(db, `rooms/${roomId}/guestReady`), false);
+    clearRoundSignals();
+  }
+
+  set(myRef, {
+    x: hostSnap.val()?.x ?? 0,
+    z: hostSnap.val()?.z ?? 0,
+    rotation: hostSnap.val()?.rotation ?? 0,
+    hp: hostSnap.val()?.hp,
+    clientId: getOrCreateClientId(),
+    joinedAt: serverTimestamp(),
+  });
+
+  onDisconnect(roomRef).remove();
+  bindHostListeners();
+
+  const guestSnap = await get(ref(db, `rooms/${roomId}/guest`));
+  if (guestSnap.exists()) {
+    if (onGuestJoined) onGuestJoined(guestSnap.val());
+    if (onRoomReady) onRoomReady();
+  }
+}
+
+async function joinRoom(id) {
+  const clientId = getOrCreateClientId();
+  const hostRef = ref(db, `rooms/${id}/host`);
+  const hostSnap = await get(hostRef);
+  if (!hostSnap.exists()) {
+    if (onJoinFailed) onJoinFailed("room_not_found");
+    return;
+  }
+
+  const guestRef = ref(db, `rooms/${id}/guest`);
+  const guestSnap = await get(guestRef);
+  if (guestSnap.exists() && guestSnap.val()?.clientId && guestSnap.val().clientId !== clientId) {
+    if (onJoinFailed) onJoinFailed("room_full");
+    return;
+  }
+
   isHost = false;
   playerId = "guest";
   roomId = id;
 
+  const url = new URL(window.location);
+  url.searchParams.set("room", roomId);
+  url.searchParams.delete("role");
+  window.history.replaceState({}, "", url);
+
   roomRef = ref(db, `rooms/${roomId}`);
   myRef = ref(db, `rooms/${roomId}/guest`);
 
-  // 写入客人信息
-  set(myRef, { x: 0, z: 0, rotation: 0, joinedAt: serverTimestamp() });
+  const prev = guestSnap.val();
+  set(myRef, {
+    x: prev?.x ?? 0,
+    z: prev?.z ?? 0,
+    rotation: prev?.rotation ?? 0,
+    hp: prev?.hp,
+    clientId,
+    joinedAt: serverTimestamp(),
+  });
 
-  // 断线清理（只清理自己的数据）
   onDisconnect(myRef).remove();
+  bindGuestListeners();
 
-  // 监听主机位置
-  listenRemote("host");
+  const stateSnap = await get(ref(db, `rooms/${roomId}/gameState`));
+  if (stateSnap.exists() && onGameState) onGameState(stateSnap.val());
 
-  // 监听游戏初始状态（NPC位置、目标等）
-  const stateRef = ref(db, `rooms/${roomId}/gameState`);
-  const unsubState = onValue(stateRef, (snap) => {
-    const data = snap.val();
-    if (data && onGameState) onGameState(data);
-  });
-  unsubscribes.push(unsubState);
-
-  // 监听对手胜利
-  const winRef = ref(db, `rooms/${roomId}/hostWin`);
-  const unsubWin = onValue(winRef, (snap) => {
-    const data = snap.val();
-    if (data && onRemoteWin) onRemoteWin(data);
-  });
-  unsubscribes.push(unsubWin);
-
-  // 通知就绪
   if (onRoomReady) onRoomReady();
 }
 
 function listenRemote(remoteId) {
   const remoteRef = ref(db, `rooms/${roomId}/${remoteId}`);
-  const unsub = onValue(remoteRef, (snap) => {
+  unsubscribes.push(onValue(remoteRef, (snap) => {
     const data = snap.val();
-    if (data && onRemoteUpdate) {
-      onRemoteUpdate(data);
-    }
-  });
-  unsubscribes.push(unsub);
+    if (data && onRemoteUpdate) onRemoteUpdate(data);
+  }));
 
-  // 监听对手出拳
   const punchRef = ref(db, `rooms/${roomId}/${remoteId}Punch`);
-  const unsubPunch = onValue(punchRef, (snap) => {
+  unsubscribes.push(onValue(punchRef, (snap) => {
     const data = snap.val();
-    if (data && onRemotePunch) {
-      onRemotePunch(data);
-    }
-  });
-  unsubscribes.push(unsubPunch);
+    if (data && onRemotePunch) onRemotePunch(data);
+  }));
 }
 
-/**
- * 同步本地玩家位置（每帧调用，内部节流到 ~20fps）
- */
 let lastSyncTime = 0;
+let lastSyncX = 0;
+let lastSyncZ = 0;
+let lastSyncRot = 0;
+
 export function syncPosition(x, z, rotation) {
   const now = performance.now();
-  if (now - lastSyncTime < 50) return; // 20fps
+  const moved = Math.hypot(x - lastSyncX, z - lastSyncZ) > 0.035;
+  const rotated = Math.abs(rotation - lastSyncRot) > 0.06;
+  if (now - lastSyncTime < 33 && !moved && !rotated) return;
   lastSyncTime = now;
+  lastSyncX = x;
+  lastSyncZ = z;
+  lastSyncRot = rotation;
 
   if (!myRef) return;
   update(myRef, { x, z, rotation });
 }
 
-/**
- * 同步出拳事件
- */
 export function syncPunch(x, z, rotation, extra = {}) {
   if (!roomId) return;
   const punchRef = ref(db, `rooms/${roomId}/${playerId}Punch`);
   set(punchRef, { x, z, rotation, ...extra, t: serverTimestamp() });
 }
 
-/**
- * 同步当前生命值
- */
 export function syncHp(hp) {
   if (!myRef) return;
   update(myRef, { hp });
 }
 
-/**
- * 同步游戏初始状态（host 调用，发送 NPC 位置等）
- */
 export function syncGameState(state) {
   if (!roomId || !isHost) return;
   const stateRef = ref(db, `rooms/${roomId}/gameState`);
   set(stateRef, state);
 }
 
-/**
- * 选手确认就绪
- */
 export function syncGuestReady(ready) {
   if (!roomId || isHost) return;
   const readyRef = ref(db, `rooms/${roomId}/guestReady`);
   set(readyRef, ready);
 }
 
-/**
- * 重置选手就绪状态（房主选关时调用）
- */
 export function clearGuestReady() {
   if (!roomId || !isHost) return;
   const readyRef = ref(db, `rooms/${roomId}/guestReady`);
   set(readyRef, false);
 }
 
-/**
- * 同步胜利事件
- */
 export function syncWin(data) {
   if (!roomId) return;
   const winRef = ref(db, `rooms/${roomId}/${playerId}Win`);
   set(winRef, { ...data, t: serverTimestamp() });
 }
 
-/**
- * 清理当前房间的出拳/胜利残留信号，避免同房间下一局读到上一局事件
- */
 export function clearRoundSignals() {
   if (!roomId) return;
   set(ref(db, `rooms/${roomId}/hostPunch`), null);
@@ -264,44 +359,31 @@ export function clearRoundSignals() {
   set(ref(db, `rooms/${roomId}/guestWin`), null);
 }
 
-/**
- * 获取分享链接
- */
 export function getShareLink() {
   const url = new URL(window.location);
   url.searchParams.set("room", roomId);
+  url.searchParams.delete("role");
   return url.toString();
 }
 
-/**
- * 是否房主
- */
 export function getIsHost() {
   return isHost;
 }
 
-/**
- * 是否已连接（有房间）
- */
 export function isConnected() {
   return roomId !== null;
 }
 
-/**
- * 获取房间 ID
- */
 export function getRoomId() {
   return roomId;
 }
 
-/**
- * 离开房间并清理连接
- */
 export function leaveRoom() {
   unsubscribes.forEach((unsub) => unsub());
   unsubscribes = [];
   if (isHost && roomRef) {
     set(roomRef, null);
+    clearStoredHostRoom();
   } else if (myRef) {
     set(myRef, null);
   }
@@ -311,6 +393,9 @@ export function leaveRoom() {
   roomRef = null;
   myRef = null;
   lastSyncTime = 0;
+  lastSyncX = 0;
+  lastSyncZ = 0;
+  lastSyncRot = 0;
 }
 
 /** @deprecated 使用 leaveRoom */
@@ -318,9 +403,6 @@ export function cleanup() {
   leaveRoom();
 }
 
-/**
- * 生成 6 位房间 ID
- */
 function generateRoomId() {
   const chars = "abcdefghjkmnpqrstuvwxyz23456789";
   let id = "";

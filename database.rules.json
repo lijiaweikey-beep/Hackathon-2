@@ -1,0 +1,19 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".read": true,
+        ".write": true,
+        "host": {
+          ".validate": "newData.hasChildren(['x', 'z', 'rotation'])"
+        },
+        "guest": {
+          ".validate": "newData.hasChildren(['x', 'z', 'rotation'])"
+        },
+        "gameState": {
+          ".validate": "newData.child('revision').isNumber()"
+        }
+      }
+    }
+  }
+}

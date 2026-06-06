@@ -12,6 +12,7 @@ import {
   getIsHost,
   isConnected,
   leaveRoom as mpLeaveRoom,
+  clearStoredHostRoom,
 } from "./multiplayer.js";
 
 const DEFAULT_NPC_COUNT = 20;
@@ -34,6 +35,8 @@ const NPC_PUNCH_RANGE = 1.65;
 const NPC_PUNCH_SWING = 0.42;
 const HIT_INVULN = 0.55;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
+const REMOTE_POS_LERP = 16; // 对手位置插值速度（越大越跟手）
+const REMOTE_SNAP_DIST = 2.2; // 偏差过大时直接瞬移，避免长时间拉扯
 const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
@@ -167,6 +170,9 @@ let duelRoundId = 0;
 let localEventSeq = 0;
 let lastRemotePunchId = null;
 let lastRemoteWinId = null;
+let settleTimer = null;
+let mpSnapshotTimer = 0;
+let duelRng = null;
 let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
@@ -396,7 +402,92 @@ function isDuelLevel(level = levelState?.level) {
 }
 
 function isDuelActive() {
-  return isDuelLevel() || (gameMode === "duel" && isConnected());
+  if (!isDuelLevel()) return false;
+  if (!isConnected()) return true;
+  return ["briefing", "playing", "paused", "settling"].includes(gameStatus);
+}
+
+function createSeededRng(seed) {
+  let t = (seed >>> 0) || 1;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function duelRandom() {
+  return duelRng ? duelRng() : Math.random();
+}
+
+function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
+  if (gameStatus === "won" || gameStatus === "lost" || gameStatus === "settling") return;
+  gameStatus = "settling";
+  if (settleTimer) window.clearTimeout(settleTimer);
+  settleTimer = window.setTimeout(() => {
+    settleTimer = null;
+    finishRound(won, failMessage);
+  }, delayMs);
+}
+
+function validatePvpHit(punchData, targetActor) {
+  if (!targetActor?.group || targetActor.hp <= 0) return false;
+  const playerPos = targetActor.group.position;
+  const toTarget = new THREE.Vector2(
+    playerPos.x - punchData.x,
+    playerPos.z - punchData.z,
+  );
+  const facing = getFacingVector(punchData.rotation ?? 0);
+  return toTarget.length() <= HIT_RANGE && isFacingTarget(facing, toTarget);
+}
+
+function collectDuelSnapshot() {
+  if (!isDuelLevel() || !levelState) return null;
+  return {
+    worldSeed: levelState.worldSeed,
+    elapsed: Math.max(0, totalTime - (levelState.startTime || 0)),
+    hostHp: getIsHost() ? player.hp : remotePlayer?.hp,
+    guestHp: getIsHost() ? remotePlayer?.hp : player.hp,
+    duelNpcs: npcs.map((n) => ({
+      x: n.group.position.x,
+      z: n.group.position.z,
+      hp: n.hp ?? DUEL_HP,
+      alive: n.alive,
+      punchDelay: n.punchDelay ?? NPC_PUNCH_MIN,
+      punchTimer: n.punchTimer ?? 0,
+    })),
+  };
+}
+
+function buildGameStatePayload(extra = {}) {
+  const payload = {
+    revision: stateRevision,
+    mode: gameMode,
+    phase: gameStatus === "levelSelect"
+      ? "lobby"
+      : gameStatus === "paused"
+        ? "paused"
+        : gameStatus === "playing"
+          ? "playing"
+          : "briefing",
+    levelIndex: gameStatus === "levelSelect" ? null : currentLevelIndex,
+    npcCount: isDuelActive() ? DUEL_NPC_COUNT : matchNpcCount,
+    roundId: duelRoundId,
+    started: gameStatus === "playing",
+    ...extra,
+  };
+  if (isConnected() && getIsHost() && isDuelLevel(levelState?.level) && gameStatus !== "levelSelect") {
+    const snap = collectDuelSnapshot();
+    if (snap) {
+      payload.worldSeed = snap.worldSeed;
+      payload.duelNpcs = snap.duelNpcs;
+      payload.elapsed = snap.elapsed;
+      payload.hostHp = snap.hostHp;
+      payload.guestHp = snap.guestHp;
+    }
+  }
+  return payload;
 }
 
 function nextDuelRoundId() {
@@ -419,12 +510,19 @@ function hasRoomInUrl() {
 function clearRoomFromUrl() {
   const url = new URL(window.location);
   url.searchParams.delete("room");
+  url.searchParams.delete("role");
   window.history.replaceState({}, "", url);
 }
 
 function leaveDuelLobby() {
   mpLeaveRoom();
+  clearStoredHostRoom();
   clearRoomFromUrl();
+  duelRng = null;
+  if (settleTimer) {
+    window.clearTimeout(settleTimer);
+    settleTimer = null;
+  }
   gameMode = "solo";
   mpStatus = "none";
   guestReady = false;
@@ -581,16 +679,46 @@ function updateMpUI() {
 function pushGameState(extra = {}) {
   if (!isConnected() || !getIsHost()) return;
   stateRevision += 1;
-  syncGameState({
-    revision: stateRevision,
-    mode: gameMode,
-    phase: gameStatus === "levelSelect" ? "lobby" : gameStatus === "playing" ? "playing" : "briefing",
-    levelIndex: gameStatus === "levelSelect" ? null : currentLevelIndex,
-    npcCount: isDuelActive() ? DUEL_NPC_COUNT : matchNpcCount,
-    roundId: duelRoundId,
-    started: gameStatus === "playing",
-    ...extra,
-  });
+  syncGameState(buildGameStatePayload(extra));
+}
+
+function applyDuelSnapshot(snapshot, options = {}) {
+  if (!snapshot?.duelNpcs?.length) return;
+  levelState.worldSeed = snapshot.worldSeed ?? levelState.worldSeed;
+  duelRng = createSeededRng(levelState.worldSeed);
+
+  if (options.respawnNpcs) {
+    npcs.forEach((n) => scene.remove(n.group));
+    npcs = [];
+    spawnDuelNpcsFromSnapshot(snapshot);
+  } else {
+    snapshot.duelNpcs.forEach((data, i) => {
+      const npc = npcs[i];
+      if (!npc) return;
+      npc.group.position.set(data.x, 0, data.z);
+      npc.hp = data.hp ?? DUEL_HP;
+      npc.alive = data.alive !== false;
+      npc.punchDelay = data.punchDelay ?? NPC_PUNCH_MIN;
+      npc.punchTimer = data.punchTimer ?? 0;
+      npc.group.visible = npc.alive;
+    });
+  }
+
+  if (snapshot.elapsed != null && levelState.startTime != null) {
+    totalTime = levelState.startTime + snapshot.elapsed;
+  }
+
+  const myHp = getIsHost() ? snapshot.hostHp : snapshot.guestHp;
+  if (myHp != null && player) {
+    player.hp = myHp;
+    levelState.playerHp = myHp;
+    levelState.attempts = myHp;
+  }
+  const remoteHp = getIsHost() ? snapshot.guestHp : snapshot.hostHp;
+  if (remoteHp != null && remotePlayer) {
+    remotePlayer.hp = remoteHp;
+  }
+  updateHud();
 }
 
 function applyRemoteGameState(state) {
@@ -615,6 +743,7 @@ function applyRemoteGameState(state) {
   const remoteRoundId = state.roundId ?? 0;
   const roundChanged = remoteRoundId !== duelRoundId;
   const levelChanged = state.levelIndex !== currentLevelIndex;
+  const midGameReconnect = state.started && scene && !levelChanged && !roundChanged;
 
   if (state.mode === "duel" && roundChanged) {
     duelRoundId = remoteRoundId;
@@ -624,14 +753,32 @@ function applyRemoteGameState(state) {
 
   if (levelChanged || (state.mode === "duel" && roundChanged)) {
     guestConfirmed = false;
-    resetLevel(state.levelIndex);
+    resetLevel(state.levelIndex, {
+      worldSeed: state.worldSeed,
+      duelNpcs: state.duelNpcs,
+      elapsed: state.started ? state.elapsed : 0,
+      playerHp: state.guestHp,
+      skipBriefing: state.started,
+    });
     updateMpUI();
     updateTaskMpUI();
+  } else if (midGameReconnect && state.duelNpcs) {
+    applyDuelSnapshot(state, { respawnNpcs: false });
+  } else if (state.duelNpcs && isDuelLevel() && gameStatus !== "levelSelect") {
+    applyDuelSnapshot(state, { respawnNpcs: false });
+  }
+
+  if (state.phase === "paused" && gameStatus === "playing") {
+    gameStatus = "paused";
+    ui.pauseModal.classList.add("visible");
+  } else if (state.phase === "playing" && gameStatus === "paused") {
+    gameStatus = "playing";
+    ui.pauseModal.classList.remove("visible");
   }
 
   if (state.started && gameStatus === "briefing") {
     gameStatus = "playing";
-    levelState.startTime = totalTime;
+    levelState.startTime = totalTime - (state.elapsed ?? 0);
     ui.taskModal.classList.remove("visible");
     updateMpUI();
   }
@@ -666,14 +813,34 @@ function createMpCallbacks() {
   return {
     onRemoteUpdate(data) {
       if (remotePlayer) {
-        remotePlayer.group.position.set(data.x, 0, data.z);
-        remotePlayer.group.rotation.y = data.rotation || 0;
+        const tx = data.x ?? remotePlayer.targetX ?? remotePlayer.group.position.x;
+        const tz = data.z ?? remotePlayer.targetZ ?? remotePlayer.group.position.z;
+        const tr = data.rotation ?? remotePlayer.targetRot ?? remotePlayer.group.rotation.y;
+        remotePlayer.targetX = tx;
+        remotePlayer.targetZ = tz;
+        remotePlayer.targetRot = tr;
+
+        if (!remotePlayer._netInit) {
+          remotePlayer.group.position.set(tx, 0, tz);
+          remotePlayer.group.rotation.y = tr;
+          remotePlayer._prevX = tx;
+          remotePlayer._prevZ = tz;
+          remotePlayer._netInit = true;
+        } else {
+          const dx = tx - remotePlayer.group.position.x;
+          const dz = tz - remotePlayer.group.position.z;
+          if (dx * dx + dz * dz > REMOTE_SNAP_DIST * REMOTE_SNAP_DIST) {
+            remotePlayer.group.position.set(tx, 0, tz);
+            remotePlayer.group.rotation.y = tr;
+            remotePlayer._prevX = tx;
+            remotePlayer._prevZ = tz;
+          }
+        }
         if (data.hp != null) {
           remotePlayer.hp = data.hp;
           if (isDuelActive() && data.hp <= 0 && gameStatus === "playing") {
             dissolveActor(remotePlayer);
-            gameStatus = "settling";
-            window.setTimeout(() => finishRound(true), 500);
+            settleRound(true);
           }
         }
       }
@@ -684,18 +851,18 @@ function createMpCallbacks() {
       if (data.punchId && data.punchId === lastRemotePunchId) return;
       if (data.punchId) lastRemotePunchId = data.punchId;
       if (remotePlayer) remotePlayer.punchTimer = 0.26;
-      if (isDuelActive() && data?.hit) {
-        applyPlayerDamage(1, "对手出拳");
+      if (isDuelActive() && (data.attempt || data.hit)) {
+        if (validatePvpHit(data, player)) {
+          applyPlayerDamage(1, "对手出拳");
+        }
       }
     },
     onRemoteWin(data) {
-      if (isDuelActive() && data?.roundId !== duelRoundId) return;
+      if (isDuelActive()) return;
       if (data?.winId && data.winId === lastRemoteWinId) return;
       if (data?.winId) lastRemoteWinId = data.winId;
-      if (gameStatus === "playing" || gameStatus === "settling") {
-        gameStatus = "settling";
-        const msg = isDuelActive() ? "对手将你击败！" : "对手先命中目标！";
-        window.setTimeout(() => finishRound(false, msg), 400);
+      if (gameStatus === "playing") {
+        settleRound(false, "对手先命中目标！");
       }
     },
     onGuestJoined() {
@@ -720,6 +887,25 @@ function createMpCallbacks() {
     onGameState(state) {
       applyRemoteGameState(state);
     },
+    onRemoteLeft(who) {
+      mpStatus = "none";
+      const msg = who === "host" ? "房主已离开，房间已关闭" : "对手已离开";
+      if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = `⚠️ ${msg}`;
+      if (ui.mpStatusText) ui.mpStatusText.textContent = `⚠️ ${msg}`;
+      if (gameStatus === "playing" || gameStatus === "paused" || gameStatus === "briefing") {
+        settleRound(false, msg);
+      } else {
+        showLevelSelect();
+      }
+    },
+    onJoinFailed(reason) {
+      mpStatus = "none";
+      const msg = reason === "room_full"
+        ? "房间已满，请向房主索取新链接"
+        : "房间不存在或已关闭";
+      if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = `❌ ${msg}`;
+      clearRoomFromUrl();
+    },
   };
 }
 
@@ -735,14 +921,26 @@ function selectLevel(index) {
   if (isConnected() && getIsHost() && isDuelLevel(LEVELS[index])) nextDuelRoundId();
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
-  pushGameState({
-    mode: gameMode,
-    phase: "briefing",
-    levelIndex: index,
-    npcCount: isDuelLevel(LEVELS[index]) ? DUEL_NPC_COUNT : matchNpcCount,
-    roundId: duelRoundId,
-    started: false,
-  });
+  if (isConnected() && getIsHost() && isDuelLevel(LEVELS[index])) {
+    pushGameState({
+      mode: gameMode,
+      phase: "briefing",
+      levelIndex: index,
+      npcCount: DUEL_NPC_COUNT,
+      roundId: duelRoundId,
+      started: false,
+      worldSeed: levelState.worldSeed,
+    });
+  } else {
+    pushGameState({
+      mode: gameMode,
+      phase: "briefing",
+      levelIndex: index,
+      npcCount: isDuelLevel(LEVELS[index]) ? DUEL_NPC_COUNT : matchNpcCount,
+      roundId: duelRoundId,
+      started: false,
+    });
+  }
 }
 
 function startDuelBriefing() {
@@ -895,7 +1093,7 @@ function boot() {
   if (hasRoomInUrl()) {
     gameMode = "duel";
     mpStatus = "waiting";
-    initMultiplayer(createMpCallbacks());
+    void initMultiplayer(createMpCallbacks());
   }
 
   // 初始显示关卡选择，不直接加载关卡
@@ -937,17 +1135,22 @@ function setupUi() {
     if (gameStatus !== "playing") return;
     gameStatus = "paused";
     ui.pauseModal.classList.add("visible");
+    if (isConnected() && getIsHost()) pushGameState({ phase: "paused" });
   });
 
   ui.resumeButton.addEventListener("click", () => {
     if (gameStatus !== "paused") return;
     gameStatus = "playing";
     ui.pauseModal.classList.remove("visible");
+    if (isConnected() && getIsHost()) pushGameState({ phase: "playing", started: true });
   });
 
   ui.backFromPauseButton.addEventListener("click", () => {
     if (gameStatus !== "paused") return;
     ui.pauseModal.classList.remove("visible");
+    if (isConnected() && getIsHost()) {
+      pushGameState({ phase: "lobby", levelIndex: null, started: false });
+    }
     showLevelSelect();
   });
 
@@ -971,7 +1174,7 @@ function setupUi() {
   ui.mpCreateBtn.addEventListener("click", () => {
     if (isConnected()) return;
     gameMode = "duel";
-    initMultiplayer(createMpCallbacks());
+    void initMultiplayer(createMpCallbacks());
     mpStatus = "waiting";
     ui.mpLinkInput.value = getShareLink();
     updateDuelLobbyUI();
@@ -1092,7 +1295,7 @@ function getCachedTexture(cache, key, factory) {
   return cache[key];
 }
 
-function resetLevel(index) {
+function resetLevel(index, options = {}) {
   // 先清理旧场景资源
   disposeScene();
 
@@ -1106,13 +1309,16 @@ function resetLevel(index) {
   punchCooldown = 0;
   punchTier = 0;
   punchResetTimer = 0;
-  totalTime = 0;
+  totalTime = options.elapsed ?? 0;
   hitstopTimer = 0;
   shakeTimer = 0;
   playerInputVel.set(0, 0);
-  gameStatus = "briefing";
+  gameStatus = options.skipBriefing ? "playing" : "briefing";
 
   const duel = isDuelLevel(level);
+  const worldSeed = duel ? (options.worldSeed ?? Math.floor(Math.random() * 2147483647)) : null;
+  duelRng = duel ? createSeededRng(worldSeed) : null;
+
   levelState = {
     level,
     remaining: duel ? 9999 : ROUND_SECONDS,
@@ -1121,13 +1327,14 @@ function resetLevel(index) {
     pair: null,
     startTime: 0,
     obstacles: [],
-    playerHp: DUEL_HP,
+    playerHp: options.playerHp ?? DUEL_HP,
     hitInvuln: 0,
+    worldSeed,
   };
 
   buildWorld(level);
   player = createPlayer();
-  player.hp = duel ? DUEL_HP : ATTEMPTS;
+  player.hp = duel ? (options.playerHp ?? DUEL_HP) : ATTEMPTS;
   player.hitInvuln = 0;
   player.group.position.copy(duel ? duelSpawnPosition(true) : randomOpenPosition());
   scene.add(player.group);
@@ -1138,13 +1345,30 @@ function resetLevel(index) {
   if (isConnected()) {
     remotePlayer = createRemotePlayer();
     remotePlayer.hp = DUEL_HP;
-    remotePlayer.group.position.copy(duel ? duelSpawnPosition(false) : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8)));
+    const remoteSpawn = duel ? duelSpawnPosition(false) : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+    remotePlayer.group.position.copy(remoteSpawn);
+    remotePlayer.targetX = remoteSpawn.x;
+    remotePlayer.targetZ = remoteSpawn.z;
+    remotePlayer.targetRot = 0;
+    remotePlayer._netInit = false;
     scene.add(remotePlayer.group);
   }
 
-  spawnNpcs(level);
+  if (duel && options.duelNpcs?.length) {
+    spawnDuelNpcsFromSnapshot({ worldSeed: levelState.worldSeed, duelNpcs: options.duelNpcs });
+  } else {
+    spawnNpcs(level);
+  }
+
+  if (options.skipBriefing) {
+    levelState.startTime = totalTime - (options.elapsed ?? 0);
+    ui.levelSelectModal.classList.remove("visible");
+    ui.taskModal.classList.remove("visible");
+  } else {
+    showTask();
+    return;
+  }
   updateHud();
-  showTask();
 }
 
 function showTask() {
@@ -1791,6 +2015,25 @@ function spawnDuelNpcs() {
   }
 }
 
+function spawnDuelNpcsFromSnapshot(snapshot) {
+  duelRng = createSeededRng(snapshot.worldSeed ?? levelState.worldSeed);
+  snapshot.duelNpcs.forEach((data, i) => {
+    const npc = createNpc(i, { duelPunch: true });
+    npc.group.position.set(data.x, 0, data.z);
+    npc.hp = data.hp ?? DUEL_HP;
+    npc.alive = data.alive !== false;
+    npc.punchDelay = data.punchDelay ?? randomRange(NPC_PUNCH_MIN, NPC_PUNCH_MAX);
+    npc.punchTimer = data.punchTimer ?? 0;
+    npc.punchHitDone = false;
+    npc.wanderTimer = randomRange(0.6, 2.2);
+    npc.pauseTimer = randomRange(0.2, 1.3);
+    npc.walking = false;
+    if (!npc.alive) npc.group.visible = false;
+    npcs.push(npc);
+    scene.add(npc.group);
+  });
+}
+
 function duelSpawnPosition(isLocal) {
   const fakeNpc = { group: { position: new THREE.Vector3(isLocal ? -4.2 : 4.2, 0, 0) } };
   nudgeActorFromObstacles(fakeNpc);
@@ -1867,8 +2110,7 @@ function applyPlayerDamage(amount, reason) {
 
   if (player.hp <= 0) {
     dissolveActor(player);
-    gameStatus = "settling";
-    window.setTimeout(() => finishRound(false, reason || "你被击败了"), 500);
+    settleRound(false, reason || "你被击败了");
   }
 }
 
@@ -1902,13 +2144,12 @@ function findDuelPunchTarget() {
 
 function damageRemotePlayer() {
   if (!remotePlayer?.group || remotePlayer.hp <= 0) return false;
+  if (isConnected()) return true;
   remotePlayer.hp = Math.max(0, (remotePlayer.hp ?? DUEL_HP) - 1);
 
   if (remotePlayer.hp <= 0) {
     dissolveActor(remotePlayer);
-    gameStatus = "settling";
-    syncWin({ reason: "pvp", roundId: duelRoundId, winId: nextLocalEventId("win") });
-    window.setTimeout(() => finishRound(true), 500);
+    settleRound(true);
   }
   return true;
 }
@@ -2375,6 +2616,14 @@ function tick() {
     if (isConnected()) {
       syncPosition(player.group.position.x, player.group.position.z, player.group.rotation.y);
     }
+
+    if (isConnected() && getIsHost() && isDuelLevel()) {
+      mpSnapshotTimer += dt;
+      if (mpSnapshotTimer >= 2) {
+        mpSnapshotTimer = 0;
+        pushGameState({ started: true, phase: "playing" });
+      }
+    }
   } else if (gameStatus === "won") {
     animateCheer(dt);
   }
@@ -2447,6 +2696,19 @@ function animateCheer(dt) {
 function updateRemotePlayerAnim(dt) {
   if (!remotePlayer || !remotePlayer.group.userData) return;
   const ud = remotePlayer.group.userData;
+
+  if (remotePlayer.targetX != null) {
+    const t = Math.min(1, dt * REMOTE_POS_LERP);
+    const pos = remotePlayer.group.position;
+    pos.x += (remotePlayer.targetX - pos.x) * t;
+    pos.z += (remotePlayer.targetZ - pos.z) * t;
+    remotePlayer.group.rotation.y = lerpAngle(
+      remotePlayer.group.rotation.y,
+      remotePlayer.targetRot,
+      t,
+    );
+  }
+
   // 检测对手是否在移动（对比上一帧位置）
   const pos = remotePlayer.group.position;
   const prevX = remotePlayer._prevX ?? pos.x;
@@ -2492,6 +2754,7 @@ function updateNpcs(dt) {
       animateActor(npc, dt, npc.walking);
       animateNpcPunchPose(npc);
     });
+    separateDuelActors();
     return;
   }
 
@@ -2894,6 +3157,25 @@ function separateActors() {
   }
 }
 
+function separateDuelActors() {
+  for (let i = 0; i < npcs.length; i += 1) {
+    const a = npcs[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < npcs.length; j += 1) {
+      const b = npcs[j];
+      if (!b.alive) continue;
+      pushApart(a.group.position, b.group.position, 0.62, 0.018);
+    }
+    pushApart(a.group.position, player.group.position, 0.72, 0.012);
+    if (remotePlayer?.group) {
+      pushApart(a.group.position, remotePlayer.group.position, 0.72, 0.012);
+    }
+  }
+  if (remotePlayer?.group) {
+    pushApart(player.group.position, remotePlayer.group.position, 0.72, 0.012);
+  }
+}
+
 function pushApart(a, b, minDistance, strength) {
   const dx = a.x - b.x;
   const dz = a.z - b.z;
@@ -2922,7 +3204,8 @@ function triggerAttack() {
 
   if (isDuelActive()) {
     const hit = findDuelPunchTarget();
-    const remoteHit = hit?.type === "remote" ? damageRemotePlayer() : false;
+    const remoteAttempt = hit?.type === "remote";
+    const remoteHit = remoteAttempt && !isConnected() ? damageRemotePlayer() : false;
     const npcHit = hit?.type === "npc" ? damageDuelNpc(hit.actor) : false;
     if (isConnected()) {
       syncPunch(
@@ -2932,14 +3215,14 @@ function triggerAttack() {
         {
           roundId: duelRoundId,
           punchId: nextLocalEventId("punch"),
-          hit: remoteHit,
+          attempt: remoteAttempt,
         },
       );
     }
-    if (remoteHit || npcHit) {
+    if (remoteHit || npcHit || (remoteAttempt && isConnected())) {
       triggerHitstop(0.06);
       triggerShake(0.22, 0.14);
-      sfxHit();
+      if (remoteHit || npcHit) sfxHit();
     }
     return;
   }
@@ -2964,10 +3247,13 @@ function triggerAttack() {
     sfxHit();
     // 同步胜利给对手
     if (isConnected()) {
-      syncWin({ time: Math.round(totalTime - levelState.startTime) });
+      syncWin({
+        time: Math.round(totalTime - levelState.startTime),
+        roundId: duelRoundId,
+        winId: nextLocalEventId("win"),
+      });
     }
-    gameStatus = "settling";
-    window.setTimeout(() => finishRound(true), 760);
+    settleRound(true, null, 760);
     return;
   }
 
@@ -2978,8 +3264,7 @@ function triggerAttack() {
   levelState.attempts = Math.max(0, levelState.attempts - 1);
   updateHud();
   if (levelState.attempts <= 0) {
-    gameStatus = "settling";
-    window.setTimeout(() => finishRound(false), 680);
+    settleRound(false, null, 680);
   }
 }
 
@@ -3091,6 +3376,10 @@ function updateParticles(dt) {
 
 function finishRound(won, failMessage) {
   if (gameStatus === "won" || gameStatus === "lost") return;
+  if (settleTimer) {
+    window.clearTimeout(settleTimer);
+    settleTimer = null;
+  }
   gameStatus = won ? "won" : "lost";
   player.cheer = won;
   if (won) sfxWin(); else sfxLose();
@@ -3168,5 +3457,6 @@ function lerpAngle(a, b, t) {
 }
 
 function randomRange(min, max) {
-  return min + Math.random() * (max - min);
+  const r = duelRng && isDuelLevel() ? duelRng() : Math.random();
+  return min + r * (max - min);
 }
