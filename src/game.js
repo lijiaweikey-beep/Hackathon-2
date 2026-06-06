@@ -1,12 +1,12 @@
 import * as THREE from "three";
 
-const NPC_COUNT = 15;
+const NPC_COUNT = 20;
 const WORLD_LIMIT = 10.8;
 const HIT_RANGE = 1.85;
 const HIT_PAIR_RANGE = 2.15;
 const HIT_FACING_DOT = 0.12;
-const PLAYER_SPEED = 5.2;
-const NPC_SPEED = 1.05;
+const PLAYER_SPEED = 3;
+const NPC_SPEED = 3;
 const ROUND_SECONDS = 90;
 const ATTEMPTS = 3;
 
@@ -62,7 +62,6 @@ let npcs = [];
 let particles = [];
 let punchEffects = [];
 let gameStatus = "briefing";
-let cameraFocus = new THREE.Vector3();
 let punchCooldown = 0;
 let totalTime = 0;
 
@@ -210,7 +209,7 @@ function resetLevel(index) {
 
   buildWorld(level);
   player = createPlayer();
-  player.group.position.set(0, 0, 4.8);
+  player.group.position.set(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
   scene.add(player.group);
   spawnNpcs(level);
   updateHud();
@@ -587,27 +586,10 @@ function randomOpenPosition() {
 
 function createPlayer() {
   const actor = createPerson({
-    body: 0x25c5b5,
-    pants: 0x164e63,
-    hair: 0x172033,
-    isPlayer: true,
+    body: 0x64748b,
+    pants: 0x293241,
+    hair: 0x16181e,
   });
-
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.58, 0.035, 8, 42),
-    new THREE.MeshStandardMaterial({ color: 0x2dd4bf, emissive: 0x0f766e, emissiveIntensity: 1.1 }),
-  );
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.05;
-  actor.group.add(ring);
-
-  const arrow = new THREE.Mesh(
-    new THREE.ConeGeometry(0.18, 0.5, 3),
-    new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xf59e0b, emissiveIntensity: 0.5 }),
-  );
-  arrow.rotation.x = Math.PI / 2;
-  arrow.position.set(0, 0.12, 0.88);
-  actor.group.add(arrow);
 
   actor.speed = PLAYER_SPEED;
   actor.punchTimer = 0;
@@ -761,7 +743,6 @@ function tick() {
 
   updatePunchEffects(dt);
   updateParticles(dt);
-  updateCamera(dt);
   renderer.render(scene, camera);
 }
 
@@ -1229,13 +1210,6 @@ function updateHud() {
   ui.missionText.textContent = levelState.level.mission;
   ui.timerText.textContent = Math.ceil(levelState.remaining).toString();
   ui.attemptText.textContent = levelState.attempts.toString();
-}
-
-function updateCamera(dt) {
-  if (!player) return;
-  cameraFocus.lerp(player.group.position, 1 - Math.pow(0.001, dt));
-  camera.position.set(cameraFocus.x, 19.5, cameraFocus.z + 17.2);
-  camera.lookAt(cameraFocus.x, 0, cameraFocus.z);
 }
 
 function clampToWorld(position) {
