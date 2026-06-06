@@ -59,6 +59,8 @@ const LEVELS = [
     id: "gaming",
     sceneName: "凌晨三点",
     emoji: "🌙",
+    tag: "经典",
+    tagType: "classic",
     cardDesc: "在人群中找到凌晨三点还在打游戏的人",
     mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
     clue: "目标特征：有明显黑眼圈",
@@ -72,6 +74,8 @@ const LEVELS = [
     id: "library",
     sceneName: "图书馆",
     emoji: "📚",
+    tag: "推荐",
+    tagType: "recommend",
     cardDesc: "在人群中找到图书馆里亲嘴的情侣",
     mission: "图书馆里有一对情侣在亲嘴，太辣眼睛了！",
     clue: "目标特征：两个人贴在一起，嘴上有口红印",
@@ -86,6 +90,8 @@ const LEVELS = [
     mapId: "library",
     sceneName: "图书馆决斗",
     emoji: "⚔️",
+    tag: "联机",
+    tagType: "recommend",
     cardDesc: "在出拳人群中击败对手",
     mission: "图书馆里挤满了出拳的读者，击败你的对手！",
     hudMission: "击败对手，同时躲避 NPC 的拳头",
@@ -93,7 +99,7 @@ const LEVELS = [
     hudClue: "NPC 每 10 秒挥拳 · 1.5 分钟集合 · 所有人 3 滴血",
     targetDesc: "对手",
     difficulty: 3,
-    success: "你击败了对手，图书馆归于“平静”。",
+    success: "你击败了对手，图书馆归于「平静」。",
     failure: "你被击败了",
     lighting: "library",
     duelMode: true,
@@ -102,6 +108,8 @@ const LEVELS = [
     id: "temple",
     sceneName: "承天寺夜游",
     emoji: "🌕",
+    tag: "困难",
+    tagType: "hard",
     cardDesc: "在苏轼影分身里找出真正吵醒怀民的苏轼",
     mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
     hudMission: "观察月下显形线索，找出真正的苏轼。",
@@ -418,6 +426,18 @@ function bindNpcCountInput() {
   input.addEventListener("wheel", (event) => {
     if (document.activeElement === input) event.preventDefault();
   }, { passive: false });
+
+  const arrows = document.querySelectorAll(".match-settings-arrow");
+  arrows.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const step = btn.classList.contains("up") ? 1 : -1;
+      const current = clampNpcCount(getNpcCountPreview() + step);
+      matchNpcCount = current;
+      syncNpcCountInput();
+      saveMatchNpcCount();
+      buildLevelCards();
+    });
+  });
 }
 
 /* ---- 关卡选择 ---- */
@@ -661,7 +681,10 @@ function buildLevelCards() {
     card.dataset.level = level.id;
     card.innerHTML = `
       <div class="level-card-accent" aria-hidden="true"></div>
-      <div class="level-card-icon">${level.emoji}</div>
+      <div class="level-card-header">
+        <div class="level-card-icon">${level.emoji}</div>
+        ${level.tag ? `<span class="level-card-tag level-card-tag--${level.tagType}">${level.tag}</span>` : ""}
+      </div>
       <div class="level-card-body">
         <div class="level-card-name">${level.sceneName}</div>
         <div class="level-card-desc">${formatLevelCardDesc(level)}</div>
@@ -670,7 +693,7 @@ function buildLevelCards() {
           <span class="level-card-best">最佳 <strong>${bestText}</strong></span>
         </div>
       </div>
-      <div class="level-card-go" aria-hidden="true"><span>👊</span></div>
+      <div class="level-card-go" aria-hidden="true"><span>›</span></div>
     `;
     if (!disabled) {
       card.addEventListener("click", () => selectLevel(i));
