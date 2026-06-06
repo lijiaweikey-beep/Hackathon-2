@@ -1646,9 +1646,9 @@ function updatePlayer(dt) {
   const moving = playerInputVel.lengthSq() > 0.0004;
   if (moving) {
     player.group.position.x += playerInputVel.x * player.speed * dt;
-    player.group.position.z += playerInputVel.y * player.speed * dt;
+    player.group.position.z -= playerInputVel.y * player.speed * dt;
     clampActorPosition(player.group.position, playerInputVel);
-    const targetRotation = Math.atan2(playerInputVel.x, playerInputVel.y);
+    const targetRotation = Math.atan2(playerInputVel.x, -playerInputVel.y);
     player.group.rotation.y = lerpAngle(player.group.rotation.y, targetRotation, 0.24);
   }
 
