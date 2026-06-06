@@ -706,7 +706,7 @@ function showLevelSelect() {
   updateDuelLobbyUI();
   if (!isInDuelLobby()) buildLevelCards();
   updateMpUI();
-  if (ui.hud) ui.hud.classList.remove("is-duel-play");
+  if (ui.hud) ui.hud.classList.remove("is-duel-play", "gather-active");
   if (ui.gatherBanner) ui.gatherBanner.classList.add("hidden");
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
@@ -2407,6 +2407,7 @@ function updateGatherBanner() {
   if (!state?.bannerVisible) {
     ui.gatherBanner.classList.add("hidden");
     ui.gatherBanner.classList.remove("preview", "urgent", "success", "upcoming");
+    if (ui.hud) ui.hud.classList.remove("gather-active");
     return;
   }
 
@@ -2415,6 +2416,7 @@ function updateGatherBanner() {
   ui.gatherBannerTitle.textContent = state.title;
   ui.gatherBannerCountdown.textContent = formatGatherCountdown(state.seconds);
   ui.gatherBannerHint.textContent = state.hint;
+  if (ui.hud) ui.hud.classList.add("gather-active");
 }
 
 function getDuelProximityState() {

@@ -57,9 +57,10 @@ button {
   left: 12px;
   right: 12px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
+  min-height: 52px;
 }
 
 .mission-strip,
@@ -442,33 +443,18 @@ button {
   margin-top: 4px;
 }
 
-/* ---- HUD 线索提示条 ---- */
-.duel-bottom-hud {
+/* ---- HUD 顶部信息区（决斗生命条）---- */
+.duel-top-hud {
   position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 66px);
   left: 12px;
   right: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   pointer-events: none;
   z-index: 4;
 }
 
-.hud:not(.is-duel-play) .duel-bottom-hud {
-  top: calc(max(12px, env(safe-area-inset-top)) + 66px);
-  bottom: auto;
-}
-
-.hud.is-duel-play .duel-bottom-hud {
-  top: auto;
-  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 148px);
-}
-
 .clue-bar {
   position: relative;
-  left: auto;
-  right: auto;
-  top: auto;
   width: 100%;
   padding: 7px 12px;
   border-radius: 8px;
@@ -496,54 +482,43 @@ button {
   50% { opacity: 0.85; }
 }
 
-/* ---- 决斗集合圈提示 ---- */
-.gather-banner {
-  position: relative;
-  left: auto;
-  right: auto;
-  top: auto;
-  transform: none;
-  width: 100%;
-  padding: 12px 14px 11px;
-  border-radius: 12px;
+/* ---- 决斗集合圈提示（嵌入 topbar 中央）---- */
+.topbar .gather-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(calc(100% - 220px), 320px);
+  padding: 6px 10px 5px;
+  border-radius: 10px;
   border: 2px solid rgba(21, 128, 61, 0.85);
-  background: rgba(6, 40, 22, 0.88);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  background: rgba(6, 40, 22, 0.92);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(14px);
   text-align: center;
   pointer-events: none;
-  z-index: 6;
-}
-
-.hud.is-duel-play .gather-banner {
-  padding: 8px 12px 7px;
-  border-radius: 10px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
-}
-
-.hud.is-duel-play .gather-banner-countdown {
-  font-size: 26px;
-}
-
-.hud.is-duel-play .gather-banner-hint {
-  font-size: 11px;
-  margin-top: 4px;
+  z-index: 2;
 }
 
 .gather-banner.hidden {
   display: none;
 }
 
+.hud.gather-active .mission-strip {
+  opacity: 0;
+}
+
 .gather-banner-title {
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
   color: #bbf7d0;
+  line-height: 1.2;
 }
 
 .gather-banner-countdown {
-  margin-top: 4px;
-  font-size: 34px;
+  margin-top: 1px;
+  font-size: 22px;
   line-height: 1;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
@@ -552,11 +527,15 @@ button {
 }
 
 .gather-banner-hint {
-  margin-top: 7px;
-  font-size: 12px;
-  line-height: 1.35;
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.25;
   font-weight: 600;
   color: rgba(220, 252, 231, 0.92);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .gather-banner.preview {
@@ -570,14 +549,14 @@ button {
 }
 
 .gather-banner.upcoming .gather-banner-countdown {
-  font-size: 28px;
+  font-size: 20px;
   color: #86efac;
 }
 
 .gather-banner.urgent {
   border-color: rgba(185, 28, 28, 0.95);
   background: rgba(48, 8, 8, 0.92);
-  animation: gatherUrgentPulse 0.85s ease-in-out infinite;
+  animation: gatherUrgentPulseTopbar 0.85s ease-in-out infinite;
 }
 
 .gather-banner.urgent .gather-banner-title {
@@ -606,9 +585,9 @@ button {
   color: #4ade80;
 }
 
-@keyframes gatherUrgentPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+@keyframes gatherUrgentPulseTopbar {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.02); }
 }
 
 /* ---- 关卡选择界面 ---- */
