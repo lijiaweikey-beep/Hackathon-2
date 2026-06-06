@@ -126,6 +126,8 @@ let remotePlayer = null; // 对手角色
 let mpStatus = "none"; // "none" | "waiting" | "connected"
 let guestReady = false;
 let guestConfirmed = false;
+let stateRevision = 0;
+let lastRemoteStateRevision = -1;
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
@@ -335,7 +337,10 @@ function showLevelSelect() {
   gameStatus = "levelSelect";
   guestReady = false;
   guestConfirmed = false;
-  if (isConnected() && getIsHost()) clearGuestReady();
+  if (isConnected() && getIsHost()) {
+    clearGuestReady();
+    pushGameState({ phase: "lobby", levelIndex: null, started: false });
+  }
   syncNpcCountInput();
   buildLevelCards();
   updateMpUI();
@@ -382,8 +387,11 @@ function updateMpUI() {
 
 function pushGameState(extra = {}) {
   if (!isConnected() || !getIsHost()) return;
+  stateRevision += 1;
   syncGameState({
-    levelIndex: currentLevelIndex,
+    revision: stateRevision,
+    phase: gameStatus === "levelSelect" ? "lobby" : gameStatus === "playing" ? "playing" : "briefing",
+    levelIndex: gameStatus === "levelSelect" ? null : currentLevelIndex,
     npcCount: matchNpcCount,
     started: gameStatus === "playing",
     ...extra,
@@ -393,17 +401,27 @@ function pushGameState(extra = {}) {
 function applyRemoteGameState(state) {
   if (!state || getIsHost()) return;
 
+  if (state.revision != null && state.revision <= lastRemoteStateRevision) return;
+  if (state.revision != null) lastRemoteStateRevision = state.revision;
+
+  if (state.phase === "lobby" || state.levelIndex == null) {
+    if (gameStatus !== "levelSelect") showLevelSelect();
+    return;
+  }
+
   if (state.npcCount != null) {
     matchNpcCount = clampNpcCount(state.npcCount);
     syncNpcCountInput();
     saveMatchNpcCount();
   }
 
-  if (state.levelIndex != null && gameStatus === "levelSelect") {
+  const levelChanged = state.levelIndex !== currentLevelIndex;
+
+  if (levelChanged) {
     guestConfirmed = false;
-    currentLevelIndex = state.levelIndex;
     resetLevel(state.levelIndex);
     updateMpUI();
+    updateTaskMpUI();
   }
 
   if (state.started && gameStatus === "briefing") {
@@ -460,7 +478,10 @@ function createMpCallbacks() {
       mpStatus = "connected";
       buildLevelCards();
       updateMpUI();
-      pushGameState();
+      // 仅当房主已选关时才同步，避免把默认关卡 0 推给选手
+      if (gameStatus !== "levelSelect") {
+        pushGameState();
+      }
     },
     onRoomReady() {
       mpStatus = "connected";
@@ -488,7 +509,12 @@ function selectLevel(index) {
   if (isConnected() && getIsHost()) clearGuestReady();
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
-  pushGameState({ levelIndex: index, npcCount: matchNpcCount, started: false });
+  pushGameState({
+    phase: "briefing",
+    levelIndex: index,
+    npcCount: matchNpcCount,
+    started: false,
+  });
 }
 
 const input = {
@@ -666,7 +692,7 @@ function setupUi() {
     gameStatus = "playing";
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
-    pushGameState({ started: true });
+    pushGameState({ phase: "playing", started: true });
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -692,7 +718,14 @@ function setupUi() {
     showLevelSelect();
   });
 
-  ui.retryButton.addEventListener("click", () => resetLevel(currentLevelIndex));
+  ui.retryButton.addEventListener("click", () => {
+    resetLevel(currentLevelIndex);
+    if (isConnected() && getIsHost()) {
+      guestReady = false;
+      clearGuestReady();
+      pushGameState({ phase: "briefing", started: false });
+    }
+  });
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
   ui.attackButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();

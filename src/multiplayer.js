@@ -83,6 +83,10 @@ function createRoom() {
   roomRef = ref(db, `rooms/${roomId}`);
   myRef = ref(db, `rooms/${roomId}/host`);
 
+  // 清空上一局残留状态，避免新选手读到旧关卡
+  set(ref(db, `rooms/${roomId}/gameState`), null);
+  set(ref(db, `rooms/${roomId}/guestReady`), false);
+
   // 写入主机信息
   set(myRef, { x: 0, z: 0, rotation: 0, joinedAt: serverTimestamp() });
 
@@ -91,9 +95,15 @@ function createRoom() {
 
   // 等待客人加入
   const guestRef = ref(db, `rooms/${roomId}/guest`);
+  let guestJoinNotified = false;
   const unsub = onValue(guestRef, (snap) => {
-    if (snap.exists() && onGuestJoined) {
-      onGuestJoined(snap.val());
+    if (!snap.exists()) {
+      guestJoinNotified = false;
+      return;
+    }
+    if (!guestJoinNotified) {
+      guestJoinNotified = true;
+      if (onGuestJoined) onGuestJoined(snap.val());
       if (onRoomReady) onRoomReady();
     }
   });
