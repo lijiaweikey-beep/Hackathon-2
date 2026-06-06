@@ -390,7 +390,106 @@ button {
 
 @keyframes cluePulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  50% { opacity: 0.85; }
+}
+
+/* ---- 决斗集合圈提示 ---- */
+.gather-banner {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 108px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92%, 360px);
+  padding: 12px 14px 11px;
+  border-radius: 12px;
+  border: 2px solid rgba(21, 128, 61, 0.85);
+  background: rgba(6, 40, 22, 0.88);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(14px);
+  text-align: center;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.gather-banner.hidden {
+  display: none;
+}
+
+.gather-banner-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #bbf7d0;
+}
+
+.gather-banner-countdown {
+  margin-top: 4px;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #4ade80;
+  text-shadow: 0 0 18px rgba(74, 222, 128, 0.35);
+}
+
+.gather-banner-hint {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgba(220, 252, 231, 0.92);
+}
+
+.gather-banner.preview {
+  border-color: rgba(21, 128, 61, 0.95);
+  background: rgba(6, 40, 22, 0.9);
+}
+
+.gather-banner.upcoming {
+  border-color: rgba(22, 101, 52, 0.8);
+  background: rgba(8, 32, 18, 0.82);
+}
+
+.gather-banner.upcoming .gather-banner-countdown {
+  font-size: 28px;
+  color: #86efac;
+}
+
+.gather-banner.urgent {
+  border-color: rgba(185, 28, 28, 0.95);
+  background: rgba(48, 8, 8, 0.92);
+  animation: gatherUrgentPulse 0.85s ease-in-out infinite;
+}
+
+.gather-banner.urgent .gather-banner-title {
+  color: #fecaca;
+}
+
+.gather-banner.urgent .gather-banner-countdown {
+  color: #f87171;
+  text-shadow: 0 0 20px rgba(248, 113, 113, 0.45);
+}
+
+.gather-banner.urgent .gather-banner-hint {
+  color: rgba(254, 226, 226, 0.95);
+}
+
+.gather-banner.success {
+  border-color: rgba(20, 83, 45, 0.95);
+  background: rgba(5, 36, 20, 0.9);
+}
+
+.gather-banner.success .gather-banner-title {
+  color: #86efac;
+}
+
+.gather-banner.success .gather-banner-countdown {
+  color: #4ade80;
+}
+
+@keyframes gatherUrgentPulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.02); }
 }
 
 /* ---- 关卡选择界面 ---- */

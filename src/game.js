@@ -45,6 +45,9 @@ const DUEL_GATHER_INTERVAL = 90; // 1.5 分钟一轮集合
 const DUEL_GATHER_PREVIEW = 30; // 提前 30 秒显示集合圈
 const DUEL_GATHER_WINDOW = 5; // 最后 5 秒内需站在圈内
 const DUEL_GATHER_RADIUS = 2.2;
+const GATHER_COLOR_PREVIEW = 0x15803d;
+const GATHER_COLOR_URGENT = 0xb91c1c;
+const GATHER_COLOR_SUCCESS = 0x14532d;
 const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
@@ -115,6 +118,10 @@ const ui = {
   timerText: document.querySelector("#timerText"),
   attemptText: document.querySelector("#attemptText"),
   clueBar: document.querySelector("#clueBar"),
+  gatherBanner: document.querySelector("#gatherBanner"),
+  gatherBannerTitle: document.querySelector("#gatherBannerTitle"),
+  gatherBannerCountdown: document.querySelector("#gatherBannerCountdown"),
+  gatherBannerHint: document.querySelector("#gatherBannerHint"),
   levelSelectModal: document.querySelector("#levelSelectModal"),
   levelSelectPanel: document.querySelector("#levelSelectPanel"),
   levelCards: document.querySelector("#levelCards"),
@@ -2238,9 +2245,9 @@ function ensureGatherMarker() {
   if (duelGatherMarker || !scene) return;
   const ringGeo = new THREE.RingGeometry(DUEL_GATHER_RADIUS * 0.82, DUEL_GATHER_RADIUS, 48);
   const ringMat = new THREE.MeshBasicMaterial({
-    color: 0x22c55e,
+    color: GATHER_COLOR_PREVIEW,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.78,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
@@ -2250,9 +2257,9 @@ function ensureGatherMarker() {
 
   const fillGeo = new THREE.CircleGeometry(DUEL_GATHER_RADIUS * 0.8, 48);
   const fillMat = new THREE.MeshBasicMaterial({
-    color: 0x22c55e,
+    color: GATHER_COLOR_PREVIEW,
     transparent: true,
-    opacity: 0.14,
+    opacity: 0.34,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
@@ -2274,19 +2281,97 @@ function removeGatherMarker() {
   duelGatherMarker = null;
 }
 
-function getDuelGatherHudHint() {
-  if (!isDuelLevel() || levelState?.startTime == null) return "";
+function formatGatherCountdown(seconds) {
+  const total = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(total / 60);
+  const remainder = total % 60;
+  if (minutes > 0) return `${minutes}:${String(remainder).padStart(2, "0")}`;
+  return `${total}s`;
+}
+
+function getDuelGatherUiState() {
+  if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) return null;
+
   const elapsed = Math.max(0, totalTime - levelState.startTime);
   const gatherIndex = Math.floor(elapsed / DUEL_GATHER_INTERVAL);
   const phaseInCycle = elapsed - gatherIndex * DUEL_GATHER_INTERVAL;
   const timeToDeadline = DUEL_GATHER_INTERVAL - phaseInCycle;
-  if (timeToDeadline > DUEL_GATHER_PREVIEW) return "";
-  if (timeToDeadline <= DUEL_GATHER_WINDOW) {
-    return duelGatherMetWindow
-      ? `✅ 已在集合圈 · 剩余 ${Math.ceil(timeToDeadline)}s`
-      : `🔴 进集合圈！${Math.ceil(timeToDeadline)}s 内未到达扣 1 ❤️`;
+  const timeToPreview = Math.max(0, timeToDeadline - DUEL_GATHER_PREVIEW);
+  const inCircle = isPlayerInGatherCircle();
+
+  if (timeToDeadline > DUEL_GATHER_PREVIEW) {
+    if (timeToPreview <= 12) {
+      return {
+        bannerVisible: true,
+        phase: "upcoming",
+        seconds: timeToPreview,
+        title: "即将集合报到",
+        hint: "绿圈马上出现 · 站进去报到 · 最后 5 秒必须在圈内 · 否则扣 1 ❤️",
+      };
+    }
+    return {
+      bannerVisible: false,
+      clueHint: `⏳ ${formatGatherCountdown(timeToPreview)} 后出现集合圈 · 未报到扣 1 ❤️`,
+    };
   }
-  return `📍 集合圈已刷新 · ${Math.ceil(timeToDeadline)}s 后截止`;
+
+  if (timeToDeadline <= 0) return null;
+
+  const seconds = timeToDeadline;
+  if (timeToDeadline <= DUEL_GATHER_WINDOW) {
+    if (inCircle) {
+      return {
+        bannerVisible: true,
+        phase: "success",
+        seconds,
+        title: "已在集合圈内",
+        hint: `保持站立 · 剩余 ${formatGatherCountdown(seconds)} · 离开会扣 1 ❤️`,
+      };
+    }
+    return {
+      bannerVisible: true,
+      phase: "urgent",
+      seconds,
+      title: "立刻进入集合圈！",
+      hint: `地面红圈内站好 · 剩余 ${formatGatherCountdown(seconds)} · 未进圈扣 1 ❤️`,
+    };
+  }
+
+  return {
+    bannerVisible: true,
+    phase: "preview",
+    seconds,
+    title: "集合报到",
+    hint: `走到地面绿圈内 · 截止 ${formatGatherCountdown(seconds)} · 最后 5 秒必须在圈里 · 否则扣 1 ❤️`,
+  };
+}
+
+function getDuelGatherHudHint() {
+  const state = getDuelGatherUiState();
+  if (!state) return "";
+  if (state.bannerVisible) {
+    if (state.phase === "urgent") return `🔴 ${state.title} ${formatGatherCountdown(state.seconds)}`;
+    if (state.phase === "success") return `✅ ${state.title} ${formatGatherCountdown(state.seconds)}`;
+    if (state.phase === "upcoming") return `⏳ ${formatGatherCountdown(state.seconds)} 后出圈`;
+    return `📍 ${state.title} · ${formatGatherCountdown(state.seconds)}`;
+  }
+  return state.clueHint || "";
+}
+
+function updateGatherBanner() {
+  if (!ui.gatherBanner) return;
+  const state = getDuelGatherUiState();
+  if (!state?.bannerVisible) {
+    ui.gatherBanner.classList.add("hidden");
+    ui.gatherBanner.classList.remove("preview", "urgent", "success", "upcoming");
+    return;
+  }
+
+  ui.gatherBanner.classList.remove("hidden", "preview", "urgent", "success", "upcoming");
+  ui.gatherBanner.classList.add(state.phase);
+  ui.gatherBannerTitle.textContent = state.title;
+  ui.gatherBannerCountdown.textContent = formatGatherCountdown(state.seconds);
+  ui.gatherBannerHint.textContent = state.hint;
 }
 
 function updateDuelGather() {
@@ -2319,10 +2404,15 @@ function updateDuelGather() {
     ensureGatherMarker();
     duelGatherMarker.position.set(duelGatherSpot.x, 0.04, duelGatherSpot.z);
     const urgent = activeWindow;
-    duelGatherMarker.material.color.setHex(urgent ? 0xef4444 : 0x22c55e);
-    duelGatherMarker.userData.fill.material.color.setHex(urgent ? 0xef4444 : 0x22c55e);
-    const pulse = 0.42 + Math.sin(totalTime * (urgent ? 9 : 4)) * 0.18 + (urgent ? 0.2 : 0);
+    const inCircle = isPlayerInGatherCircle();
+    const ringColor = urgent
+      ? (inCircle ? GATHER_COLOR_SUCCESS : GATHER_COLOR_URGENT)
+      : GATHER_COLOR_PREVIEW;
+    duelGatherMarker.material.color.setHex(ringColor);
+    duelGatherMarker.userData.fill.material.color.setHex(ringColor);
+    const pulse = 0.68 + Math.sin(totalTime * (urgent ? 9 : 4)) * 0.12 + (urgent ? 0.14 : 0);
     duelGatherMarker.material.opacity = pulse;
+    duelGatherMarker.userData.fill.material.opacity = urgent ? 0.42 : 0.36;
     duelGatherMarker.visible = true;
   } else if (duelGatherMarker) {
     duelGatherMarker.visible = false;
@@ -3805,10 +3895,12 @@ function updateHud() {
   ui.clueBar.textContent = duel
     ? (() => {
         const gatherHint = getDuelGatherHudHint();
-        const base = `你的生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_HP)}`;
-        return gatherHint ? `⚔️ ${gatherHint} · ${base}` : `⚔️ ${base} · 躲避 NPC 拳头`;
+        const base = `生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_HP)}`;
+        return gatherHint ? `${gatherHint} · ${base}` : `⚔️ ${base} · 每 1.5 分钟需到集合圈报到`;
       })()
     : "🔍 " + (levelState.level.hudClue || levelState.level.clue);
+
+  updateGatherBanner();
 
   // 出拳冷却动画
   if (punchCooldown > 0 && punchCooldownMax > 0) {
