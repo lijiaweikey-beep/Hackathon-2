@@ -39,10 +39,12 @@ const HIT_INVULN = 0.55;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
 const REMOTE_POS_LERP = 14; // 对手位置插值速度（越大越跟手）
 const REMOTE_SNAP_DIST = 2.2; // 偏差过大时直接瞬移，避免长时间拉扯
-const REMOTE_STALE_MS = 350; // 超过此时间未收到更新则允许瞬移对齐
+const REMOTE_STALE_MS = 900; // 网络延迟容忍；过大才瞬移对齐
 const DUEL_SPAWN_MIN_DIST = 4.2;
-const DUEL_HERD_INTERVAL = 15;
-const DUEL_HERD_DURATION = 2.8;
+const DUEL_GATHER_INTERVAL = 90; // 1.5 分钟一轮集合
+const DUEL_GATHER_PREVIEW = 30; // 提前 30 秒显示集合圈
+const DUEL_GATHER_WINDOW = 5; // 最后 5 秒内需站在圈内
+const DUEL_GATHER_RADIUS = 2.2;
 const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
@@ -80,8 +82,8 @@ const LEVELS = [
     cardDesc: "在出拳人群中击败对手",
     mission: "图书馆里挤满了出拳的读者，击败你的对手！",
     hudMission: "击败对手，同时躲避 NPC 的拳头",
-    clue: "NPC 每 10 秒挥拳一次，靠近会很危险；所有人都有 3 滴血",
-    hudClue: "NPC 每 10 秒挥拳 · 所有人 3 滴血 · 击败对手获胜",
+    clue: "NPC 每 10 秒挥拳一次；每 1.5 分钟需到集合圈报到，否则扣 1 滴血",
+    hudClue: "NPC 每 10 秒挥拳 · 1.5 分钟集合 · 所有人 3 滴血",
     targetDesc: "对手",
     difficulty: 3,
     success: "你击败了对手，图书馆归于“平静”。",
@@ -181,9 +183,12 @@ let lastRemoteWinId = null;
 let settleTimer = null;
 let duelRng = null;
 let duelSeparateTick = 0;
-let duelHerdIndex = -1;
-const duelHerdDir = new THREE.Vector2(0, 1);
-let duelHerdActive = false;
+let duelGatherSpotIndex = -1;
+let duelGatherCheckedIndex = -1;
+let duelGatherMetWindow = false;
+let duelGatherMarker = null;
+let lastGuestSnapshotAt = 0;
+const duelGatherSpot = { x: 0, z: 0, radius: DUEL_GATHER_RADIUS };
 let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
@@ -501,6 +506,7 @@ function buildGameStatePayload(extra = {}) {
     payload.duelSpawns = levelState.duelSpawns;
   }
   if (extra.includeSnapshot) {
+    payload.syncSnapshot = extra.syncSnapshot === true;
     const snap = collectDuelSnapshot();
     if (snap) {
       payload.worldSeed = snap.worldSeed;
@@ -732,6 +738,7 @@ function applyDuelSnapshot(snapshot, options = {}) {
       const npc = npcs[i];
       if (!npc) return;
       npc.group.position.set(data.x, 0, data.z);
+      clampToWorld(npc.group.position);
       npc.hp = data.hp ?? DUEL_HP;
       npc.alive = data.alive !== false;
       npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
@@ -740,7 +747,7 @@ function applyDuelSnapshot(snapshot, options = {}) {
     });
   }
 
-  if (snapshot.elapsed != null && levelState.startTime != null) {
+  if (options.resyncTime && snapshot.elapsed != null && levelState.startTime != null) {
     totalTime = levelState.startTime + snapshot.elapsed;
   }
 
@@ -830,8 +837,8 @@ function applyRemoteGameState(state) {
     });
     updateMpUI();
     updateTaskMpUI();
-  } else if (midGameReconnect && state.duelNpcs) {
-    applyDuelSnapshot(state, { respawnNpcs: false });
+  } else if (midGameReconnect && state.duelNpcs && state.syncSnapshot) {
+    applyDuelSnapshot(state, { respawnNpcs: false, resyncTime: true });
   }
 
   if (state.phase === "paused" && gameStatus === "playing") {
@@ -930,7 +937,10 @@ function createMpCallbacks() {
       if (gameMode === "duel" && getIsHost() && gameStatus === "levelSelect") {
         startDuelBriefing();
       } else if (gameStatus !== "levelSelect") {
-        pushGameState({ includeSnapshot: gameStatus === "playing" });
+        const now = performance.now();
+        if (gameStatus === "playing" && now - lastGuestSnapshotAt < 12000) return;
+        lastGuestSnapshotAt = now;
+        pushGameState({ includeSnapshot: true, syncSnapshot: true });
       }
     },
     onRoomReady() {
@@ -1372,6 +1382,7 @@ function resize() {
 
 function disposeScene() {
   if (!scene) return;
+  removeGatherMarker();
   // 清理粒子（材质是共享缓存的，不 dispose）
   particles.forEach((p) => {
     scene.remove(p.mesh);
@@ -1447,9 +1458,10 @@ function resetLevel(index, options = {}) {
   }
 
   duelSeparateTick = 0;
-  duelHerdIndex = -1;
-  duelHerdActive = false;
-  duelHerdDir.set(0, 1);
+  duelGatherSpotIndex = -1;
+  duelGatherCheckedIndex = -1;
+  duelGatherMetWindow = false;
+  removeGatherMarker();
 
   player = createPlayer();
   player.hp = duel ? (options.playerHp ?? DUEL_HP) : ATTEMPTS;
@@ -2167,7 +2179,7 @@ function spawnDuelNpcs() {
     npc.pauseTimer = randomRange(0.2, 1.3);
     npc.walking = false;
     npc.hp = DUEL_HP;
-    npc.punchDelay = NPC_PUNCH_INTERVAL;
+    npc.punchDelay = NPC_PUNCH_INTERVAL * ((i % 12) / 12);
     npc.punchTimer = 0;
     npc.punchHitDone = false;
     npcs.push(npc);
@@ -2194,52 +2206,131 @@ function spawnDuelNpcsFromSnapshot(snapshot) {
   });
 }
 
-function generateDuelHerdDirection(cycleIndex, worldSeed) {
-  const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 2654435761));
-  const angle = rng() * Math.PI * 2;
-  return new THREE.Vector2(Math.sin(angle), Math.cos(angle)).normalize();
+function generateDuelGatherSpot(cycleIndex, worldSeed) {
+  const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 1597334677));
+  const probe = { group: { position: new THREE.Vector3() } };
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    probe.group.position.set(
+      rng() * 14 - 7,
+      0,
+      rng() * (7.2 - (PLAY_Z_MIN + 1.0)) + PLAY_Z_MIN + 1.0,
+    );
+    nudgeActorFromObstacles(probe);
+    if (!collidesWithObstacle(probe.group.position)) {
+      return {
+        x: probe.group.position.x,
+        z: probe.group.position.z,
+        radius: DUEL_GATHER_RADIUS,
+      };
+    }
+  }
+  return { x: 0, z: 2, radius: DUEL_GATHER_RADIUS };
 }
 
-function updateDuelHerdState() {
+function isPlayerInGatherCircle() {
+  if (!player?.group) return false;
+  const dx = player.group.position.x - duelGatherSpot.x;
+  const dz = player.group.position.z - duelGatherSpot.z;
+  return dx * dx + dz * dz <= duelGatherSpot.radius * duelGatherSpot.radius;
+}
+
+function ensureGatherMarker() {
+  if (duelGatherMarker || !scene) return;
+  const ringGeo = new THREE.RingGeometry(DUEL_GATHER_RADIUS * 0.82, DUEL_GATHER_RADIUS, 48);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x22c55e,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  duelGatherMarker = new THREE.Mesh(ringGeo, ringMat);
+  duelGatherMarker.rotation.x = -Math.PI / 2;
+  duelGatherMarker.position.y = 0.04;
+
+  const fillGeo = new THREE.CircleGeometry(DUEL_GATHER_RADIUS * 0.8, 48);
+  const fillMat = new THREE.MeshBasicMaterial({
+    color: 0x22c55e,
+    transparent: true,
+    opacity: 0.14,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  const fill = new THREE.Mesh(fillGeo, fillMat);
+  fill.rotation.x = -Math.PI / 2;
+  fill.position.y = -0.005;
+  duelGatherMarker.add(fill);
+  duelGatherMarker.userData.fill = fill;
+  scene.add(duelGatherMarker);
+}
+
+function removeGatherMarker() {
+  if (!duelGatherMarker) return;
+  if (scene) scene.remove(duelGatherMarker);
+  duelGatherMarker.geometry?.dispose();
+  duelGatherMarker.material?.dispose();
+  duelGatherMarker.userData.fill?.geometry?.dispose();
+  duelGatherMarker.userData.fill?.material?.dispose();
+  duelGatherMarker = null;
+}
+
+function getDuelGatherHudHint() {
+  if (!isDuelLevel() || levelState?.startTime == null) return "";
+  const elapsed = Math.max(0, totalTime - levelState.startTime);
+  const gatherIndex = Math.floor(elapsed / DUEL_GATHER_INTERVAL);
+  const phaseInCycle = elapsed - gatherIndex * DUEL_GATHER_INTERVAL;
+  const timeToDeadline = DUEL_GATHER_INTERVAL - phaseInCycle;
+  if (timeToDeadline > DUEL_GATHER_PREVIEW) return "";
+  if (timeToDeadline <= DUEL_GATHER_WINDOW) {
+    return duelGatherMetWindow
+      ? `✅ 已在集合圈 · 剩余 ${Math.ceil(timeToDeadline)}s`
+      : `🔴 进集合圈！${Math.ceil(timeToDeadline)}s 内未到达扣 1 ❤️`;
+  }
+  return `📍 集合圈已刷新 · ${Math.ceil(timeToDeadline)}s 后截止`;
+}
+
+function updateDuelGather() {
   if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) {
-    duelHerdActive = false;
+    removeGatherMarker();
     return;
   }
 
   const elapsed = Math.max(0, totalTime - levelState.startTime);
-  if (elapsed < DUEL_HERD_INTERVAL) {
-    duelHerdActive = false;
-    return;
+  const gatherIndex = Math.floor(elapsed / DUEL_GATHER_INTERVAL);
+  const phaseInCycle = elapsed - gatherIndex * DUEL_GATHER_INTERVAL;
+  const timeToDeadline = DUEL_GATHER_INTERVAL - phaseInCycle;
+
+  if (gatherIndex !== duelGatherSpotIndex) {
+    if (duelGatherSpotIndex >= 0 && duelGatherCheckedIndex !== duelGatherSpotIndex) {
+      duelGatherCheckedIndex = duelGatherSpotIndex;
+      if (!duelGatherMetWindow && player.hp > 0) {
+        applyPlayerDamage(1, "未及时集合");
+      }
+    }
+    duelGatherSpotIndex = gatherIndex;
+    duelGatherMetWindow = false;
+    Object.assign(duelGatherSpot, generateDuelGatherSpot(gatherIndex, levelState.worldSeed));
   }
 
-  const cycleIndex = Math.floor(elapsed / DUEL_HERD_INTERVAL);
-  const phase = elapsed - cycleIndex * DUEL_HERD_INTERVAL;
-  duelHerdActive = phase < DUEL_HERD_DURATION;
+  const showMarker = timeToDeadline <= DUEL_GATHER_PREVIEW && timeToDeadline > 0;
+  const activeWindow = timeToDeadline <= DUEL_GATHER_WINDOW && timeToDeadline > 0;
 
-  if (cycleIndex !== duelHerdIndex) {
-    duelHerdIndex = cycleIndex;
-    duelHerdDir.copy(generateDuelHerdDirection(cycleIndex, levelState.worldSeed));
-    npcs.forEach((npc) => {
-      if (!npc.alive) return;
-      npc.pauseTimer = 0;
-      npc.wanderTimer = 1;
-      npc.velocity.set(0, 0);
-    });
+  if (showMarker) {
+    ensureGatherMarker();
+    duelGatherMarker.position.set(duelGatherSpot.x, 0.04, duelGatherSpot.z);
+    const urgent = activeWindow;
+    duelGatherMarker.material.color.setHex(urgent ? 0xef4444 : 0x22c55e);
+    duelGatherMarker.userData.fill.material.color.setHex(urgent ? 0xef4444 : 0x22c55e);
+    const pulse = 0.42 + Math.sin(totalTime * (urgent ? 9 : 4)) * 0.18 + (urgent ? 0.2 : 0);
+    duelGatherMarker.material.opacity = pulse;
+    duelGatherMarker.visible = true;
+  } else if (duelGatherMarker) {
+    duelGatherMarker.visible = false;
   }
-}
 
-function updateDuelNpcMovement(npc, dt) {
-  if (duelHerdActive) {
-    npc.walking = true;
-    const speed = NPC_SPEED * 1.45;
-    npc.group.position.x += duelHerdDir.x * speed * dt;
-    npc.group.position.z += duelHerdDir.y * speed * dt;
-    clampActorPosition(npc.group.position, duelHerdDir);
-    const targetRotation = Math.atan2(duelHerdDir.x, duelHerdDir.y);
-    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.12);
-    return;
+  if (activeWindow && isPlayerInGatherCircle()) {
+    duelGatherMetWindow = true;
   }
-  updateWander(npc, dt);
 }
 
 function generateDuelSpawnPair(seed) {
@@ -2538,9 +2629,11 @@ function clampActorPosition(position, velocity = null) {
 }
 
 function pickWanderDirection(npc) {
-  const angle = Math.random() * Math.PI * 2;
-  npc.velocity.set(Math.sin(angle), Math.cos(angle)).multiplyScalar(randomRange(0.55, 1.15));
-  npc.wanderTimer = randomRange(1.0, 3.0);
+  const rng = isDuelLevel() && duelRng ? duelRng : Math.random;
+  const angle = rng() * Math.PI * 2;
+  const scale = isDuelLevel() && duelRng ? rng() * 0.6 + 0.55 : randomRange(0.55, 1.15);
+  npc.velocity.set(Math.sin(angle), Math.cos(angle)).multiplyScalar(scale);
+  npc.wanderTimer = isDuelLevel() && duelRng ? rng() * 2 + 1 : randomRange(1.0, 3.0);
   npc.stuckTimer = 0;
 }
 
@@ -3001,10 +3094,10 @@ function updateRemotePlayerAnim(dt) {
 
 function updateNpcs(dt) {
   if (isDuelLevel()) {
-    updateDuelHerdState();
+    updateDuelGather();
     npcs.forEach((npc) => {
       if (!npc.alive) return;
-      updateDuelNpcMovement(npc, dt);
+      updateWander(npc, dt);
       updateDuelNpcPunch(npc, dt);
       animateActor(npc, dt, npc.walking);
       animateNpcPunchPose(npc);
@@ -3710,7 +3803,11 @@ function updateHud() {
     ui.attemptText.classList.remove("hearts-display");
   }
   ui.clueBar.textContent = duel
-    ? `⚔️ 你的生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_HP)} · 躲避 NPC 拳头`
+    ? (() => {
+        const gatherHint = getDuelGatherHudHint();
+        const base = `你的生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_HP)}`;
+        return gatherHint ? `⚔️ ${gatherHint} · ${base}` : `⚔️ ${base} · 躲避 NPC 拳头`;
+      })()
     : "🔍 " + (levelState.level.hudClue || levelState.level.clue);
 
   // 出拳冷却动画

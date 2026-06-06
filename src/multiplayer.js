@@ -125,9 +125,23 @@ function bindGuestListeners() {
   listenRemote("host");
 
   const stateRef = ref(db, `rooms/${roomId}/gameState`);
+  let pendingState = null;
+  let stateFlushScheduled = false;
+
+  const flushState = () => {
+    stateFlushScheduled = false;
+    if (pendingState && onGameState) onGameState(pendingState);
+    pendingState = null;
+  };
+
   unsubscribes.push(onValue(stateRef, (snap) => {
     const data = snap.val();
-    if (data && onGameState) onGameState(data);
+    if (!data) return;
+    pendingState = data;
+    if (!stateFlushScheduled) {
+      stateFlushScheduled = true;
+      requestAnimationFrame(flushState);
+    }
   }));
 
   const winRef = ref(db, `rooms/${roomId}/hostWin`);
