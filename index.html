@@ -12,8 +12,12 @@
     <main id="hud" class="hud">
       <section class="topbar">
         <div class="mission-strip">
-          <div id="sceneName" class="scene-name">凌晨三点</div>
+          <div class="mission-header">
+            <div id="sceneName" class="scene-name">凌晨三点</div>
+            <button id="missionToggleButton" class="mission-toggle-button" type="button" aria-label="收起任务卡片" aria-expanded="true">⌃</button>
+          </div>
           <div id="missionText" class="mission-text">任务加载中</div>
+          <div id="mechanicHint" class="mechanic-hint" aria-hidden="true"></div>
         </div>
         <div class="status-strip">
           <div class="status-chip">

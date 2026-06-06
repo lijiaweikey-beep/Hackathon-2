@@ -73,9 +73,60 @@ button {
 
 .mission-strip {
   min-width: 0;
-  max-width: min(58%, 420px);
+  max-width: min(62%, 470px);
   padding: 10px 12px;
   border-radius: 8px;
+  pointer-events: auto;
+  transition: max-width 180ms ease, padding 180ms ease;
+}
+
+.mission-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mission-toggle-button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 24px;
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 7px;
+  background: rgba(8, 18, 28, 0.48);
+  color: var(--accent);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.mission-toggle-button:hover {
+  border-color: rgba(45, 212, 191, 0.5);
+  background: rgba(20, 184, 166, 0.16);
+}
+
+.mission-toggle-button:active {
+  transform: translateY(1px);
+}
+
+.mission-toggle-button:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.8);
+  outline-offset: 2px;
+}
+
+.mission-strip.collapsed {
+  max-width: min(62%, 250px);
+  padding-bottom: 9px;
+}
+
+.mission-strip.collapsed .mission-text,
+.mission-strip.collapsed .mechanic-hint {
+  display: none;
 }
 
 .scene-name {
@@ -83,6 +134,11 @@ button {
   font-size: 12px;
   line-height: 1.2;
   font-weight: 800;
+}
+
+.scene-name.bloodmoon-text {
+  color: #fb7185;
+  text-shadow: 0 0 16px rgba(248, 113, 113, 0.55);
 }
 
 .mission-text {
@@ -117,6 +173,11 @@ button {
 
 .status-chip.danger strong {
   color: var(--danger);
+}
+
+.status-chip.bloodmoon strong {
+  color: #fca5a5;
+  text-shadow: 0 0 14px rgba(248, 113, 113, 0.55);
 }
 
 .status-label {
@@ -220,6 +281,15 @@ button {
 
 .attack-button.cooling {
   opacity: 0.7;
+}
+
+.attack-button.bloodmoon {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(160deg, #7f1d1d, #fb7185 58%, #111116);
+  box-shadow: 0 18px 34px rgba(248, 113, 113, 0.34), 0 20px 36px var(--shadow);
+  color: #fff5f5;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
 }
 
 .cooldown-overlay {
@@ -348,6 +418,232 @@ button {
   text-align: center;
   pointer-events: none;
   animation: cluePulse 2.5s ease-in-out infinite;
+}
+
+.clue-bar.bloodmoon {
+  border-color: rgba(248, 113, 113, 0.36);
+  color: #fca5a5;
+  background: rgba(33, 6, 11, 0.72);
+  text-shadow: 0 0 14px rgba(248, 113, 113, 0.42);
+}
+
+.clue-bar.hidden {
+  display: none;
+}
+
+.mechanic-hint {
+  display: none;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(45, 212, 191, 0.24);
+  color: rgba(236, 253, 245, 0.92);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 750;
+  text-align: left;
+  pointer-events: none;
+}
+
+.mechanic-hint.visible {
+  display: block;
+}
+
+.mechanic-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.mechanic-hint-row:first-child {
+  margin-top: 0;
+}
+
+.mechanic-hint-label {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-weight: 900;
+}
+
+.mechanic-hint-text {
+  min-width: 0;
+}
+
+.mechanic-hint .shadow-mark {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 42px;
+  margin: -6px 1px -7px 0;
+  vertical-align: -15px;
+}
+
+.mechanic-hint .shadow-line {
+  position: absolute;
+  border-radius: 999px;
+  background: #12352f;
+  box-shadow: 0 0 8px rgba(18, 53, 47, 0.5);
+  transform-origin: center center;
+}
+
+.mechanic-hint .shadow-line.accent {
+  background: #5eead4;
+  box-shadow: 0 0 10px rgba(94, 234, 212, 0.55);
+}
+
+.hud.bloodmoon-hit::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 42%, rgba(127, 29, 29, 0.32)),
+    rgba(248, 113, 113, 0.22);
+  animation: bloodmoonHitFlash 180ms ease-out both;
+}
+
+.hud.bloodmoon-lightning::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(105deg, transparent 0 42%, rgba(255, 255, 255, 0.86) 43%, transparent 46% 58%, rgba(219, 234, 254, 0.72) 59%, transparent 62%),
+    rgba(239, 246, 255, 0.42);
+  mix-blend-mode: screen;
+  animation: bloodmoonLightningFlash 360ms steps(3, end) both;
+}
+
+.hunt-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  color: var(--text);
+  background: radial-gradient(circle at center, rgba(127, 29, 29, 0.16), rgba(4, 7, 12, 0.58));
+}
+
+.hunt-intro.visible {
+  animation: huntIntroFlash 2.8s ease both;
+}
+
+.hunt-intro > * {
+  grid-area: 1 / 1;
+}
+
+.hunt-intro-moon {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #fecdd3, #dc2626 48%, #450a0a 74%);
+  box-shadow: 0 0 60px rgba(248, 113, 113, 0.44);
+  animation: huntMoonPulse 2.8s ease both;
+}
+
+.hunt-intro-title {
+  margin-top: -54px;
+  color: #fecdd3;
+  font-size: 15px;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-shadow: 0 0 18px rgba(248, 113, 113, 0.78);
+}
+
+.hunt-intro-quote {
+  margin-top: 74px;
+  width: min(520px, calc(100% - 34px));
+  text-align: center;
+  color: #fff1f2;
+  font-size: 24px;
+  line-height: 1.28;
+  font-weight: 950;
+  text-shadow: 0 0 24px rgba(0, 0, 0, 0.72);
+}
+
+.hunt-card {
+  position: fixed;
+  left: 50%;
+  top: 22%;
+  z-index: 4;
+  width: min(420px, calc(100% - 32px));
+  padding: 16px 18px;
+  border: 1px solid rgba(248, 113, 113, 0.44);
+  border-radius: 8px;
+  background: rgba(20, 6, 10, 0.9);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.46), 0 0 28px rgba(248, 113, 113, 0.18);
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -14px) scale(0.98);
+}
+
+.hunt-card.visible {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.hunt-card-title {
+  color: #fca5a5;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 950;
+}
+
+.hunt-card-quote {
+  margin-top: 7px;
+  color: #fff1f2;
+  font-size: 19px;
+  line-height: 1.28;
+  font-weight: 950;
+}
+
+.hunt-card-rule {
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.hunt-card-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 14px;
+  border-radius: 8px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 950;
+}
+
+@keyframes huntIntroFlash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes huntMoonPulse {
+  0% { transform: scale(0.58); opacity: 0; }
+  20% { transform: scale(1.06); opacity: 1; }
+  62% { transform: scale(0.98); opacity: 1; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+@keyframes bloodmoonHitFlash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes bloodmoonLightningFlash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  28% { opacity: 0.22; }
+  42% { opacity: 0.95; }
+  100% { opacity: 0; }
 }
 
 @keyframes cluePulse {
@@ -591,6 +887,10 @@ button {
   .mission-strip {
     max-width: calc(100% - 152px);
     padding: 9px 10px;
+  }
+
+  .mission-strip.collapsed {
+    max-width: calc(100% - 152px);
   }
 
   .mission-text {
