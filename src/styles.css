@@ -218,6 +218,44 @@ button {
   transform: scale(0.96);
 }
 
+.attack-button.punching {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 0 6px rgba(251, 113, 133, 0.45),
+    0 18px 34px rgba(245, 158, 11, 0.35),
+    0 20px 36px var(--shadow);
+}
+
+.damage-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 120;
+  background: radial-gradient(circle at center, rgba(255, 60, 60, 0.55), rgba(180, 20, 20, 0.15) 55%, transparent 75%);
+  opacity: 0;
+  transition: opacity 0.05s ease-out;
+}
+
+.damage-flash.active {
+  opacity: 1;
+  animation: damage-flash-pulse 0.38s ease-out forwards;
+}
+
+@keyframes damage-flash-pulse {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+.hearts-display {
+  font-size: 1.05em;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.status-chip.danger .hearts-display {
+  font-size: 1.15em;
+}
+
 .attack-button.cooling {
   opacity: 0.7;
 }

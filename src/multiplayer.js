@@ -81,6 +81,15 @@ function shouldRejoinAsHost(existingRoom, roleParam) {
   return getStoredHostRoom() === existingRoom;
 }
 
+/** Firebase 拒绝 undefined 字段，写入前剔除 */
+function omitUndefined(obj) {
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
 function bindHostListeners() {
   const guestRef = ref(db, `rooms/${roomId}/guest`);
   let guestJoinNotified = false;
@@ -157,12 +166,17 @@ export async function initMultiplayer(callbacks) {
   const existingRoom = params.get("room");
   const roleParam = params.get("role");
 
-  if (existingRoom && shouldRejoinAsHost(existingRoom, roleParam)) {
-    await rejoinAsHost(existingRoom);
-  } else if (existingRoom) {
-    await joinRoom(existingRoom);
-  } else {
-    createRoom();
+  try {
+    if (existingRoom && shouldRejoinAsHost(existingRoom, roleParam)) {
+      await rejoinAsHost(existingRoom);
+    } else if (existingRoom) {
+      await joinRoom(existingRoom);
+    } else {
+      createRoom();
+    }
+  } catch (err) {
+    console.error("[multiplayer] init failed:", err);
+    if (onJoinFailed) onJoinFailed("error");
   }
 }
 
@@ -217,14 +231,14 @@ async function rejoinAsHost(id) {
     clearRoundSignals();
   }
 
-  set(myRef, {
+  set(myRef, omitUndefined({
     x: hostSnap.val()?.x ?? 0,
     z: hostSnap.val()?.z ?? 0,
     rotation: hostSnap.val()?.rotation ?? 0,
     hp: hostSnap.val()?.hp,
     clientId: getOrCreateClientId(),
     joinedAt: serverTimestamp(),
-  });
+  }));
 
   onDisconnect(roomRef).remove();
   bindHostListeners();
@@ -265,14 +279,14 @@ async function joinRoom(id) {
   myRef = ref(db, `rooms/${roomId}/guest`);
 
   const prev = guestSnap.val();
-  set(myRef, {
+  set(myRef, omitUndefined({
     x: prev?.x ?? 0,
     z: prev?.z ?? 0,
     rotation: prev?.rotation ?? 0,
     hp: prev?.hp,
     clientId,
     joinedAt: serverTimestamp(),
-  });
+  }));
 
   onDisconnect(myRef).remove();
   bindGuestListeners();
@@ -319,7 +333,7 @@ export function syncPosition(x, z, rotation) {
 export function syncPunch(x, z, rotation, extra = {}) {
   if (!roomId) return;
   const punchRef = ref(db, `rooms/${roomId}/${playerId}Punch`);
-  set(punchRef, { x, z, rotation, ...extra, t: serverTimestamp() });
+  set(punchRef, omitUndefined({ x, z, rotation, ...extra, t: serverTimestamp() }));
 }
 
 export function syncHp(hp) {
@@ -348,7 +362,7 @@ export function clearGuestReady() {
 export function syncWin(data) {
   if (!roomId) return;
   const winRef = ref(db, `rooms/${roomId}/${playerId}Win`);
-  set(winRef, { ...data, t: serverTimestamp() });
+  set(winRef, omitUndefined({ ...data, t: serverTimestamp() }));
 }
 
 export function clearRoundSignals() {
