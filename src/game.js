@@ -35,6 +35,7 @@ const PUNCH_SWING = 0.32;
 const NPC_PUNCH_INTERVAL = 10;
 const NPC_PUNCH_RANGE = 1.65;
 const NPC_PUNCH_SWING = 0.42;
+const NPC_PUNCH_DAMAGE = 0.5;
 const HIT_INVULN = 0.55;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
 const REMOTE_POS_LERP = 14; // 对手位置插值速度（越大越跟手）
@@ -48,10 +49,10 @@ const DUEL_GATHER_RADIUS = 2.2;
 const GATHER_COLOR_PREVIEW = 0x15803d;
 const GATHER_COLOR_URGENT = 0xb91c1c;
 const GATHER_COLOR_SUCCESS = 0x14532d;
+const ACTOR_COLLISION_RADIUS = 0.38;
 const PROXIMITY_BODY_LEN = ACTOR_COLLISION_RADIUS * 2;
 const PROXIMITY_MIN_DIST = PROXIMITY_BODY_LEN * 2;
 const PROXIMITY_MAX_DIST = PROXIMITY_BODY_LEN * 4;
-const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
   {
@@ -435,8 +436,25 @@ function isDuelActive() {
 }
 
 function formatHearts(hp, max = DUEL_HP) {
-  const n = Math.max(0, Math.min(max, Math.ceil(hp ?? 0)));
-  return "❤️".repeat(n) + "🖤".repeat(max - n);
+  const safe = Math.max(0, Math.min(max, Number(hp) || 0));
+  let out = "";
+  for (let i = 0; i < max; i += 1) {
+    const rem = safe - i;
+    if (rem >= 1) out += "❤️";
+    else if (rem >= 0.5) out += "💗";
+    else out += "🖤";
+  }
+  return out;
+}
+
+function buildDuelPuncherSet(worldSeed) {
+  const rng = createSeededRng((worldSeed >>> 0) ^ 0x8f4e2c1b);
+  const order = Array.from({ length: DUEL_NPC_COUNT }, (_, i) => i);
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return new Set(order.slice(0, Math.floor(DUEL_NPC_COUNT / 2)));
 }
 
 function isDuelRematchContext() {
@@ -679,8 +697,8 @@ function showLevelSelect() {
     pushGameState({ phase: "lobby", levelIndex: null, started: false, mode: gameMode });
   }
   syncNpcCountInput();
-  if (!isInDuelLobby()) buildLevelCards();
   updateDuelLobbyUI();
+  if (!isInDuelLobby()) buildLevelCards();
   updateMpUI();
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
@@ -739,6 +757,9 @@ function applyDuelSnapshot(snapshot, options = {}) {
   if (!snapshot?.duelNpcs?.length) return;
   levelState.worldSeed = snapshot.worldSeed ?? levelState.worldSeed;
   duelRng = createSeededRng(levelState.worldSeed);
+  if (!levelState.duelPunchers) {
+    levelState.duelPunchers = buildDuelPuncherSet(levelState.worldSeed);
+  }
 
   if (options.respawnNpcs) {
     npcs.forEach((n) => scene.remove(n.group));
@@ -985,7 +1006,8 @@ function createMpCallbacks() {
           ? "房间不存在或已关闭"
           : "加入房间失败，请刷新重试";
       if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = `❌ ${msg}`;
-      clearRoomFromUrl();
+      leaveDuelLobby();
+      if (ui.mpStatusText) ui.mpStatusText.textContent = `❌ ${msg}`;
     },
   };
 }
@@ -1460,6 +1482,7 @@ function resetLevel(index, options = {}) {
     hitInvuln: 0,
     worldSeed,
     duelSpawns: null,
+    duelPunchers: duel ? buildDuelPuncherSet(worldSeed) : null,
   };
 
   buildWorld(level);
@@ -2181,6 +2204,7 @@ function addWanderNpc(id) {
 }
 
 function spawnDuelNpcs() {
+  const punchers = levelState.duelPunchers ?? buildDuelPuncherSet(levelState.worldSeed);
   for (let i = 0; i < DUEL_NPC_COUNT; i += 1) {
     const npc = createNpc(i, { duelPunch: true });
     const pos = randomOpenPosition();
@@ -2190,6 +2214,7 @@ function spawnDuelNpcs() {
     npc.pauseTimer = randomRange(0.2, 1.3);
     npc.walking = false;
     npc.hp = DUEL_HP;
+    npc.canPunch = punchers.has(i);
     npc.punchDelay = NPC_PUNCH_INTERVAL * ((i % 12) / 12);
     npc.punchTimer = 0;
     npc.punchHitDone = false;
@@ -2200,11 +2225,14 @@ function spawnDuelNpcs() {
 
 function spawnDuelNpcsFromSnapshot(snapshot) {
   duelRng = createSeededRng(snapshot.worldSeed ?? levelState.worldSeed);
+  const punchers = levelState.duelPunchers
+    ?? buildDuelPuncherSet(snapshot.worldSeed ?? levelState.worldSeed);
   snapshot.duelNpcs.forEach((data, i) => {
     const npc = createNpc(i, { duelPunch: true });
     npc.group.position.set(data.x, 0, data.z);
     npc.hp = data.hp ?? DUEL_HP;
     npc.alive = data.alive !== false;
+    npc.canPunch = punchers.has(i);
     npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
     npc.punchTimer = data.punchTimer ?? 0;
     npc.punchHitDone = false;
@@ -2513,6 +2541,8 @@ function duelActorSpawn(isLocalPlayer) {
 }
 
 function updateDuelNpcPunch(npc, dt) {
+  if (!npc.canPunch) return;
+
   if (npc.punchTimer > 0) {
     npc.punchTimer = Math.max(0, npc.punchTimer - dt);
     const punchT = 1 - npc.punchTimer / NPC_PUNCH_SWING;
@@ -2562,7 +2592,7 @@ function tryNpcPunchHit(npc) {
     );
     if (toTarget.length() > NPC_PUNCH_RANGE || !isFacingTarget(facing, toTarget)) return;
     if (actor === player) {
-      applyPlayerDamage(1, "NPC 出拳");
+      applyPlayerDamage(NPC_PUNCH_DAMAGE, "NPC 出拳");
     }
   });
 }
