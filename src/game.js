@@ -3,7 +3,11 @@ import {
   initMultiplayer,
   syncPosition,
   syncPunch,
+  syncGameState,
+  syncGuestReady,
+  clearGuestReady,
   getShareLink,
+  getIsHost,
   isConnected,
   cleanup as mpCleanup,
 } from "./multiplayer.js";
@@ -88,6 +92,7 @@ const ui = {
   targetPreviewCanvas: document.querySelector("#targetPreviewCanvas"),
   targetLabel: document.querySelector("#targetLabel"),
   startButton: document.querySelector("#startButton"),
+  taskMpHint: document.querySelector("#taskMpHint"),
   resultModal: document.querySelector("#resultModal"),
   resultRating: document.querySelector("#resultRating"),
   resultTitle: document.querySelector("#resultTitle"),
@@ -119,6 +124,8 @@ let clock;
 let player;
 let remotePlayer = null; // 对手角色
 let mpStatus = "none"; // "none" | "waiting" | "connected"
+let guestReady = false;
+let guestConfirmed = false;
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
@@ -278,16 +285,25 @@ function onNpcCountInputChange() {
 }
 
 /* ---- 关卡选择 ---- */
+function canHostPickLevel() {
+  return !isConnected() || (getIsHost() && mpStatus === "connected");
+}
+
 function buildLevelCards() {
   ui.levelCards.innerHTML = "";
+  const mpGuest = isConnected() && !getIsHost();
+  const mpHostWaiting = isConnected() && getIsHost() && mpStatus !== "connected";
+
   LEVELS.forEach((level, i) => {
     const best = getBestScore(level.id);
     const stars = "★".repeat(level.difficulty) + "☆".repeat(3 - level.difficulty);
     const bestText = best ? `${best.grade} · ${best.time}s` : "--";
+    const disabled = mpGuest || mpHostWaiting;
 
     const card = document.createElement("button");
-    card.className = "level-card";
+    card.className = disabled ? "level-card disabled" : "level-card";
     card.type = "button";
+    card.disabled = disabled;
     card.innerHTML = `
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-body">
@@ -300,15 +316,26 @@ function buildLevelCards() {
       </div>
       <div class="level-card-arrow">›</div>
     `;
-    card.addEventListener("click", () => selectLevel(i));
+    if (!disabled) {
+      card.addEventListener("click", () => selectLevel(i));
+    }
     ui.levelCards.appendChild(card);
   });
+
+  if (mpGuest) {
+    ui.npcCountInput.disabled = true;
+  } else {
+    ui.npcCountInput.disabled = false;
+  }
 }
 
 function showLevelSelect() {
   disposeScene();
   scene = null;
   gameStatus = "levelSelect";
+  guestReady = false;
+  guestConfirmed = false;
+  if (isConnected() && getIsHost()) clearGuestReady();
   syncNpcCountInput();
   buildLevelCards();
   updateMpUI();
@@ -322,23 +349,146 @@ function updateMpUI() {
     ui.mpCreateBtn.style.display = "none";
     ui.mpShareBox.style.display = "block";
     ui.mpLinkInput.value = getShareLink();
-    if (mpStatus === "connected") {
-      ui.mpStatusText.textContent = "✅ 对手已加入！选择关卡开始对战";
+    const isGuest = !getIsHost();
+    if (isGuest) {
+      ui.mpLinkInput.style.display = "none";
+      ui.mpCopyBtn.style.display = "none";
+      if (gameStatus === "levelSelect") {
+        ui.mpStatusText.textContent = mpStatus === "connected"
+          ? "✅ 已加入房间，等待房主选择关卡..."
+          : "🔗 正在加入房间...";
+      } else {
+        ui.mpStatusText.textContent = "✅ 已加入对战";
+      }
       ui.mpStatusText.style.color = "#4ade80";
     } else {
-      ui.mpStatusText.textContent = "🔗 等待对手加入...";
+      ui.mpLinkInput.style.display = "";
+      ui.mpCopyBtn.style.display = "";
+      if (mpStatus === "connected") {
+        ui.mpStatusText.textContent = "✅ 选手已加入！请选择关卡";
+        ui.mpStatusText.style.color = "#4ade80";
+      } else {
+        ui.mpStatusText.textContent = "🔗 等待选手加入...（请分享下方链接）";
+        ui.mpStatusText.style.color = "";
+      }
     }
   } else {
     ui.mpCreateBtn.style.display = "";
     ui.mpShareBox.style.display = "none";
+    ui.mpLinkInput.style.display = "";
+    ui.mpCopyBtn.style.display = "";
   }
 }
 
+function pushGameState(extra = {}) {
+  if (!isConnected() || !getIsHost()) return;
+  syncGameState({
+    levelIndex: currentLevelIndex,
+    npcCount: matchNpcCount,
+    started: gameStatus === "playing",
+    ...extra,
+  });
+}
+
+function applyRemoteGameState(state) {
+  if (!state || getIsHost()) return;
+
+  if (state.npcCount != null) {
+    matchNpcCount = clampNpcCount(state.npcCount);
+    syncNpcCountInput();
+    saveMatchNpcCount();
+  }
+
+  if (state.levelIndex != null && gameStatus === "levelSelect") {
+    guestConfirmed = false;
+    currentLevelIndex = state.levelIndex;
+    resetLevel(state.levelIndex);
+    updateMpUI();
+  }
+
+  if (state.started && gameStatus === "briefing") {
+    gameStatus = "playing";
+    levelState.startTime = totalTime;
+    ui.taskModal.classList.remove("visible");
+    updateMpUI();
+  }
+}
+
+function updateTaskMpUI() {
+  if (!isConnected() || gameStatus !== "briefing") {
+    ui.taskMpHint.hidden = true;
+    ui.startButton.disabled = false;
+    ui.startButton.textContent = "开始行动";
+    return;
+  }
+
+  ui.taskMpHint.hidden = false;
+
+  if (getIsHost()) {
+    ui.startButton.textContent = "开始行动";
+    ui.startButton.disabled = !guestReady;
+    ui.taskMpHint.textContent = guestReady
+      ? "✅ 选手已确认，可以开始对战"
+      : "⏳ 等待选手阅读任务并点击「确认就绪」";
+  } else {
+    ui.startButton.textContent = guestConfirmed ? "已确认" : "确认就绪";
+    ui.startButton.disabled = guestConfirmed;
+    ui.taskMpHint.textContent = guestConfirmed
+      ? "✅ 已确认，等待队长开始..."
+      : "请阅读任务后点击「确认就绪」";
+  }
+}
+
+function createMpCallbacks() {
+  return {
+    onRemoteUpdate(data) {
+      if (remotePlayer) {
+        remotePlayer.group.position.set(data.x, 0, data.z);
+        remotePlayer.group.rotation.y = data.rotation || 0;
+      }
+    },
+    onRemotePunch() {
+      if (remotePlayer) remotePlayer.punchTimer = 0.26;
+    },
+    onRemoteWin() {
+      if (gameStatus === "playing" || gameStatus === "settling") {
+        gameStatus = "settling";
+        window.setTimeout(() => finishRound(false, "对手先命中目标！"), 400);
+      }
+    },
+    onGuestJoined() {
+      mpStatus = "connected";
+      buildLevelCards();
+      updateMpUI();
+      pushGameState();
+    },
+    onRoomReady() {
+      mpStatus = "connected";
+      buildLevelCards();
+      updateMpUI();
+    },
+    onGuestReady() {
+      guestReady = true;
+      if (gameStatus === "briefing") updateTaskMpUI();
+    },
+    onGameState(state) {
+      applyRemoteGameState(state);
+    },
+  };
+}
+
 function selectLevel(index) {
-  matchNpcCount = readNpcCountInput();
-  saveMatchNpcCount();
+  if (isConnected() && !canHostPickLevel()) return;
+  if (getIsHost() || !isConnected()) {
+    matchNpcCount = readNpcCountInput();
+    saveMatchNpcCount();
+  }
+  guestReady = false;
+  guestConfirmed = false;
+  if (isConnected() && getIsHost()) clearGuestReady();
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
+  pushGameState({ levelIndex: index, npcCount: matchNpcCount, started: false });
 }
 
 const input = {
@@ -486,27 +636,7 @@ function boot() {
   // 如果 URL 有 room 参数，自动加入房间（guest 模式）
   if (new URLSearchParams(window.location.search).get("room")) {
     mpStatus = "waiting";
-    initMultiplayer({
-      onRemoteUpdate(data) {
-        if (remotePlayer) {
-          remotePlayer.group.position.set(data.x, 0, data.z);
-          remotePlayer.group.rotation.y = data.rotation || 0;
-        }
-      },
-      onRemotePunch() {
-        if (remotePlayer) remotePlayer.punchTimer = 0.26;
-      },
-      onRemoteWin() {
-        if (gameStatus === "playing" || gameStatus === "settling") {
-          gameStatus = "settling";
-          window.setTimeout(() => finishRound(false, "对手先命中目标！"), 400);
-        }
-      },
-      onRoomReady() {
-        mpStatus = "connected";
-        updateMpUI();
-      },
-    });
+    initMultiplayer(createMpCallbacks());
   }
 
   // 初始显示关卡选择，不直接加载关卡
@@ -522,9 +652,21 @@ function setupUi() {
 
   ui.startButton.addEventListener("click", () => {
     if (gameStatus !== "briefing") return;
+
+    if (isConnected() && !getIsHost()) {
+      if (guestConfirmed) return;
+      guestConfirmed = true;
+      syncGuestReady(true);
+      updateTaskMpUI();
+      return;
+    }
+
+    if (isConnected() && getIsHost() && !guestReady) return;
+
     gameStatus = "playing";
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
+    pushGameState({ started: true });
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -560,31 +702,7 @@ function setupUi() {
   // 多人联机按钮
   ui.mpCreateBtn.addEventListener("click", () => {
     if (isConnected()) return;
-    initMultiplayer({
-      onRemoteUpdate(data) {
-        if (remotePlayer) {
-          remotePlayer.group.position.set(data.x, 0, data.z);
-          remotePlayer.group.rotation.y = data.rotation || 0;
-        }
-      },
-      onRemotePunch() {
-        if (remotePlayer) remotePlayer.punchTimer = 0.26;
-      },
-      onRemoteWin(data) {
-        if (gameStatus === "playing" || gameStatus === "settling") {
-          gameStatus = "settling";
-          window.setTimeout(() => finishRound(false, "对手先命中目标！"), 400);
-        }
-      },
-      onGuestJoined() {
-        mpStatus = "connected";
-        updateMpUI();
-      },
-      onRoomReady() {
-        mpStatus = "connected";
-        updateMpUI();
-      },
-    });
+    initMultiplayer(createMpCallbacks());
     mpStatus = "waiting";
     updateMpUI();
   });
@@ -765,6 +883,7 @@ function showTask() {
 
   // 渲染 3D 目标预览
   renderTargetPreview(level);
+  updateTaskMpUI();
 }
 
 function buildWorld(level) {

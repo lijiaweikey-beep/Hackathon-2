@@ -486,6 +486,13 @@ button {
   pointer-events: auto;
 }
 
+.level-card.disabled,
+.level-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .level-card:hover,
 .level-card:active {
   transform: scale(1.02);
@@ -820,4 +827,21 @@ button {
 
 .mp-copy-btn:active {
   transform: scale(0.95);
+}
+
+.task-mp-hint {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  background: rgba(45, 212, 191, 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.primary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

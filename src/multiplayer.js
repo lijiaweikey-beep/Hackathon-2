@@ -38,6 +38,7 @@ let onRemoteWin = null;
 let onGuestJoined = null;
 let onRoomReady = null;
 let onGameState = null;
+let onGuestReady = null;
 
 /**
  * 初始化多人联机
@@ -48,6 +49,7 @@ let onGameState = null;
  * @param {function} callbacks.onGuestJoined - (host) 客人加入房间
  * @param {function} callbacks.onRoomReady - 房间就绪（两人到齐）
  * @param {function} callbacks.onGameState - (guest) 收到游戏初始状态
+ * @param {function} callbacks.onGuestReady - (host) 选手确认就绪
  */
 export function initMultiplayer(callbacks) {
   onRemoteUpdate = callbacks.onRemoteUpdate || null;
@@ -56,6 +58,7 @@ export function initMultiplayer(callbacks) {
   onGuestJoined = callbacks.onGuestJoined || null;
   onRoomReady = callbacks.onRoomReady || null;
   onGameState = callbacks.onGameState || null;
+  onGuestReady = callbacks.onGuestReady || null;
 
   const params = new URLSearchParams(window.location.search);
   const existingRoom = params.get("room");
@@ -106,6 +109,13 @@ function createRoom() {
     if (data && onRemoteWin) onRemoteWin(data);
   });
   unsubscribes.push(unsubWin);
+
+  // 监听选手确认就绪
+  const readyRef = ref(db, `rooms/${roomId}/guestReady`);
+  const unsubReady = onValue(readyRef, (snap) => {
+    if (snap.val() === true && onGuestReady) onGuestReady();
+  });
+  unsubscribes.push(unsubReady);
 }
 
 function joinRoom(id) {
@@ -195,6 +205,24 @@ export function syncGameState(state) {
   if (!roomId || !isHost) return;
   const stateRef = ref(db, `rooms/${roomId}/gameState`);
   set(stateRef, state);
+}
+
+/**
+ * 选手确认就绪
+ */
+export function syncGuestReady(ready) {
+  if (!roomId || isHost) return;
+  const readyRef = ref(db, `rooms/${roomId}/guestReady`);
+  set(readyRef, ready);
+}
+
+/**
+ * 重置选手就绪状态（房主选关时调用）
+ */
+export function clearGuestReady() {
+  if (!roomId || !isHost) return;
+  const readyRef = ref(db, `rooms/${roomId}/guestReady`);
+  set(readyRef, false);
 }
 
 /**
