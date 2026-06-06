@@ -2678,14 +2678,6 @@ function createRemotePlayer() {
   actor.speed = PLAYER_SPEED;
   actor.punchTimer = 0;
   actor.cheer = false;
-  // 对手脚下加一个红色光环区分
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.58, 0.03, 8, 32),
-    new THREE.MeshBasicMaterial({ color: 0xff6b6b, transparent: true, opacity: 0.6 }),
-  );
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.05;
-  actor.group.add(ring);
   return actor;
 }
 
