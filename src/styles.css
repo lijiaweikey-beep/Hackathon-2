@@ -370,6 +370,102 @@ button {
   text-shadow: 0 0 24px rgba(45, 212, 191, 0.4);
 }
 
+.level-select-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.match-settings {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  pointer-events: auto;
+}
+
+.match-settings-icon {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 30px;
+}
+
+.match-settings-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.match-settings-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.match-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.match-settings-input-wrap {
+  flex-shrink: 0;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.match-settings-input {
+  width: 72px;
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.match-settings-input:focus {
+  outline: none;
+}
+
+.match-settings-input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.18);
+}
+
+.match-settings-input::-webkit-outer-spin-button,
+.match-settings-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.match-settings-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
 .level-cards {
   display: flex;
   flex-direction: column;
@@ -652,4 +748,76 @@ button {
   .result-rating {
     font-size: 42px;
   }
+}
+
+/* ---- 多人联机 ---- */
+.mp-section {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.mp-create-btn {
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.mp-create-btn:hover {
+  border-color: var(--accent);
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.mp-share-box {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  background: rgba(45, 212, 191, 0.06);
+  margin-bottom: 12px;
+}
+
+.mp-status {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.mp-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.mp-link-input {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font-size: 12px;
+  font-family: monospace;
+  outline: none;
+  min-width: 0;
+}
+
+.mp-copy-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--accent);
+  color: #04100e;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mp-copy-btn:active {
+  transform: scale(0.95);
 }

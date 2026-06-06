@@ -1,6 +1,17 @@
 import * as THREE from "three";
+import {
+  initMultiplayer,
+  syncPosition,
+  syncPunch,
+  getShareLink,
+  isConnected,
+  cleanup as mpCleanup,
+} from "./multiplayer.js";
 
-const NPC_COUNT = 20;
+const DEFAULT_NPC_COUNT = 20;
+const MIN_NPC_COUNT = 10;
+const MAX_NPC_COUNT = 100;
+const NPC_COUNT_STORAGE_KEY = "nightAction_npcCount";
 const WORLD_LIMIT = 10.8;
 const HIT_RANGE = 1.85;
 const HIT_PAIR_RANGE = 2.15;
@@ -17,7 +28,7 @@ const LEVELS = [
     id: "gaming",
     sceneName: "凌晨三点",
     emoji: "🌙",
-    cardDesc: "在 20 人中找到凌晨三点还在打游戏的人",
+    cardDesc: "在人群中找到凌晨三点还在打游戏的人",
     mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
     clue: "目标特征：有明显黑眼圈",
     targetDesc: "打游戏的人",
@@ -30,7 +41,7 @@ const LEVELS = [
     id: "library",
     sceneName: "图书馆",
     emoji: "📚",
-    cardDesc: "在 20 人中找到图书馆里亲嘴的情侣",
+    cardDesc: "在人群中找到图书馆里亲嘴的情侣",
     mission: "图书馆里有一对情侣在亲嘴，太辣眼睛了！",
     clue: "目标特征：两个人贴在一起，嘴上有口红印",
     targetDesc: "亲嘴的情侣",
@@ -43,7 +54,7 @@ const LEVELS = [
     id: "temple",
     sceneName: "承天寺夜游",
     emoji: "🌕",
-    cardDesc: "在 20 个苏轼影分身里找出真正吵醒怀民的苏轼",
+    cardDesc: "在苏轼影分身里找出真正吵醒怀民的苏轼",
     mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
     hudMission: "观察月下显形线索，找出真正的苏轼。",
     clue: "目标特征：会在月色最亮的中庭停留，随后衣襟泛月白光，身上有竹柏影纹，手里拿着诗卷",
@@ -72,6 +83,8 @@ const ui = {
   taskClue: document.querySelector("#taskClue"),
   taskTime: document.querySelector("#taskTime"),
   taskAttempts: document.querySelector("#taskAttempts"),
+  taskNpcCount: document.querySelector("#taskNpcCount"),
+  npcCountInput: document.querySelector("#npcCountInput"),
   targetPreviewCanvas: document.querySelector("#targetPreviewCanvas"),
   targetLabel: document.querySelector("#targetLabel"),
   startButton: document.querySelector("#startButton"),
@@ -88,6 +101,11 @@ const ui = {
   resumeButton: document.querySelector("#resumeButton"),
   backFromPauseButton: document.querySelector("#backFromPauseButton"),
   backFromTaskButton: document.querySelector("#backFromTaskButton"),
+  mpCreateBtn: document.querySelector("#mpCreateBtn"),
+  mpShareBox: document.querySelector("#mpShareBox"),
+  mpStatusText: document.querySelector("#mpStatusText"),
+  mpLinkInput: document.querySelector("#mpLinkInput"),
+  mpCopyBtn: document.querySelector("#mpCopyBtn"),
   joystick: document.querySelector("#joystick"),
   joystickKnob: document.querySelector("#joystickKnob"),
   attackButton: document.querySelector("#attackButton"),
@@ -99,6 +117,9 @@ let scene;
 let camera;
 let clock;
 let player;
+let remotePlayer = null; // 对手角色
+let mpStatus = "none"; // "none" | "waiting" | "connected"
+let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
 let npcs = [];
@@ -211,6 +232,51 @@ function calcRating(won, timeUsed, attemptsLeft) {
   return { grade: "C", rating: 4 };
 }
 
+function clampNpcCount(value) {
+  return THREE.MathUtils.clamp(Math.round(value), MIN_NPC_COUNT, MAX_NPC_COUNT);
+}
+
+function loadMatchNpcCount() {
+  try {
+    const saved = Number(localStorage.getItem(NPC_COUNT_STORAGE_KEY));
+    if (Number.isFinite(saved)) return clampNpcCount(saved);
+  } catch { /* ignore */ }
+  return DEFAULT_NPC_COUNT;
+}
+
+function saveMatchNpcCount() {
+  try {
+    localStorage.setItem(NPC_COUNT_STORAGE_KEY, String(matchNpcCount));
+  } catch { /* ignore */ }
+}
+
+function getMatchNpcCount() {
+  return matchNpcCount;
+}
+
+function readNpcCountInput() {
+  return clampNpcCount(Number(ui.npcCountInput.value));
+}
+
+function syncNpcCountInput() {
+  ui.npcCountInput.value = String(matchNpcCount);
+}
+
+function formatLevelCardDesc(level) {
+  const n = getMatchNpcCount();
+  if (level.id === "gaming") return `在 ${n} 人中找到凌晨三点还在打游戏的人`;
+  if (level.id === "library") return `在 ${n} 人中找到图书馆里亲嘴的情侣`;
+  if (level.id === "temple") return `在 ${n} 个苏轼影分身里找出真正吵醒怀民的苏轼`;
+  return level.cardDesc;
+}
+
+function onNpcCountInputChange() {
+  matchNpcCount = readNpcCountInput();
+  syncNpcCountInput();
+  saveMatchNpcCount();
+  buildLevelCards();
+}
+
 /* ---- 关卡选择 ---- */
 function buildLevelCards() {
   ui.levelCards.innerHTML = "";
@@ -226,7 +292,7 @@ function buildLevelCards() {
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-body">
         <div class="level-card-name">${level.sceneName}</div>
-        <div class="level-card-desc">${level.cardDesc}</div>
+        <div class="level-card-desc">${formatLevelCardDesc(level)}</div>
         <div class="level-card-meta">
           <span>难度 ${stars}</span>
           <span>最佳 <span class="best">${bestText}</span></span>
@@ -243,13 +309,34 @@ function showLevelSelect() {
   disposeScene();
   scene = null;
   gameStatus = "levelSelect";
+  syncNpcCountInput();
   buildLevelCards();
+  updateMpUI();
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
   ui.resultModal.classList.remove("visible");
 }
 
+function updateMpUI() {
+  if (isConnected()) {
+    ui.mpCreateBtn.style.display = "none";
+    ui.mpShareBox.style.display = "block";
+    ui.mpLinkInput.value = getShareLink();
+    if (mpStatus === "connected") {
+      ui.mpStatusText.textContent = "✅ 对手已加入！选择关卡开始对战";
+      ui.mpStatusText.style.color = "#4ade80";
+    } else {
+      ui.mpStatusText.textContent = "🔗 等待对手加入...";
+    }
+  } else {
+    ui.mpCreateBtn.style.display = "";
+    ui.mpShareBox.style.display = "none";
+  }
+}
+
 function selectLevel(index) {
+  matchNpcCount = readNpcCountInput();
+  saveMatchNpcCount();
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
 }
@@ -394,6 +481,33 @@ function boot() {
   setupUi();
   resize();
   window.addEventListener("resize", resize);
+  window.addEventListener("beforeunload", mpCleanup);
+
+  // 如果 URL 有 room 参数，自动加入房间（guest 模式）
+  if (new URLSearchParams(window.location.search).get("room")) {
+    mpStatus = "waiting";
+    initMultiplayer({
+      onRemoteUpdate(data) {
+        if (remotePlayer) {
+          remotePlayer.group.position.set(data.x, 0, data.z);
+          remotePlayer.group.rotation.y = data.rotation || 0;
+        }
+      },
+      onRemotePunch() {
+        if (remotePlayer) remotePlayer.punchTimer = 0.26;
+      },
+      onRemoteWin() {
+        if (gameStatus === "playing" || gameStatus === "settling") {
+          gameStatus = "settling";
+          window.setTimeout(() => finishRound(false, "对手先命中目标！"), 400);
+        }
+      },
+      onRoomReady() {
+        mpStatus = "connected";
+        updateMpUI();
+      },
+    });
+  }
 
   // 初始显示关卡选择，不直接加载关卡
   showLevelSelect();
@@ -401,6 +515,11 @@ function boot() {
 }
 
 function setupUi() {
+  matchNpcCount = loadMatchNpcCount();
+  syncNpcCountInput();
+  ui.npcCountInput.addEventListener("change", onNpcCountInputChange);
+  ui.npcCountInput.addEventListener("input", onNpcCountInputChange);
+
   ui.startButton.addEventListener("click", () => {
     if (gameStatus !== "briefing") return;
     gameStatus = "playing";
@@ -436,6 +555,46 @@ function setupUi() {
   ui.attackButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     triggerAttack();
+  });
+
+  // 多人联机按钮
+  ui.mpCreateBtn.addEventListener("click", () => {
+    if (isConnected()) return;
+    initMultiplayer({
+      onRemoteUpdate(data) {
+        if (remotePlayer) {
+          remotePlayer.group.position.set(data.x, 0, data.z);
+          remotePlayer.group.rotation.y = data.rotation || 0;
+        }
+      },
+      onRemotePunch() {
+        if (remotePlayer) remotePlayer.punchTimer = 0.26;
+      },
+      onRemoteWin(data) {
+        if (gameStatus === "playing" || gameStatus === "settling") {
+          gameStatus = "settling";
+          window.setTimeout(() => finishRound(false, "对手先命中目标！"), 400);
+        }
+      },
+      onGuestJoined() {
+        mpStatus = "connected";
+        updateMpUI();
+      },
+      onRoomReady() {
+        mpStatus = "connected";
+        updateMpUI();
+      },
+    });
+    mpStatus = "waiting";
+    updateMpUI();
+  });
+
+  ui.mpCopyBtn.addEventListener("click", () => {
+    const link = getShareLink();
+    navigator.clipboard.writeText(link).then(() => {
+      ui.mpCopyBtn.textContent = "已复制!";
+      setTimeout(() => { ui.mpCopyBtn.textContent = "复制"; }, 1500);
+    });
   });
 }
 
@@ -576,6 +735,15 @@ function resetLevel(index) {
   player = createPlayer();
   player.group.position.copy(randomOpenPosition());
   scene.add(player.group);
+
+  // 创建对手角色（多人模式）
+  remotePlayer = null;
+  if (isConnected()) {
+    remotePlayer = createRemotePlayer();
+    remotePlayer.group.position.set(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+    scene.add(remotePlayer.group);
+  }
+
   spawnNpcs(level);
   updateHud();
   showTask();
@@ -587,6 +755,7 @@ function showTask() {
   ui.taskTitle.textContent = level.sceneName;
   ui.taskCopy.textContent = level.mission;
   ui.taskClue.textContent = "🔍 " + level.clue;
+  ui.taskNpcCount.textContent = getMatchNpcCount();
   ui.taskTime.textContent = ROUND_SECONDS;
   ui.taskAttempts.textContent = ATTEMPTS;
   ui.targetLabel.textContent = level.targetDesc;
@@ -1131,7 +1300,7 @@ function spawnNpcs(level) {
     npcs.push(target);
     scene.add(target.group);
 
-    for (let i = 1; i < NPC_COUNT; i += 1) {
+    for (let i = 1; i < getMatchNpcCount(); i += 1) {
       addWanderNpc(i);
     }
   } else if (level.id === "library") {
@@ -1152,7 +1321,7 @@ function spawnNpcs(level) {
       scatterPoints: [new THREE.Vector3(-3, 0, 2.5), new THREE.Vector3(3, 0, 1.6)],
     };
 
-    for (let i = 2; i < NPC_COUNT; i += 1) {
+    for (let i = 2; i < getMatchNpcCount(); i += 1) {
       addWanderNpc(i);
     }
   } else {
@@ -1170,7 +1339,7 @@ function spawnNpcs(level) {
     npcs.push(target);
     scene.add(target.group);
 
-    for (let i = 1; i < NPC_COUNT; i += 1) {
+    for (let i = 1; i < getMatchNpcCount(); i += 1) {
       addWanderNpc(i);
     }
   }
@@ -1369,6 +1538,16 @@ const LOW_POLY_NPC_PALETTES = [
   { jacket: 0xa78bfa, jacketDark: 0x7c3aed, shorts: 0x166534, shortsDark: 0x14532d, cap: 0x0ea5e9, capAccent: 0xfcd34d, sock: 0xbae6fd },
 ];
 
+const LOW_POLY_REMOTE_PALETTE = {
+  jacket: 0xef4444,
+  jacketDark: 0xdc2626,
+  shorts: 0x1e3a5f,
+  shortsDark: 0x172e4a,
+  cap: 0xfbbf24,
+  capAccent: 0xef4444,
+  sock: 0xfca5a5,
+};
+
 const LOW_POLY_TEMPLE_PALETTE = {
   jacket: 0xc8d4dc,
   jacketDark: 0x8796a4,
@@ -1562,6 +1741,22 @@ function createPlayer() {
   return actor;
 }
 
+function createRemotePlayer() {
+  const actor = createLowPolyPerson(LOW_POLY_REMOTE_PALETTE);
+  actor.speed = PLAYER_SPEED;
+  actor.punchTimer = 0;
+  actor.cheer = false;
+  // 对手脚下加一个红色光环区分
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.58, 0.03, 8, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff6b6b, transparent: true, opacity: 0.6 }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.05;
+  actor.group.add(ring);
+  return actor;
+}
+
 function createNpc(id, flags) {
   const isTemple = flags.templeClone || flags.suShiTarget || levelState?.level?.id === "temple";
   const actor = createLowPolyPerson(
@@ -1615,8 +1810,18 @@ function tick() {
     updatePlayer(dt);
     updateNpcs(dt);
     updateHud();
+
+    // 同步本地玩家位置到 Firebase
+    if (isConnected()) {
+      syncPosition(player.group.position.x, player.group.position.z, player.group.rotation.y);
+    }
   } else if (gameStatus === "won") {
     animateCheer(dt);
+  }
+
+  // 更新对手角色动画
+  if (remotePlayer) {
+    updateRemotePlayerAnim(dt);
   }
 
   updateParticles(dt);
@@ -1677,6 +1882,45 @@ function animateCheer(dt) {
   userData.leftArm.rotation.z = 2.45;
   userData.rightArm.rotation.z = -2.45;
   player.group.rotation.y += dt * 1.8;
+}
+
+function updateRemotePlayerAnim(dt) {
+  if (!remotePlayer || !remotePlayer.group.userData) return;
+  const ud = remotePlayer.group.userData;
+  // 检测对手是否在移动（对比上一帧位置）
+  const pos = remotePlayer.group.position;
+  const prevX = remotePlayer._prevX ?? pos.x;
+  const prevZ = remotePlayer._prevZ ?? pos.z;
+  const dx = pos.x - prevX;
+  const dz = pos.z - prevZ;
+  const moving = (dx * dx + dz * dz) > 0.0001;
+  remotePlayer._prevX = pos.x;
+  remotePlayer._prevZ = pos.z;
+
+  // 走路动画
+  remotePlayer.walkCycle = (remotePlayer.walkCycle ?? 0) + dt * (moving ? 8.5 : 2);
+  const walk = moving ? Math.sin(remotePlayer.walkCycle) : 0;
+  if (ud.visual) ud.visual.position.y = moving ? Math.abs(walk) * 0.06 : 0;
+  if (ud.leftLeg) ud.leftLeg.rotation.x = walk * 0.55;
+  if (ud.rightLeg) ud.rightLeg.rotation.x = -walk * 0.55;
+
+  // 出拳动画
+  if (remotePlayer.punchTimer > 0) {
+    remotePlayer.punchTimer = Math.max(0, remotePlayer.punchTimer - dt);
+    const t = Math.sin((remotePlayer.punchTimer / 0.26) * Math.PI);
+    if (ud.rightArm) {
+      ud.rightArm.rotation.x = -1.4 * t;
+      ud.rightArm.rotation.z = (ud.baseArmRotations?.rightZ ?? -0.38) - 0.65 * t;
+    }
+    if (ud.leftArm) {
+      ud.leftArm.rotation.z = (ud.baseArmRotations?.leftZ ?? 0.38) + 0.28 * t;
+    }
+  } else if (ud.leftArm && ud.rightArm && ud.baseArmRotations) {
+    ud.leftArm.rotation.x = -walk * 0.28;
+    ud.rightArm.rotation.x = walk * 0.28;
+    ud.leftArm.rotation.z = ud.baseArmRotations.leftZ + (moving ? -Math.abs(walk) * 0.08 : 0);
+    ud.rightArm.rotation.z = ud.baseArmRotations.rightZ + (moving ? Math.abs(walk) * 0.08 : 0);
+  }
 }
 
 function updateNpcs(dt) {
@@ -2105,6 +2349,11 @@ function triggerAttack() {
   player.punchTimer = 0.26;
   sfxPunch();
 
+  // 同步出拳事件给对手
+  if (isConnected()) {
+    syncPunch(player.group.position.x, player.group.position.z, player.group.rotation.y);
+  }
+
   const hit = findHitTarget();
   if (!hit) return;
 
@@ -2118,6 +2367,10 @@ function triggerAttack() {
     triggerHitstop(0.08);
     triggerShake(0.35, 0.2);
     sfxHit();
+    // 同步胜利给对手
+    if (isConnected()) {
+      syncWin({ time: Math.round(totalTime - levelState.startTime) });
+    }
     gameStatus = "settling";
     window.setTimeout(() => finishRound(true), 760);
     return;
@@ -2236,7 +2489,7 @@ function updateParticles(dt) {
   }
 }
 
-function finishRound(won) {
+function finishRound(won, failMessage) {
   if (gameStatus === "won" || gameStatus === "lost") return;
   gameStatus = won ? "won" : "lost";
   player.cheer = won;
@@ -2247,7 +2500,7 @@ function finishRound(won) {
   const rating = calcRating(won, timeUsed, attemptsLeft);
 
   ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
-  ui.resultCopy.textContent = won ? levelState.level.success : levelState.level.failure;
+  ui.resultCopy.textContent = won ? levelState.level.success : (failMessage || levelState.level.failure);
   ui.resultRating.textContent = rating.grade;
   ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
   ui.statTime.textContent = timeUsed + " 秒";

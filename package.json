@@ -10,8 +10,8 @@
     "serve:dist": "node tools/serve-dist.mjs"
   },
   "dependencies": {
+    "firebase": "^12.14.0",
     "three": "^0.179.1",
     "vite": "^7.0.0"
-  },
-  "devDependencies": {}
+  }
 }
