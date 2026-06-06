@@ -48,6 +48,9 @@ const DUEL_GATHER_RADIUS = 2.2;
 const GATHER_COLOR_PREVIEW = 0x15803d;
 const GATHER_COLOR_URGENT = 0xb91c1c;
 const GATHER_COLOR_SUCCESS = 0x14532d;
+const PROXIMITY_BODY_LEN = ACTOR_COLLISION_RADIUS * 2;
+const PROXIMITY_MIN_DIST = PROXIMITY_BODY_LEN * 2;
+const PROXIMITY_MAX_DIST = PROXIMITY_BODY_LEN * 4;
 const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
@@ -146,6 +149,7 @@ const ui = {
   statAttempts: document.querySelector("#statAttempts"),
   statAttemptsLabel: document.querySelector("#statAttemptsLabel"),
   damageFlash: document.querySelector("#damageFlash"),
+  proximityPulse: document.querySelector("#proximityPulse"),
   retryButton: document.querySelector("#retryButton"),
   backToSelectButton: document.querySelector("#backToSelectButton"),
   pauseButton: document.querySelector("#pauseButton"),
@@ -2374,6 +2378,49 @@ function updateGatherBanner() {
   ui.gatherBannerHint.textContent = state.hint;
 }
 
+function getDuelProximityState() {
+  if (
+    gameStatus !== "playing"
+    || !isDuelActive()
+    || !player?.group
+    || !remotePlayer?.group
+    || remotePlayer.hp <= 0
+    || remotePlayer.group.visible === false
+  ) {
+    return { active: false };
+  }
+
+  const dx = player.group.position.x - remotePlayer.group.position.x;
+  const dz = player.group.position.z - remotePlayer.group.position.z;
+  const dist = Math.hypot(dx, dz);
+
+  if (dist < PROXIMITY_MIN_DIST || dist > PROXIMITY_MAX_DIST) {
+    return { active: false, dist };
+  }
+
+  const t = 1 - (dist - PROXIMITY_MIN_DIST) / (PROXIMITY_MAX_DIST - PROXIMITY_MIN_DIST);
+  const strength = 0.35 + t * 0.65;
+
+  return { active: true, dist, strength };
+}
+
+function updateProximityHint() {
+  if (!ui.proximityPulse) return;
+  const state = getDuelProximityState();
+  if (!state.active) {
+    ui.proximityPulse.classList.add("hidden");
+    ui.proximityPulse.classList.remove("beating");
+    return;
+  }
+
+  ui.proximityPulse.classList.remove("hidden");
+  ui.proximityPulse.classList.add("beating");
+  const edgeGlow = 0.12 + state.strength * 0.38;
+  const beatDuration = 1.05 - state.strength * 0.42;
+  ui.proximityPulse.style.setProperty("--proximity-glow", edgeGlow.toFixed(3));
+  ui.proximityPulse.style.setProperty("--beat-duration", `${beatDuration.toFixed(2)}s`);
+}
+
 function updateDuelGather() {
   if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) {
     removeGatherMarker();
@@ -3036,6 +3083,7 @@ function tick() {
     if (damageFlashTimer > 0) damageFlashTimer = Math.max(0, damageFlashTimer - dt);
     updatePlayer(dt);
     updateNpcs(dt);
+    updateProximityHint();
     updateHud();
 
     // 同步本地玩家位置到 Firebase

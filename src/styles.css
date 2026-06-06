@@ -246,6 +246,79 @@ button {
   100% { opacity: 0; }
 }
 
+/* ---- 对手近距离心跳提示（不显示方向） ---- */
+.proximity-pulse {
+  --proximity-glow: 0.2;
+  --beat-duration: 0.9s;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.proximity-pulse.beating {
+  opacity: 1;
+}
+
+.proximity-pulse.beating::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow:
+    inset 0 0 90px rgba(220, 38, 38, var(--proximity-glow)),
+    inset 0 0 160px rgba(127, 29, 29, calc(var(--proximity-glow) * 0.55));
+  animation: proximity-edge-beat var(--beat-duration) ease-in-out infinite;
+}
+
+.proximity-heart-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.proximity-heart {
+  display: block;
+  font-size: 28px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.55));
+  animation: proximity-heart-beat var(--beat-duration) ease-in-out infinite;
+}
+
+.proximity-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(254, 202, 202, 0.95);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes proximity-heart-beat {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.22); }
+  24% { transform: scale(1); }
+  36% { transform: scale(1.14); }
+  48% { transform: scale(1); }
+}
+
+@keyframes proximity-edge-beat {
+  0%, 100% { opacity: 0.55; }
+  12% { opacity: 1; }
+  24% { opacity: 0.6; }
+  36% { opacity: 0.92; }
+  48% { opacity: 0.55; }
+}
+
+.proximity-pulse.hidden {
+  display: none;
+}
+
 .hearts-display {
   font-size: 1.05em;
   letter-spacing: 0.06em;
