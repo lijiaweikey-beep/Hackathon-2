@@ -394,18 +394,75 @@ button {
 }
 
 /* ---- 关卡选择界面 ---- */
+#levelSelectModal.modal.visible {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(45, 212, 191, 0.14), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 100% 100%, rgba(251, 113, 133, 0.1), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 0% 90%, rgba(245, 158, 11, 0.08), transparent 45%),
+    rgba(4, 7, 12, 0.62);
+  backdrop-filter: blur(12px);
+}
+
 .level-select-panel {
+  position: relative;
   width: min(440px, 100%);
   text-align: center;
   color: var(--text);
+  padding: 4px 2px 8px;
+}
+
+.level-select-panel::before {
+  content: "";
+  position: absolute;
+  inset: -40px -20px auto;
+  height: 180px;
+  background: radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.08), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.level-select-header,
+.level-select-stack,
+.duel-lobby-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.level-select-header {
+  margin-bottom: 22px;
 }
 
 .game-logo {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 950;
-  color: var(--accent);
-  margin-bottom: 28px;
-  text-shadow: 0 0 24px rgba(45, 212, 191, 0.4);
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #fde68a 0%, #fb7185 42%, #2dd4bf 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(251, 113, 133, 0.35));
+}
+
+.level-select-tagline {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(247, 251, 255, 0.42);
+}
+
+.level-select-panel.is-duel-lobby .level-select-tagline {
+  display: none;
+}
+
+.level-select-panel.is-duel-lobby .game-logo {
+  background: linear-gradient(135deg, #2dd4bf, #5eead4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 0 16px rgba(45, 212, 191, 0.45));
 }
 
 [hidden] {
@@ -419,30 +476,62 @@ button {
 .level-select-stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   text-align: left;
+}
+
+.level-section-label {
+  margin: 2px 2px 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(45, 212, 191, 0.72);
+}
+
+.level-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 2px 0;
+  color: rgba(247, 251, 255, 0.28);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.level-section-divider::before,
+.level-section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
 }
 
 .match-settings {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel-strong);
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.08), rgba(255, 255, 255, 0.02)),
+    var(--panel-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   pointer-events: auto;
 }
 
 .match-settings-icon {
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 30px;
+  border-radius: 12px;
+  background: rgba(45, 212, 191, 0.1);
+  border: 1px solid rgba(45, 212, 191, 0.18);
+  font-size: 26px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
 .match-settings-body {
@@ -452,8 +541,8 @@ button {
 
 .match-settings-label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 17px;
+  margin-bottom: 6px;
+  font-size: 15px;
   font-weight: 900;
   color: var(--accent);
   cursor: pointer;
@@ -467,10 +556,10 @@ button {
 
 .match-settings-input-wrap {
   flex-shrink: 0;
-  padding: 4px;
+  padding: 3px;
   border-radius: 10px;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .match-settings-input {
@@ -515,46 +604,84 @@ button {
 .level-cards {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .level-card {
+  --card-accent: var(--accent);
+  --card-glow: rgba(45, 212, 191, 0.22);
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel-strong);
+  gap: 14px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 48%),
+    var(--panel-strong);
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   text-align: left;
   pointer-events: auto;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.level-card--gaming {
+  --card-accent: #818cf8;
+  --card-glow: rgba(129, 140, 248, 0.28);
+}
+
+.level-card--library {
+  --card-accent: #2dd4bf;
+  --card-glow: rgba(45, 212, 191, 0.28);
+}
+
+.level-card--temple {
+  --card-accent: #fbbf24;
+  --card-glow: rgba(251, 191, 36, 0.28);
+}
+
+.level-card-accent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--card-accent), transparent);
+  opacity: 0.95;
 }
 
 .level-card.disabled,
 .level-card:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
   cursor: not-allowed;
   pointer-events: none;
+  filter: grayscale(0.35);
 }
 
-.level-card:hover,
-.level-card:active {
-  transform: scale(1.02);
-  border-color: var(--accent);
-  box-shadow: 0 0 20px rgba(45, 212, 191, 0.15);
+.level-card:not(:disabled):hover,
+.level-card:not(:disabled):active {
+  transform: translateY(-2px) scale(1.01);
+  border-color: color-mix(in srgb, var(--card-accent) 55%, white 10%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--card-accent) 25%, transparent),
+    0 14px 32px var(--card-glow),
+    0 10px 28px rgba(0, 0, 0, 0.32);
 }
 
 .level-card-icon {
-  font-size: 38px;
+  font-size: 32px;
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card-accent) 12%, rgba(255, 255, 255, 0.03));
+  border: 1px solid color-mix(in srgb, var(--card-accent) 22%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .level-card-body {
@@ -563,34 +690,67 @@ button {
 }
 
 .level-card-name {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 900;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  color: var(--text);
 }
 
 .level-card-desc {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .level-card-meta {
   display: flex;
-  gap: 14px;
-  margin-top: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.level-card-stars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.level-star {
+  color: rgba(255, 255, 255, 0.18);
   font-size: 12px;
-  color: var(--muted);
+  line-height: 1;
 }
 
-.level-card-meta .best {
+.level-star.is-on {
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+}
+
+.level-card-best strong {
   color: var(--accent-2);
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.level-card-arrow {
-  font-size: 20px;
-  color: var(--muted);
+.level-card-go {
   flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(160deg, rgba(251, 113, 133, 0.22), rgba(245, 158, 11, 0.18));
+  border: 1px solid rgba(251, 113, 133, 0.28);
+  font-size: 18px;
+  opacity: 0.85;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.level-card:not(:disabled):hover .level-card-go,
+.level-card:not(:disabled):active .level-card-go {
+  transform: scale(1.08);
+  opacity: 1;
 }
 
 /* ---- 任务简报弹窗 ---- */
@@ -775,18 +935,29 @@ button {
 
   .game-logo {
     font-size: 22px;
-    margin-bottom: 22px;
+    margin-bottom: 6px;
+  }
+
+  .level-select-tagline {
+    font-size: 10px;
+    letter-spacing: 0.12em;
   }
 
   .level-card {
-    padding: 14px;
-    gap: 12px;
+    padding: 12px 12px 12px 14px;
+    gap: 11px;
   }
 
   .level-card-icon {
-    font-size: 30px;
-    width: 48px;
-    height: 48px;
+    font-size: 28px;
+    width: 46px;
+    height: 46px;
+  }
+
+  .level-card-go {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
   }
 
   .target-preview-wrap {
@@ -805,16 +976,18 @@ button {
 
 /* ---- 双人决斗大厅 ---- */
 .duel-lobby-panel {
-  padding: 8px 4px 4px;
+  padding: 4px 2px 8px;
   text-align: center;
   pointer-events: auto;
 }
 
 .duel-lobby-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 900;
+  letter-spacing: 0.06em;
   color: var(--accent);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  text-shadow: 0 0 16px rgba(45, 212, 191, 0.35);
 }
 
 .duel-lobby-hint {
@@ -847,25 +1020,53 @@ button {
 
 /* ---- 多人联机 ---- */
 .level-select-stack .mp-create-btn {
-  margin-top: 6px;
+  margin-top: 2px;
   width: 100%;
 }
 
 .mp-create-btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  background:
+    linear-gradient(160deg, rgba(45, 212, 191, 0.18), rgba(245, 158, 11, 0.12)),
+    rgba(255, 255, 255, 0.04);
   color: var(--text);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
   pointer-events: auto;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 28px rgba(45, 212, 191, 0.12);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.mp-create-btn-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mp-create-btn-text {
+  line-height: 1.2;
 }
 
 .mp-create-btn:hover {
-  border-color: var(--accent);
-  background: rgba(45, 212, 191, 0.1);
+  transform: translateY(-1px);
+  border-color: rgba(45, 212, 191, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 24px rgba(45, 212, 191, 0.2),
+    0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.mp-create-btn:active {
+  transform: translateY(0) scale(0.99);
 }
 
 .mp-share-box {

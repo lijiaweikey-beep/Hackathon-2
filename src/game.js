@@ -603,25 +603,29 @@ function buildLevelCards() {
     if (level.duelMode) return;
 
     const best = getBestScore(level.id);
-    const stars = "★".repeat(level.difficulty) + "☆".repeat(3 - level.difficulty);
+    const starsHtml = Array.from({ length: 3 }, (_, si) =>
+      `<span class="level-star${si < level.difficulty ? " is-on" : ""}">★</span>`,
+    ).join("");
     const bestText = best ? `${best.grade} · ${best.time}s` : "--";
     const disabled = mpGuest || mpHostWaiting;
 
     const card = document.createElement("button");
-    card.className = disabled ? "level-card disabled" : "level-card";
+    card.className = `level-card level-card--${level.id}${disabled ? " disabled" : ""}`;
     card.type = "button";
     card.disabled = disabled;
+    card.dataset.level = level.id;
     card.innerHTML = `
+      <div class="level-card-accent" aria-hidden="true"></div>
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-body">
         <div class="level-card-name">${level.sceneName}</div>
         <div class="level-card-desc">${formatLevelCardDesc(level)}</div>
         <div class="level-card-meta">
-          <span>难度 ${stars}</span>
-          <span>最佳 <span class="best">${bestText}</span></span>
+          <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${starsHtml}</span>
+          <span class="level-card-best">最佳 <strong>${bestText}</strong></span>
         </div>
       </div>
-      <div class="level-card-arrow">›</div>
+      <div class="level-card-go" aria-hidden="true"><span>👊</span></div>
     `;
     if (!disabled) {
       card.addEventListener("click", () => selectLevel(i));

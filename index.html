@@ -57,7 +57,10 @@
     <!-- 关卡选择界面 -->
     <section id="levelSelectModal" class="modal visible">
       <div id="levelSelectPanel" class="level-select-panel">
-        <div id="gameLogo" class="game-logo">🔥 别让我逮到你 🔥</div>
+        <header class="level-select-header">
+          <div id="gameLogo" class="game-logo">🔥 别让我逮到你 🔥</div>
+          <p class="level-select-tagline">俯视角 · 人群中找人 · 一拳击倒</p>
+        </header>
 
         <div id="duelLobbyPanel" class="duel-lobby-panel" hidden>
           <div class="duel-lobby-title">⚔️ 图书馆决斗</div>
@@ -98,8 +101,13 @@
               </div>
             </div>
           </div>
+          <p class="level-section-label">选择关卡</p>
           <div id="levelCards" class="level-cards"></div>
-          <button id="mpCreateBtn" class="mp-create-btn" type="button">🎮 创建联机房间（双人决斗）</button>
+          <div class="level-section-divider" aria-hidden="true"><span>或</span></div>
+          <button id="mpCreateBtn" class="mp-create-btn" type="button">
+            <span class="mp-create-btn-icon" aria-hidden="true">⚔️</span>
+            <span class="mp-create-btn-text">创建联机房间 · 双人决斗</span>
+          </button>
         </div>
       </div>
     </section>
