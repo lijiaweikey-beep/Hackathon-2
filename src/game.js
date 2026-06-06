@@ -21,6 +21,7 @@ const MAX_NPC_COUNT = 100;
 const NPC_COUNT_STORAGE_KEY = "nightAction_npcCount";
 const HOST_ROOM_KEY = "nightAction_hostRoom";
 const WORLD_LIMIT = 10.8;
+const PLAY_Z_MIN = -5.0; // 屏幕上方区域不可进入
 const HIT_RANGE = 1.85;
 const HIT_PAIR_RANGE = 2.15;
 const HIT_FACING_DOT = 0.12;
@@ -31,8 +32,7 @@ const ATTEMPTS = 3;
 const DUEL_NPC_COUNT = 40;
 const DUEL_HP = 3;
 const PUNCH_SWING = 0.32;
-const NPC_PUNCH_MIN = 5;
-const NPC_PUNCH_MAX = 10;
+const NPC_PUNCH_INTERVAL = 10;
 const NPC_PUNCH_RANGE = 1.65;
 const NPC_PUNCH_SWING = 0.42;
 const HIT_INVULN = 0.55;
@@ -80,8 +80,8 @@ const LEVELS = [
     cardDesc: "在出拳人群中击败对手",
     mission: "图书馆里挤满了出拳的读者，击败你的对手！",
     hudMission: "击败对手，同时躲避 NPC 的拳头",
-    clue: "NPC 每 5–10 秒随机挥拳一次，靠近会很危险；所有人都有 3 滴血",
-    hudClue: "NPC 随机挥拳 · 所有人 3 滴血 · 击败对手获胜",
+    clue: "NPC 每 10 秒挥拳一次，靠近会很危险；所有人都有 3 滴血",
+    hudClue: "NPC 每 10 秒挥拳 · 所有人 3 滴血 · 击败对手获胜",
     targetDesc: "对手",
     difficulty: 3,
     success: "你击败了对手，图书馆归于“平静”。",
@@ -182,7 +182,7 @@ let settleTimer = null;
 let duelRng = null;
 let duelSeparateTick = 0;
 let duelHerdIndex = -1;
-const duelHerdTarget = new THREE.Vector3();
+const duelHerdDir = new THREE.Vector2(0, 1);
 let duelHerdActive = false;
 let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
@@ -474,7 +474,7 @@ function collectDuelSnapshot() {
       z: n.group.position.z,
       hp: n.hp ?? DUEL_HP,
       alive: n.alive,
-      punchDelay: n.punchDelay ?? NPC_PUNCH_MIN,
+      punchDelay: n.punchDelay ?? NPC_PUNCH_INTERVAL,
       punchTimer: n.punchTimer ?? 0,
     })),
   };
@@ -734,7 +734,7 @@ function applyDuelSnapshot(snapshot, options = {}) {
       npc.group.position.set(data.x, 0, data.z);
       npc.hp = data.hp ?? DUEL_HP;
       npc.alive = data.alive !== false;
-      npc.punchDelay = data.punchDelay ?? NPC_PUNCH_MIN;
+      npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
       npc.punchTimer = data.punchTimer ?? 0;
       npc.group.visible = npc.alive;
     });
@@ -1449,7 +1449,7 @@ function resetLevel(index, options = {}) {
   duelSeparateTick = 0;
   duelHerdIndex = -1;
   duelHerdActive = false;
-  duelHerdTarget.set(0, 0, 0);
+  duelHerdDir.set(0, 1);
 
   player = createPlayer();
   player.hp = duel ? (options.playerHp ?? DUEL_HP) : ATTEMPTS;
@@ -1464,7 +1464,7 @@ function resetLevel(index, options = {}) {
     remotePlayer.hp = DUEL_HP;
     const remoteSpawn = duel
       ? duelActorSpawn(false)
-      : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+      : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(PLAY_Z_MIN + 0.8, 7.8));
     remotePlayer.group.position.copy(remoteSpawn);
     remotePlayer.targetX = remoteSpawn.x;
     remotePlayer.targetZ = remoteSpawn.z;
@@ -2167,7 +2167,7 @@ function spawnDuelNpcs() {
     npc.pauseTimer = randomRange(0.2, 1.3);
     npc.walking = false;
     npc.hp = DUEL_HP;
-    npc.punchDelay = randomRange(NPC_PUNCH_MIN, NPC_PUNCH_MAX);
+    npc.punchDelay = NPC_PUNCH_INTERVAL;
     npc.punchTimer = 0;
     npc.punchHitDone = false;
     npcs.push(npc);
@@ -2182,7 +2182,7 @@ function spawnDuelNpcsFromSnapshot(snapshot) {
     npc.group.position.set(data.x, 0, data.z);
     npc.hp = data.hp ?? DUEL_HP;
     npc.alive = data.alive !== false;
-    npc.punchDelay = data.punchDelay ?? randomRange(NPC_PUNCH_MIN, NPC_PUNCH_MAX);
+    npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
     npc.punchTimer = data.punchTimer ?? 0;
     npc.punchHitDone = false;
     npc.wanderTimer = randomRange(0.6, 2.2);
@@ -2194,15 +2194,10 @@ function spawnDuelNpcsFromSnapshot(snapshot) {
   });
 }
 
-function generateDuelHerdTarget(cycleIndex, worldSeed) {
+function generateDuelHerdDirection(cycleIndex, worldSeed) {
   const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 2654435761));
-  const pos = new THREE.Vector3(
-    rng() * 14 - 7,
-    0,
-    rng() * 12 - 6,
-  );
-  nudgeActorFromObstacles({ group: { position: pos } });
-  return pos;
+  const angle = rng() * Math.PI * 2;
+  return new THREE.Vector2(Math.sin(angle), Math.cos(angle)).normalize();
 }
 
 function updateDuelHerdState() {
@@ -2223,7 +2218,7 @@ function updateDuelHerdState() {
 
   if (cycleIndex !== duelHerdIndex) {
     duelHerdIndex = cycleIndex;
-    duelHerdTarget.copy(generateDuelHerdTarget(cycleIndex, levelState.worldSeed));
+    duelHerdDir.copy(generateDuelHerdDirection(cycleIndex, levelState.worldSeed));
     npcs.forEach((npc) => {
       if (!npc.alive) return;
       npc.pauseTimer = 0;
@@ -2235,7 +2230,13 @@ function updateDuelHerdState() {
 
 function updateDuelNpcMovement(npc, dt) {
   if (duelHerdActive) {
-    moveNpcToward(npc, duelHerdTarget, NPC_SPEED * 1.45, dt);
+    npc.walking = true;
+    const speed = NPC_SPEED * 1.45;
+    npc.group.position.x += duelHerdDir.x * speed * dt;
+    npc.group.position.z += duelHerdDir.y * speed * dt;
+    clampActorPosition(npc.group.position, duelHerdDir);
+    const targetRotation = Math.atan2(duelHerdDir.x, duelHerdDir.y);
+    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.12);
     return;
   }
   updateWander(npc, dt);
@@ -2247,8 +2248,8 @@ function generateDuelSpawnPair(seed) {
   let guest = new THREE.Vector3();
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    host.set(rng() * 17.6 - 8.8, 0, rng() * 15.6 - 7.8);
-    guest.set(rng() * 17.6 - 8.8, 0, rng() * 15.6 - 7.8);
+    host.set(rng() * 17.6 - 8.8, 0, rng() * (7.8 - (PLAY_Z_MIN + 0.8)) + PLAY_Z_MIN + 0.8);
+    guest.set(rng() * 17.6 - 8.8, 0, rng() * (7.8 - (PLAY_Z_MIN + 0.8)) + PLAY_Z_MIN + 0.8);
     nudgeActorFromObstacles({ group: { position: host } });
     nudgeActorFromObstacles({ group: { position: guest } });
     if (host.distanceTo(guest) >= DUEL_SPAWN_MIN_DIST) {
@@ -2292,7 +2293,7 @@ function updateDuelNpcPunch(npc, dt) {
       tryNpcPunchHit(npc);
     }
     if (npc.punchTimer <= 0) {
-      npc.punchDelay = randomRange(NPC_PUNCH_MIN, NPC_PUNCH_MAX);
+      npc.punchDelay = NPC_PUNCH_INTERVAL;
       npc.punchHitDone = false;
     }
     return;
@@ -2464,7 +2465,9 @@ function updateDecoy(npc, dt) {
 
     // 碰到边界就转向
     if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.3) npc.decoyDir.x *= -1;
-    if (Math.abs(npc.group.position.z) >= WORLD_LIMIT - 0.3) npc.decoyDir.y *= -1;
+    if (npc.group.position.z <= PLAY_Z_MIN + 0.3 || npc.group.position.z >= WORLD_LIMIT - 0.3) {
+      npc.decoyDir.y *= -1;
+    }
 
     const targetRotation = Math.atan2(npc.decoyDir.x, npc.decoyDir.y);
     npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.14);
@@ -2557,7 +2560,7 @@ function randomOpenPosition() {
   let tries = 0;
   const playerPos = player?.group?.position ?? new THREE.Vector3();
   do {
-    pos = new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+    pos = new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(PLAY_Z_MIN + 0.8, 7.8));
     tries += 1;
   } while (tries < 40 && (pos.distanceTo(playerPos) < 2.2 || collidesWithObstacle(pos)));
   return pos;
@@ -3293,7 +3296,9 @@ function updateWander(npc, dt) {
   }
 
   if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.2) npc.velocity.x *= -1;
-  if (Math.abs(npc.group.position.z) >= WORLD_LIMIT - 0.2) npc.velocity.y *= -1;
+  if (npc.group.position.z <= PLAY_Z_MIN + 0.2 || npc.group.position.z >= WORLD_LIMIT - 0.2) {
+    npc.velocity.y *= -1;
+  }
 
   const targetRotation = Math.atan2(npc.velocity.x, npc.velocity.y);
   npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.08);
@@ -3722,7 +3727,7 @@ function updateHud() {
 
 function clampToWorld(position) {
   position.x = THREE.MathUtils.clamp(position.x, -WORLD_LIMIT, WORLD_LIMIT);
-  position.z = THREE.MathUtils.clamp(position.z, -WORLD_LIMIT, WORLD_LIMIT);
+  position.z = THREE.MathUtils.clamp(position.z, PLAY_Z_MIN, WORLD_LIMIT);
 }
 
 function lerpAngle(a, b, t) {
