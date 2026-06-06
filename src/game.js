@@ -9,6 +9,7 @@ const PLAYER_SPEED = 3;
 const NPC_SPEED = 3;
 const ROUND_SECONDS = 90;
 const ATTEMPTS = 3;
+const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
 
 const LEVELS = [
   {
@@ -74,6 +75,7 @@ const ui = {
   joystick: document.querySelector("#joystick"),
   joystickKnob: document.querySelector("#joystickKnob"),
   attackButton: document.querySelector("#attackButton"),
+  cooldownOverlay: document.querySelector("#cooldownOverlay"),
 };
 
 let renderer;
@@ -88,6 +90,11 @@ let particles = [];
 let punchEffects = [];
 let gameStatus = "briefing";
 let punchCooldown = 0;
+let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
+let punchTier = 0; // 0=第1拳(1s), 1+=后续(2s)
+let punchResetTimer = 0; // 停止出拳后重置计时
+const PUNCH_COOLDOWNS = [2.0, 4.0, 6.0]; // 第1拳2秒，第2拳4秒，第3拳6秒
+const PUNCH_RESET_DELAY = 2.0; // 停止出拳多久后重置回第1档
 let totalTime = 0;
 
 /* ---- 3D 目标预览渲染器 ---- */
@@ -238,9 +245,23 @@ const input = {
   pointerId: null,
 };
 
+const playerInputVel = new THREE.Vector2(); // 玩家实际生效的移动方向（lerp 延迟）
+
 const scratchVec2 = new THREE.Vector2();
 const scratchVec3 = new THREE.Vector3();
 const pixelGeo = new THREE.BoxGeometry(0.13, 0.13, 0.13);
+
+/* ---- 粒子材质缓存（按颜色共享） ---- */
+const pixelMaterialCache = new Map();
+
+function getPixelMaterial(color) {
+  let mat = pixelMaterialCache.get(color);
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, transparent: true, opacity: 1 });
+    pixelMaterialCache.set(color, mat);
+  }
+  return mat;
+}
 
 /* ---- 纹理缓存 ---- */
 const textureCache = { floor: {}, wall: {} };
@@ -476,10 +497,9 @@ function resize() {
 
 function disposeScene() {
   if (!scene) return;
-  // 清理粒子和打击特效
+  // 清理粒子（材质是共享缓存的，不 dispose）和打击特效
   particles.forEach((p) => {
     scene.remove(p.mesh);
-    p.mesh.material.dispose();
   });
   punchEffects.forEach((e) => {
     scene.remove(e.mesh);
@@ -525,9 +545,12 @@ function resetLevel(index) {
   particles = [];
   punchEffects = [];
   punchCooldown = 0;
+  punchTier = 0;
+  punchResetTimer = 0;
   totalTime = 0;
   hitstopTimer = 0;
   shakeTimer = 0;
+  playerInputVel.set(0, 0);
   gameStatus = "briefing";
 
   levelState = {
@@ -566,17 +589,24 @@ function showTask() {
 }
 
 function buildWorld(level) {
-  scene.background = new THREE.Color(level.lighting === "night" ? 0x060914 : 0xb9d6e7);
-  scene.fog = new THREE.Fog(level.lighting === "night" ? 0x060914 : 0xc8e3f0, 18, 35);
+  const isNight = level.lighting === "night";
+  scene.background = new THREE.Color(isNight ? 0x0c1320 : 0xb9d6e7);
+  scene.fog = new THREE.Fog(isNight ? 0x0c1320 : 0xc8e3f0, 18, 35);
 
   const hemi = new THREE.HemisphereLight(
-    level.lighting === "night" ? 0x27324b : 0xffffff,
-    level.lighting === "night" ? 0x050506 : 0xa98f6b,
-    level.lighting === "night" ? 0.8 : 1.42,
+    isNight ? 0x3a4d6b : 0xffffff,
+    isNight ? 0x0a0e16 : 0xa98f6b,
+    isNight ? 1.2 : 1.42,
   );
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(level.lighting === "night" ? 0x8fb3ff : 0xfff7d6, level.lighting === "night" ? 1.05 : 1.65);
+  // 夜间场景补一盏环境光，让角色轮廓更清晰
+  if (isNight) {
+    const ambient = new THREE.AmbientLight(0x4466aa, 0.35);
+    scene.add(ambient);
+  }
+
+  const sun = new THREE.DirectionalLight(isNight ? 0x9fc4ff : 0xfff7d6, isNight ? 1.3 : 1.65);
   sun.position.set(-5, 12, 8);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
@@ -900,6 +930,14 @@ function spawnNpcs(level) {
       addWanderNpc(i);
     }
   }
+
+  // 从普通漫游 NPC 中随机选几个作为替身
+  const decoyCount = level.id === "library" ? 4 : 3;
+  const wanderNpcs = npcs.filter((n) => !n.isGamingTarget && !n.isLover && n.alive);
+  shuffleArray(wanderNpcs);
+  for (let i = 0; i < Math.min(decoyCount, wanderNpcs.length); i += 1) {
+    initDecoy(wanderNpcs[i]);
+  }
 }
 
 function addWanderNpc(id) {
@@ -911,6 +949,71 @@ function addWanderNpc(id) {
   npc.walking = false;
   npcs.push(npc);
   scene.add(npc.group);
+}
+
+/* ---- 替身 NPC 系统 ---- */
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function initDecoy(npc) {
+  npc.isDecoy = true;
+  npc.deoyState = "wander"; // "wander" | "confuse"
+  npc.decoyTimer = randomRange(1.5, 3.5); // 当前状态剩余时间
+  npc.decoyDir = new THREE.Vector2(); // 替身移动方向
+  pickDecoyDir(npc);
+}
+
+function pickDecoyDir(npc) {
+  const angle = Math.random() * Math.PI * 2;
+  npc.decoyDir.set(Math.sin(angle), Math.cos(angle));
+}
+
+function updateDecoy(npc, dt) {
+  npc.decoyTimer -= dt;
+
+  if (npc.deoyState === "wander") {
+    // 普通漫游模式
+    updateWander(npc, dt);
+    if (npc.decoyTimer <= 0) {
+      // 切换到混淆模式
+      npc.deoyState = "confuse";
+      npc.decoyTimer = randomRange(2.0, 4.0);
+      pickDecoyDir(npc);
+      npc.walking = true;
+    }
+  } else {
+    // 混淆模式：流畅移动，像被操控一样
+    npc.walking = true;
+    npc.group.position.x += npc.decoyDir.x * NPC_SPEED * dt;
+    npc.group.position.z += npc.decoyDir.y * NPC_SPEED * dt;
+    clampToWorld(npc.group.position);
+
+    // 碰到边界就转向
+    if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.3) npc.decoyDir.x *= -1;
+    if (Math.abs(npc.group.position.z) >= WORLD_LIMIT - 0.3) npc.decoyDir.y *= -1;
+
+    const targetRotation = Math.atan2(npc.decoyDir.x, npc.decoyDir.y);
+    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.14);
+
+    // 混淆模式中偶尔微调方向，不像机器人走直线
+    if (Math.random() < dt * 0.6) {
+      const drift = (Math.random() - 0.5) * 0.8;
+      const currentAngle = Math.atan2(npc.decoyDir.x, npc.decoyDir.y);
+      npc.decoyDir.set(Math.sin(currentAngle + drift), Math.cos(currentAngle + drift));
+    }
+
+    if (npc.decoyTimer <= 0) {
+      // 切换回漫游模式
+      npc.deoyState = "wander";
+      npc.decoyTimer = randomRange(1.0, 2.5);
+      npc.wanderTimer = randomRange(0.5, 1.5);
+      npc.pauseTimer = randomRange(0.2, 0.8);
+    }
+  }
 }
 
 function randomOpenPosition() {
@@ -1121,17 +1224,24 @@ function updatePlayer(dt) {
   scratchVec2.copy(input.joystick).add(input.keys);
   if (scratchVec2.lengthSq() > 1) scratchVec2.normalize();
 
-  const moving = scratchVec2.lengthSq() > 0.0001;
+  // 玩家移动方向加入 lerp 延迟，不立即响应
+  playerInputVel.lerp(scratchVec2, 1 - Math.pow(1 - PLAYER_LERP, dt * 60));
+
+  const moving = playerInputVel.lengthSq() > 0.0004;
   if (moving) {
-    player.group.position.x += scratchVec2.x * player.speed * dt;
-    player.group.position.z += scratchVec2.y * player.speed * dt;
+    player.group.position.x += playerInputVel.x * player.speed * dt;
+    player.group.position.z += playerInputVel.y * player.speed * dt;
     clampToWorld(player.group.position);
-    const targetRotation = Math.atan2(scratchVec2.x, scratchVec2.y);
+    const targetRotation = Math.atan2(playerInputVel.x, playerInputVel.y);
     player.group.rotation.y = lerpAngle(player.group.rotation.y, targetRotation, 0.24);
   }
 
   if (punchCooldown > 0) punchCooldown = Math.max(0, punchCooldown - dt);
   if (player.punchTimer > 0) player.punchTimer = Math.max(0, player.punchTimer - dt);
+  if (punchResetTimer > 0) {
+    punchResetTimer -= dt;
+    if (punchResetTimer <= 0) punchTier = 0;
+  }
   animateActor(player, dt, moving);
   animatePunchPose();
 }
@@ -1166,7 +1276,11 @@ function updateNpcs(dt) {
       animateActor(npc, dt, npc.walking);
       return;
     }
-    updateWander(npc, dt);
+    if (npc.isDecoy) {
+      updateDecoy(npc, dt);
+    } else {
+      updateWander(npc, dt);
+    }
     animateActor(npc, dt, npc.walking);
   });
 
@@ -1370,13 +1484,50 @@ function animateActor(actor, dt, moving) {
   }
 }
 
+/* ---- 空间网格（优化碰撞检测） ---- */
+const GRID_CELL = 2.0;
+const GRID_COLS = Math.ceil((WORLD_LIMIT * 2) / GRID_CELL) + 1;
+let spatialGrid = new Map();
+
+function gridKey(cx, cz) {
+  return cx * 1000 + cz;
+}
+
+function buildSpatialGrid() {
+  spatialGrid.clear();
+  npcs.forEach((npc) => {
+    if (!npc.alive) return;
+    const cx = Math.floor((npc.group.position.x + WORLD_LIMIT) / GRID_CELL);
+    const cz = Math.floor((npc.group.position.z + WORLD_LIMIT) / GRID_CELL);
+    const key = gridKey(cx, cz);
+    if (!spatialGrid.has(key)) spatialGrid.set(key, []);
+    spatialGrid.get(key).push(npc);
+  });
+}
+
+function getNearbyNpcs(pos) {
+  const cx = Math.floor((pos.x + WORLD_LIMIT) / GRID_CELL);
+  const cz = Math.floor((pos.z + WORLD_LIMIT) / GRID_CELL);
+  const result = [];
+  for (let dx = -1; dx <= 1; dx += 1) {
+    for (let dz = -1; dz <= 1; dz += 1) {
+      const cell = spatialGrid.get(gridKey(cx + dx, cz + dz));
+      if (cell) result.push(...cell);
+    }
+  }
+  return result;
+}
+
 function separateActors() {
+  buildSpatialGrid();
+
   for (let i = 0; i < npcs.length; i += 1) {
     const a = npcs[i];
     if (!a.alive) continue;
-    for (let j = i + 1; j < npcs.length; j += 1) {
-      const b = npcs[j];
-      if (!b.alive) continue;
+    const nearby = getNearbyNpcs(a.group.position);
+    for (let j = 0; j < nearby.length; j += 1) {
+      const b = nearby[j];
+      if (b === a || !b.alive) continue;
       if (levelState.pair?.members.includes(a) && levelState.pair?.members.includes(b) && levelState.pair.state === "kiss") continue;
       pushApart(a.group.position, b.group.position, 0.62, 0.018);
     }
@@ -1403,7 +1554,10 @@ function pushApart(a, b, minDistance, strength) {
 
 function triggerAttack() {
   if (gameStatus !== "playing" || punchCooldown > 0) return;
-  punchCooldown = 0.38;
+  punchCooldownMax = PUNCH_COOLDOWNS[Math.min(punchTier, PUNCH_COOLDOWNS.length - 1)];
+  punchCooldown = punchCooldownMax;
+  punchTier += 1;
+  punchResetTimer = PUNCH_RESET_DELAY;
   player.punchTimer = 0.26;
   createPunchEffect();
   sfxPunch();
@@ -1445,10 +1599,14 @@ function findHitTarget() {
   if (levelState.level.id === "library" && levelState.pair) {
     const [a, b] = levelState.pair.members;
     if (a.alive && b.alive) {
-      const center = scratchVec3.copy(a.group.position).add(b.group.position).multiplyScalar(0.5);
-      const toCenter = new THREE.Vector2(center.x - playerPos.x, center.z - playerPos.z);
-      const centerDistance = toCenter.length();
-      if (centerDistance <= HIT_PAIR_RANGE && isFacingTarget(facing, toCenter)) {
+      // 检测任一情侣在范围内即判定命中（强制双人判定）
+      const toA = new THREE.Vector2(a.group.position.x - playerPos.x, a.group.position.z - playerPos.z);
+      const toB = new THREE.Vector2(b.group.position.x - playerPos.x, b.group.position.z - playerPos.z);
+      const distA = toA.length();
+      const distB = toB.length();
+      const aInRange = distA <= HIT_PAIR_RANGE && isFacingTarget(facing, toA);
+      const bInRange = distB <= HIT_PAIR_RANGE && isFacingTarget(facing, toB);
+      if (aInRange || bInRange) {
         return { correct: true, npcs: [a, b] };
       }
     }
@@ -1523,12 +1681,7 @@ function createPixelBurst(npc) {
   const colors = npc.group.userData.colors;
   for (let i = 0; i < 58; i += 1) {
     const color = colors[i % colors.length];
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.7,
-      transparent: true,
-      opacity: 1,
-    });
+    const material = getPixelMaterial(color);
     const cube = new THREE.Mesh(pixelGeo, material);
     cube.position.set(
       npc.group.position.x + randomRange(-0.28, 0.28),
@@ -1562,7 +1715,7 @@ function updateParticles(dt) {
 
     if (particle.life <= 0) {
       scene.remove(particle.mesh);
-      particle.mesh.material.dispose();
+      // 材质是共享缓存的，不 dispose
       particles.splice(i, 1);
     }
   }
@@ -1607,6 +1760,17 @@ function updateHud() {
   ui.timerText.textContent = Math.ceil(levelState.remaining).toString();
   ui.attemptText.textContent = levelState.attempts.toString();
   ui.clueBar.textContent = "🔍 " + levelState.level.clue;
+
+  // 出拳冷却动画
+  if (punchCooldown > 0 && punchCooldownMax > 0) {
+    const progress = (punchCooldown / punchCooldownMax) * 100;
+    ui.cooldownOverlay.style.setProperty("--cd-progress", progress + "%");
+    ui.cooldownOverlay.classList.add("active");
+    ui.attackButton.classList.add("cooling");
+  } else {
+    ui.cooldownOverlay.classList.remove("active");
+    ui.attackButton.classList.remove("cooling");
+  }
 }
 
 function clampToWorld(position) {
