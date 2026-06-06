@@ -52,6 +52,7 @@ const GATHER_COLOR_PREVIEW = 0x15803d;
 const GATHER_COLOR_URGENT = 0xb91c1c;
 const GATHER_COLOR_SUCCESS = 0x14532d;
 const ACTOR_COLLISION_RADIUS = 0.38;
+const PVP_HIT_RANGE = HIT_RANGE + ACTOR_COLLISION_RADIUS * 2 + 0.25; // 联机留容差，补偿位置同步延迟
 const PROXIMITY_BODY_LEN = ACTOR_COLLISION_RADIUS * 2;
 const PROXIMITY_MIN_DIST = PROXIMITY_BODY_LEN * 2;
 const PROXIMITY_MAX_DIST = PROXIMITY_BODY_LEN * 4;
@@ -498,8 +499,7 @@ function validatePvpHit(punchData, targetActor) {
     playerPos.x - punchData.x,
     playerPos.z - punchData.z,
   );
-  const facing = getFacingVector(punchData.rotation ?? 0);
-  return toTarget.length() <= HIT_RANGE && isFacingTarget(facing, toTarget);
+  return toTarget.length() <= PVP_HIT_RANGE;
 }
 
 function collectDuelSnapshot() {
@@ -956,7 +956,8 @@ function createMpCallbacks() {
       if (data.punchId && data.punchId === lastRemotePunchId) return;
       if (data.punchId) lastRemotePunchId = data.punchId;
       if (remotePlayer) remotePlayer.punchTimer = PUNCH_SWING;
-      if (isDuelActive() && (data.attempt || data.hit)) {
+      // 联机 PvP：以被打方本地位置为准校验，不依赖攻击方的 attempt 标记
+      if (isDuelActive() && isConnected()) {
         if (validatePvpHit(data, player)) {
           applyPlayerDamage(1, "对手出拳");
         }
@@ -2678,9 +2679,40 @@ function applyPlayerDamage(amount, reason) {
   }
 }
 
+function getActorDistance2D(a, b) {
+  if (!a?.group || !b?.group) return Infinity;
+  const dx = b.group.position.x - a.group.position.x;
+  const dz = b.group.position.z - a.group.position.z;
+  return Math.hypot(dx, dz);
+}
+
+function isRemoteInPunchRange(range = HIT_RANGE) {
+  if (!remotePlayer?.group || remotePlayer.hp <= 0 || remotePlayer.group.visible === false) {
+    return false;
+  }
+  return getActorDistance2D(player, remotePlayer) <= range;
+}
+
+function findDuelNpcTarget() {
+  const playerPos = player.group.position;
+  let best = null;
+  let bestDistance = Infinity;
+
+  npcs.forEach((npc) => {
+    if (!npc.alive || !npc.group) return;
+    const dx = npc.group.position.x - playerPos.x;
+    const dz = npc.group.position.z - playerPos.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance > HIT_RANGE || distance >= bestDistance) return;
+    bestDistance = distance;
+    best = npc;
+  });
+
+  return best;
+}
+
 function findDuelPunchTarget() {
   const playerPos = player.group.position;
-  const facing = getFacingVector(player.group.rotation.y);
   let best = null;
   let bestDistance = Infinity;
 
@@ -2691,7 +2723,7 @@ function findDuelPunchTarget() {
       actor.group.position.z - playerPos.z,
     );
     const distance = toTarget.length();
-    if (distance > HIT_RANGE || !isFacingTarget(facing, toTarget)) return;
+    if (distance > HIT_RANGE) return;
     if (distance < bestDistance) {
       bestDistance = distance;
       best = { type, actor };
@@ -3794,10 +3826,10 @@ function triggerAttack() {
   }
 
   if (isDuelActive()) {
-    const hit = findDuelPunchTarget();
-    const remoteAttempt = hit?.type === "remote";
-    const remoteHit = remoteAttempt && !isConnected() ? damageRemotePlayer() : false;
-    const npcHit = hit?.type === "npc" ? damageDuelNpc(hit.actor) : false;
+    const remoteInRange = isRemoteInPunchRange();
+    const remoteHit = remoteInRange && !isConnected() ? damageRemotePlayer() : false;
+    const npcTarget = remoteInRange ? null : findDuelNpcTarget();
+    const npcHit = npcTarget ? damageDuelNpc(npcTarget) : false;
     if (isConnected()) {
       syncPunch(
         player.group.position.x,
@@ -3806,11 +3838,10 @@ function triggerAttack() {
         {
           roundId: duelRoundId,
           punchId: nextLocalEventId("punch"),
-          attempt: remoteAttempt,
         },
       );
     }
-    if (remoteHit || npcHit || (remoteAttempt && isConnected())) {
+    if (remoteHit || npcHit || (remoteInRange && isConnected())) {
       triggerHitstop(0.06);
       triggerShake(0.22, 0.14);
       if (remoteHit || npcHit) sfxHit();
