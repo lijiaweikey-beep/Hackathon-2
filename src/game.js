@@ -37,8 +37,12 @@ const NPC_PUNCH_RANGE = 1.65;
 const NPC_PUNCH_SWING = 0.42;
 const HIT_INVULN = 0.55;
 const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
-const REMOTE_POS_LERP = 16; // 对手位置插值速度（越大越跟手）
+const REMOTE_POS_LERP = 14; // 对手位置插值速度（越大越跟手）
 const REMOTE_SNAP_DIST = 2.2; // 偏差过大时直接瞬移，避免长时间拉扯
+const REMOTE_STALE_MS = 350; // 超过此时间未收到更新则允许瞬移对齐
+const DUEL_SPAWN_MIN_DIST = 4.2;
+const DUEL_HERD_INTERVAL = 15;
+const DUEL_HERD_DURATION = 2.8;
 const ACTOR_COLLISION_RADIUS = 0.38;
 
 const LEVELS = [
@@ -175,8 +179,11 @@ let localEventSeq = 0;
 let lastRemotePunchId = null;
 let lastRemoteWinId = null;
 let settleTimer = null;
-let mpSnapshotTimer = 0;
 let duelRng = null;
+let duelSeparateTick = 0;
+let duelHerdIndex = -1;
+const duelHerdTarget = new THREE.Vector3();
+let duelHerdActive = false;
 let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
@@ -490,7 +497,10 @@ function buildGameStatePayload(extra = {}) {
     started: gameStatus === "playing",
     ...extra,
   };
-  if (isConnected() && getIsHost() && isDuelLevel(levelState?.level) && gameStatus !== "levelSelect") {
+  if (levelState?.duelSpawns) {
+    payload.duelSpawns = levelState.duelSpawns;
+  }
+  if (extra.includeSnapshot) {
     const snap = collectDuelSnapshot();
     if (snap) {
       payload.worldSeed = snap.worldSeed;
@@ -780,6 +790,7 @@ function applyRemoteGameState(state) {
     }
     resetLevel(state.levelIndex, {
       worldSeed: state.worldSeed,
+      duelSpawns: state.duelSpawns,
       duelNpcs: state.duelNpcs,
       elapsed: 0,
       playerHp: state.guestHp ?? DUEL_HP,
@@ -811,6 +822,7 @@ function applyRemoteGameState(state) {
     guestConfirmed = false;
     resetLevel(state.levelIndex, {
       worldSeed: state.worldSeed,
+      duelSpawns: state.duelSpawns,
       duelNpcs: state.duelNpcs,
       elapsed: state.started ? state.elapsed : 0,
       playerHp: state.guestHp,
@@ -819,8 +831,6 @@ function applyRemoteGameState(state) {
     updateMpUI();
     updateTaskMpUI();
   } else if (midGameReconnect && state.duelNpcs) {
-    applyDuelSnapshot(state, { respawnNpcs: false });
-  } else if (state.duelNpcs && isDuelLevel() && gameStatus !== "levelSelect") {
     applyDuelSnapshot(state, { respawnNpcs: false });
   }
 
@@ -875,6 +885,7 @@ function createMpCallbacks() {
         remotePlayer.targetX = tx;
         remotePlayer.targetZ = tz;
         remotePlayer.targetRot = tr;
+        remotePlayer.netTime = performance.now();
 
         if (!remotePlayer._netInit) {
           remotePlayer.group.position.set(tx, 0, tz);
@@ -882,15 +893,6 @@ function createMpCallbacks() {
           remotePlayer._prevX = tx;
           remotePlayer._prevZ = tz;
           remotePlayer._netInit = true;
-        } else {
-          const dx = tx - remotePlayer.group.position.x;
-          const dz = tz - remotePlayer.group.position.z;
-          if (dx * dx + dz * dz > REMOTE_SNAP_DIST * REMOTE_SNAP_DIST) {
-            remotePlayer.group.position.set(tx, 0, tz);
-            remotePlayer.group.rotation.y = tr;
-            remotePlayer._prevX = tx;
-            remotePlayer._prevZ = tz;
-          }
         }
         if (data.hp != null) {
           remotePlayer.hp = data.hp;
@@ -928,7 +930,7 @@ function createMpCallbacks() {
       if (gameMode === "duel" && getIsHost() && gameStatus === "levelSelect") {
         startDuelBriefing();
       } else if (gameStatus !== "levelSelect") {
-        pushGameState();
+        pushGameState({ includeSnapshot: gameStatus === "playing" });
       }
     },
     onRoomReady() {
@@ -988,6 +990,7 @@ function selectLevel(index) {
       roundId: duelRoundId,
       started: false,
       worldSeed: levelState.worldSeed,
+      duelSpawns: levelState.duelSpawns,
     });
   } else {
     pushGameState({
@@ -1210,7 +1213,12 @@ function setupUi() {
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
     if (isDuelActive()) syncHp(player.hp);
-    pushGameState({ phase: "playing", started: true, roundId: duelRoundId });
+    pushGameState({
+      phase: "playing",
+      started: true,
+      roundId: duelRoundId,
+      duelSpawns: levelState.duelSpawns,
+    });
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -1254,7 +1262,13 @@ function setupUi() {
     if (isConnected() && getIsHost()) {
       guestReady = false;
       clearGuestReady();
-      pushGameState({ phase: "briefing", started: false, roundId: duelRoundId });
+      pushGameState({
+        phase: "briefing",
+        started: false,
+        roundId: duelRoundId,
+        worldSeed: levelState.worldSeed,
+        duelSpawns: levelState.duelSpawns,
+      });
     }
   });
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
@@ -1423,27 +1437,40 @@ function resetLevel(index, options = {}) {
     playerHp: options.playerHp ?? DUEL_HP,
     hitInvuln: 0,
     worldSeed,
+    duelSpawns: null,
   };
 
   buildWorld(level);
+
+  if (duel) {
+    levelState.duelSpawns = options.duelSpawns ?? generateDuelSpawnPair(worldSeed);
+  }
+
+  duelSeparateTick = 0;
+  duelHerdIndex = -1;
+  duelHerdActive = false;
+  duelHerdTarget.set(0, 0, 0);
+
   player = createPlayer();
   player.hp = duel ? (options.playerHp ?? DUEL_HP) : ATTEMPTS;
   player.hitInvuln = 0;
-  player.group.position.copy(duel ? duelSpawnPosition(true) : randomOpenPosition());
+  player.group.position.copy(duel ? duelActorSpawn(true) : randomOpenPosition());
   scene.add(player.group);
   if (duel && isConnected()) syncHp(player.hp);
 
-  // 创建对手角色（多人模式）
   remotePlayer = null;
   if (isConnected()) {
     remotePlayer = createRemotePlayer();
     remotePlayer.hp = DUEL_HP;
-    const remoteSpawn = duel ? duelSpawnPosition(false) : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
+    const remoteSpawn = duel
+      ? duelActorSpawn(false)
+      : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(-7.8, 7.8));
     remotePlayer.group.position.copy(remoteSpawn);
     remotePlayer.targetX = remoteSpawn.x;
     remotePlayer.targetZ = remoteSpawn.z;
     remotePlayer.targetRot = 0;
     remotePlayer._netInit = false;
+    remotePlayer.netTime = performance.now();
     scene.add(remotePlayer.group);
   }
 
@@ -2167,10 +2194,93 @@ function spawnDuelNpcsFromSnapshot(snapshot) {
   });
 }
 
-function duelSpawnPosition(isLocal) {
-  const fakeNpc = { group: { position: new THREE.Vector3(isLocal ? -4.2 : 4.2, 0, 0) } };
-  nudgeActorFromObstacles(fakeNpc);
-  return fakeNpc.group.position.clone();
+function generateDuelHerdTarget(cycleIndex, worldSeed) {
+  const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 2654435761));
+  const pos = new THREE.Vector3(
+    rng() * 14 - 7,
+    0,
+    rng() * 12 - 6,
+  );
+  nudgeActorFromObstacles({ group: { position: pos } });
+  return pos;
+}
+
+function updateDuelHerdState() {
+  if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) {
+    duelHerdActive = false;
+    return;
+  }
+
+  const elapsed = Math.max(0, totalTime - levelState.startTime);
+  if (elapsed < DUEL_HERD_INTERVAL) {
+    duelHerdActive = false;
+    return;
+  }
+
+  const cycleIndex = Math.floor(elapsed / DUEL_HERD_INTERVAL);
+  const phase = elapsed - cycleIndex * DUEL_HERD_INTERVAL;
+  duelHerdActive = phase < DUEL_HERD_DURATION;
+
+  if (cycleIndex !== duelHerdIndex) {
+    duelHerdIndex = cycleIndex;
+    duelHerdTarget.copy(generateDuelHerdTarget(cycleIndex, levelState.worldSeed));
+    npcs.forEach((npc) => {
+      if (!npc.alive) return;
+      npc.pauseTimer = 0;
+      npc.wanderTimer = 1;
+      npc.velocity.set(0, 0);
+    });
+  }
+}
+
+function updateDuelNpcMovement(npc, dt) {
+  if (duelHerdActive) {
+    moveNpcToward(npc, duelHerdTarget, NPC_SPEED * 1.45, dt);
+    return;
+  }
+  updateWander(npc, dt);
+}
+
+function generateDuelSpawnPair(seed) {
+  const rng = createSeededRng((seed >>> 0) ^ 0x9e3779b9);
+  let host = new THREE.Vector3();
+  let guest = new THREE.Vector3();
+
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    host.set(rng() * 17.6 - 8.8, 0, rng() * 15.6 - 7.8);
+    guest.set(rng() * 17.6 - 8.8, 0, rng() * 15.6 - 7.8);
+    nudgeActorFromObstacles({ group: { position: host } });
+    nudgeActorFromObstacles({ group: { position: guest } });
+    if (host.distanceTo(guest) >= DUEL_SPAWN_MIN_DIST) {
+      return {
+        host: { x: host.x, z: host.z },
+        guest: { x: guest.x, z: guest.z },
+      };
+    }
+  }
+
+  host.set(-4.2, 0, randomRange(-3, 3));
+  guest.set(4.2, 0, randomRange(-3, 3));
+  nudgeActorFromObstacles({ group: { position: host } });
+  nudgeActorFromObstacles({ group: { position: guest } });
+  return {
+    host: { x: host.x, z: host.z },
+    guest: { x: guest.x, z: guest.z },
+  };
+}
+
+function duelActorSpawn(isLocalPlayer) {
+  const spawns = levelState?.duelSpawns;
+  if (!spawns) {
+    const side = isLocalPlayer ? -4.2 : 4.2;
+    const pos = new THREE.Vector3(side, 0, 0);
+    nudgeActorFromObstacles({ group: { position: pos } });
+    return pos;
+  }
+  const slot = isLocalPlayer
+    ? (getIsHost() ? spawns.host : spawns.guest)
+    : (getIsHost() ? spawns.guest : spawns.host);
+  return new THREE.Vector3(slot.x, 0, slot.z);
 }
 
 function updateDuelNpcPunch(npc, dt) {
@@ -2746,14 +2856,6 @@ function tick() {
     if (isConnected()) {
       syncPosition(player.group.position.x, player.group.position.z, player.group.rotation.y);
     }
-
-    if (isConnected() && getIsHost() && isDuelLevel()) {
-      mpSnapshotTimer += dt;
-      if (mpSnapshotTimer >= 2) {
-        mpSnapshotTimer = 0;
-        pushGameState({ started: true, phase: "playing" });
-      }
-    }
   } else if (gameStatus === "won") {
     animateCheer(dt);
   }
@@ -2836,15 +2938,26 @@ function updateRemotePlayerAnim(dt) {
   const ud = remotePlayer.group.userData;
 
   if (remotePlayer.targetX != null) {
-    const t = Math.min(1, dt * REMOTE_POS_LERP);
     const pos = remotePlayer.group.position;
-    pos.x += (remotePlayer.targetX - pos.x) * t;
-    pos.z += (remotePlayer.targetZ - pos.z) * t;
-    remotePlayer.group.rotation.y = lerpAngle(
-      remotePlayer.group.rotation.y,
-      remotePlayer.targetRot,
-      t,
-    );
+    const dx = remotePlayer.targetX - pos.x;
+    const dz = remotePlayer.targetZ - pos.z;
+    const distSq = dx * dx + dz * dz;
+    const stale = performance.now() - (remotePlayer.netTime ?? 0) > REMOTE_STALE_MS;
+    const snap = stale || distSq > REMOTE_SNAP_DIST * REMOTE_SNAP_DIST;
+    if (snap) {
+      pos.x = remotePlayer.targetX;
+      pos.z = remotePlayer.targetZ;
+      remotePlayer.group.rotation.y = remotePlayer.targetRot;
+    } else {
+      const t = Math.min(1, dt * REMOTE_POS_LERP);
+      pos.x += dx * t;
+      pos.z += dz * t;
+      remotePlayer.group.rotation.y = lerpAngle(
+        remotePlayer.group.rotation.y,
+        remotePlayer.targetRot,
+        t,
+      );
+    }
   }
 
   // 检测对手是否在移动（对比上一帧位置）
@@ -2885,14 +2998,16 @@ function updateRemotePlayerAnim(dt) {
 
 function updateNpcs(dt) {
   if (isDuelLevel()) {
+    updateDuelHerdState();
     npcs.forEach((npc) => {
       if (!npc.alive) return;
-      updateWander(npc, dt);
+      updateDuelNpcMovement(npc, dt);
       updateDuelNpcPunch(npc, dt);
       animateActor(npc, dt, npc.walking);
       animateNpcPunchPose(npc);
     });
-    separateDuelActors();
+    duelSeparateTick += 1;
+    if (duelSeparateTick % 2 === 0) separateDuelActors();
     return;
   }
 
@@ -3296,12 +3411,15 @@ function separateActors() {
 }
 
 function separateDuelActors() {
+  buildSpatialGrid();
+
   for (let i = 0; i < npcs.length; i += 1) {
     const a = npcs[i];
     if (!a.alive) continue;
-    for (let j = i + 1; j < npcs.length; j += 1) {
-      const b = npcs[j];
-      if (!b.alive) continue;
+    const nearby = getNearbyNpcs(a.group.position);
+    for (let j = 0; j < nearby.length; j += 1) {
+      const b = nearby[j];
+      if (b === a || !b.alive) continue;
       pushApart(a.group.position, b.group.position, 0.62, 0.018);
     }
     pushApart(a.group.position, player.group.position, 0.72, 0.012);

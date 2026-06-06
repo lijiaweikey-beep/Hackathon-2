@@ -299,9 +299,23 @@ async function joinRoom(id) {
 
 function listenRemote(remoteId) {
   const remoteRef = ref(db, `rooms/${roomId}/${remoteId}`);
+  let pendingRemote = null;
+  let remoteFlushScheduled = false;
+
+  const flushRemote = () => {
+    remoteFlushScheduled = false;
+    if (pendingRemote && onRemoteUpdate) onRemoteUpdate(pendingRemote);
+    pendingRemote = null;
+  };
+
   unsubscribes.push(onValue(remoteRef, (snap) => {
     const data = snap.val();
-    if (data && onRemoteUpdate) onRemoteUpdate(data);
+    if (!data) return;
+    pendingRemote = data;
+    if (!remoteFlushScheduled) {
+      remoteFlushScheduled = true;
+      requestAnimationFrame(flushRemote);
+    }
   }));
 
   const punchRef = ref(db, `rooms/${roomId}/${remoteId}Punch`);
