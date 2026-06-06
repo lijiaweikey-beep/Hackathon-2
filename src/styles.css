@@ -443,11 +443,33 @@ button {
 }
 
 /* ---- HUD 线索提示条 ---- */
-.clue-bar {
+.duel-bottom-hud {
   position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 66px);
   left: 12px;
   right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.hud:not(.is-duel-play) .duel-bottom-hud {
+  top: calc(max(12px, env(safe-area-inset-top)) + 66px);
+  bottom: auto;
+}
+
+.hud.is-duel-play .duel-bottom-hud {
+  top: auto;
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 148px);
+}
+
+.clue-bar {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  width: 100%;
   padding: 7px 12px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -461,6 +483,14 @@ button {
   animation: cluePulse 2.5s ease-in-out infinite;
 }
 
+.hud.is-duel-play .clue-bar {
+  color: #fde68a;
+  border-color: rgba(253, 224, 71, 0.22);
+  background: rgba(8, 12, 20, 0.88);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 @keyframes cluePulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }
@@ -468,11 +498,12 @@ button {
 
 /* ---- 决斗集合圈提示 ---- */
 .gather-banner {
-  position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 108px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(92%, 360px);
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  transform: none;
+  width: 100%;
   padding: 12px 14px 11px;
   border-radius: 12px;
   border: 2px solid rgba(21, 128, 61, 0.85);
@@ -482,6 +513,21 @@ button {
   text-align: center;
   pointer-events: none;
   z-index: 6;
+}
+
+.hud.is-duel-play .gather-banner {
+  padding: 8px 12px 7px;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
+}
+
+.hud.is-duel-play .gather-banner-countdown {
+  font-size: 26px;
+}
+
+.hud.is-duel-play .gather-banner-hint {
+  font-size: 11px;
+  margin-top: 4px;
 }
 
 .gather-banner.hidden {
@@ -561,8 +607,8 @@ button {
 }
 
 @keyframes gatherUrgentPulse {
-  0%, 100% { transform: translateX(-50%) scale(1); }
-  50% { transform: translateX(-50%) scale(1.02); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
 }
 
 /* ---- 关卡选择界面 ---- */

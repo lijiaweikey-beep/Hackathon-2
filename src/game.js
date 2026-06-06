@@ -46,6 +46,8 @@ const DUEL_GATHER_INTERVAL = 90; // 1.5 分钟一轮集合
 const DUEL_GATHER_PREVIEW = 30; // 提前 30 秒显示集合圈
 const DUEL_GATHER_WINDOW = 5; // 最后 5 秒内需站在圈内
 const DUEL_GATHER_RADIUS = 2.2;
+const DUEL_HERD_INTERVAL = 20;
+const DUEL_HERD_DURATION = 2.8;
 const GATHER_COLOR_PREVIEW = 0x15803d;
 const GATHER_COLOR_URGENT = 0xb91c1c;
 const GATHER_COLOR_SUCCESS = 0x14532d;
@@ -117,6 +119,7 @@ const LEVELS = [
 
 const canvas = document.querySelector("#gameCanvas");
 const ui = {
+  hud: document.querySelector("#hud"),
   sceneName: document.querySelector("#sceneName"),
   missionText: document.querySelector("#missionText"),
   timerText: document.querySelector("#timerText"),
@@ -195,6 +198,9 @@ let lastRemoteWinId = null;
 let settleTimer = null;
 let duelRng = null;
 let duelSeparateTick = 0;
+let duelHerdIndex = -1;
+const duelHerdDir = new THREE.Vector2(0, 1);
+let duelHerdActive = false;
 let duelGatherSpotIndex = -1;
 let duelGatherCheckedIndex = -1;
 let duelGatherMetWindow = false;
@@ -700,6 +706,8 @@ function showLevelSelect() {
   updateDuelLobbyUI();
   if (!isInDuelLobby()) buildLevelCards();
   updateMpUI();
+  if (ui.hud) ui.hud.classList.remove("is-duel-play");
+  if (ui.gatherBanner) ui.gatherBanner.classList.add("hidden");
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
   ui.resultModal.classList.remove("visible");
@@ -1492,6 +1500,9 @@ function resetLevel(index, options = {}) {
   }
 
   duelSeparateTick = 0;
+  duelHerdIndex = -1;
+  duelHerdActive = false;
+  duelHerdDir.set(0, 1);
   duelGatherSpotIndex = -1;
   duelGatherCheckedIndex = -1;
   duelGatherMetWindow = false;
@@ -2498,6 +2509,54 @@ function updateDuelGather() {
   }
 }
 
+function generateDuelHerdDirection(cycleIndex, worldSeed) {
+  const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 2654435761));
+  const angle = rng() * Math.PI * 2;
+  return new THREE.Vector2(Math.sin(angle), Math.cos(angle)).normalize();
+}
+
+function updateDuelHerdState() {
+  if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) {
+    duelHerdActive = false;
+    return;
+  }
+
+  const elapsed = Math.max(0, totalTime - levelState.startTime);
+  if (elapsed < DUEL_HERD_INTERVAL) {
+    duelHerdActive = false;
+    return;
+  }
+
+  const cycleIndex = Math.floor(elapsed / DUEL_HERD_INTERVAL);
+  const phase = elapsed - cycleIndex * DUEL_HERD_INTERVAL;
+  duelHerdActive = phase < DUEL_HERD_DURATION;
+
+  if (cycleIndex !== duelHerdIndex) {
+    duelHerdIndex = cycleIndex;
+    duelHerdDir.copy(generateDuelHerdDirection(cycleIndex, levelState.worldSeed));
+    npcs.forEach((npc) => {
+      if (!npc.alive) return;
+      npc.pauseTimer = 0;
+      npc.wanderTimer = 1;
+      npc.velocity.set(0, 0);
+    });
+  }
+}
+
+function updateDuelNpcMovement(npc, dt) {
+  if (duelHerdActive) {
+    npc.walking = true;
+    const speed = NPC_SPEED * 1.45;
+    npc.group.position.x += duelHerdDir.x * speed * dt;
+    npc.group.position.z += duelHerdDir.y * speed * dt;
+    clampActorPosition(npc.group.position, duelHerdDir);
+    const targetRotation = Math.atan2(duelHerdDir.x, duelHerdDir.y);
+    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.12);
+    return;
+  }
+  updateWander(npc, dt);
+}
+
 function generateDuelSpawnPair(seed) {
   const rng = createSeededRng((seed >>> 0) ^ 0x9e3779b9);
   let host = new THREE.Vector3();
@@ -3263,9 +3322,10 @@ function updateRemotePlayerAnim(dt) {
 function updateNpcs(dt) {
   if (isDuelLevel()) {
     updateDuelGather();
+    updateDuelHerdState();
     npcs.forEach((npc) => {
       if (!npc.alive) return;
-      updateWander(npc, dt);
+      updateDuelNpcMovement(npc, dt);
       updateDuelNpcPunch(npc, dt);
       animateActor(npc, dt, npc.walking);
       animateNpcPunchPose(npc);
@@ -3959,6 +4019,9 @@ function finishRound(won, failMessage) {
 
 function updateHud() {
   const duel = isDuelLevel();
+  const duelPlaying = duel && (gameStatus === "playing" || gameStatus === "paused");
+  if (ui.hud) ui.hud.classList.toggle("is-duel-play", duelPlaying);
+
   ui.sceneName.textContent = levelState.level.sceneName;
   ui.missionText.textContent = levelState.level.hudMission || levelState.level.mission;
   ui.timerText.textContent = duel ? "∞" : Math.ceil(levelState.remaining).toString();
