@@ -138,13 +138,8 @@ function renderTargetPreview(level) {
   previewScene.background = new THREE.Color(bg);
 
   if (level.id === "gaming") {
-    const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
-    // 渲染黑眼圈效果
-    npc.group.userData.blackMarks.forEach((m) => {
-      m.material = m.material.clone();
-      m.material.opacity = 0.72;
-      m.scale.setScalar(1.35);
-    });
+    const npc = createNpc(0, { gamingTarget: true });
+    setBlackEye(npc, 1);
     previewScene.add(npc.group);
   } else {
     // 情侣：两个人面对面
@@ -812,29 +807,43 @@ function buildLibrary() {
       shelf.castShadow = true;
       shelf.receiveShadow = true;
       scene.add(shelf);
+      registerObstacle(x, z, 0.37, 1.1);
     });
   });
 
-  [-4.7, 0, 4.7].forEach((x) => {
-    [-2.8, 3.0].forEach((z) => {
-      const table = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.35, 1.35), tableMat);
-      table.position.set(x, 0.38, z);
-      table.castShadow = true;
-      table.receiveShadow = true;
-      scene.add(table);
-      registerObstacle(x, z, 1.35, 0.675);
+  [-9.5, -6.2, -2.9, 2.9, 6.2, 9.5].forEach((x) => {
+    registerObstacle(x, -9.2, 1.1, 0.33);
+  });
 
-      const lamp = new THREE.PointLight(0xffe0a8, 0.48, 5.2);
-      lamp.position.set(x, 1.6, z);
-      scene.add(lamp);
+  // 两侧与后侧墙体碰撞（内缘与可视墙对齐）
+  registerObstacle(-10.9, 0, 0.35, 10.6);
+  registerObstacle(10.9, 0, 0.35, 10.6);
+  registerObstacle(0, -10.9, 10.6, 0.35);
 
-      [-1, 1].forEach((side) => {
-        const chair = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.42, 0.58), chairMat);
-        chair.position.set(x + side * 1.15, 0.26, z);
-        chair.castShadow = true;
-        chair.receiveShadow = true;
-        scene.add(chair);
-      });
+  const libraryTables = [
+    [-3.4, -1.4],
+    [3.4, -1.4],
+    [-3.4, 2.4],
+    [3.4, 2.4],
+  ];
+  libraryTables.forEach(([x, z]) => {
+    const table = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.35, 1.35), tableMat);
+    table.position.set(x, 0.38, z);
+    table.castShadow = true;
+    table.receiveShadow = true;
+    scene.add(table);
+    registerObstacle(x, z, 1.35, 0.675);
+
+    const lamp = new THREE.PointLight(0xffe0a8, 0.48, 5.2);
+    lamp.position.set(x, 1.6, z);
+    scene.add(lamp);
+
+    [-1, 1].forEach((side) => {
+      const chair = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.42, 0.58), chairMat);
+      chair.position.set(x + side * 1.15, 0.26, z);
+      chair.castShadow = true;
+      chair.receiveShadow = true;
+      scene.add(chair);
     });
   });
 }
@@ -894,10 +903,12 @@ function spawnNpcs(level) {
     target.script = {
       state: "play",
       timer: 2.6,
+      playDuration: 2.6,
       computerIndex: 2,
       waypoint: null,
     };
     faceNpcToward(target, levelState.computers[2].clone().setZ(levelState.computers[2].z - 1.2));
+    setBlackEye(target, 0.62);
     npcs.push(target);
     scene.add(target.group);
 
@@ -940,6 +951,7 @@ function addWanderNpc(id) {
   const npc = createNpc(id, {});
   const pos = randomOpenPosition();
   npc.group.position.set(pos.x, 0, pos.z);
+  nudgeActorFromObstacles(npc);
   npc.wanderTimer = randomRange(0.6, 2.2);
   npc.pauseTimer = randomRange(0.2, 1.3);
   npc.walking = false;
@@ -984,9 +996,23 @@ function updateDecoy(npc, dt) {
   } else {
     // 混淆模式：流畅移动，像被操控一样
     npc.walking = true;
+    const prevX = npc.group.position.x;
+    const prevZ = npc.group.position.z;
     npc.group.position.x += npc.decoyDir.x * NPC_SPEED * dt;
     npc.group.position.z += npc.decoyDir.y * NPC_SPEED * dt;
-    clampActorPosition(npc.group.position);
+    const hitObstacle = resolveObstacleCollisions(npc.group.position, ACTOR_COLLISION_RADIUS, npc.decoyDir);
+    clampToWorld(npc.group.position);
+
+    const moved = Math.hypot(npc.group.position.x - prevX, npc.group.position.z - prevZ);
+    if (hitObstacle || moved < NPC_SPEED * dt * 0.12) {
+      npc.stuckTimer = (npc.stuckTimer ?? 0) + dt;
+      if (npc.stuckTimer > 0.3) {
+        pickDecoyDir(npc);
+        npc.stuckTimer = 0;
+      }
+    } else {
+      npc.stuckTimer = 0;
+    }
 
     // 碰到边界就转向
     if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.3) npc.decoyDir.x *= -1;
@@ -1029,8 +1055,9 @@ function collidesWithObstacle(pos, radius = ACTOR_COLLISION_RADIUS) {
   return false;
 }
 
-function resolveObstacleCollisions(position, radius = ACTOR_COLLISION_RADIUS) {
-  if (!levelState?.obstacles?.length) return;
+function resolveObstacleCollisions(position, radius = ACTOR_COLLISION_RADIUS, velocity = null) {
+  if (!levelState?.obstacles?.length) return false;
+  let hit = false;
   for (let pass = 0; pass < 4; pass += 1) {
     let resolved = false;
     for (const obs of levelState.obstacles) {
@@ -1041,18 +1068,40 @@ function resolveObstacleCollisions(position, radius = ACTOR_COLLISION_RADIUS) {
       if (overlapX <= 0 || overlapZ <= 0) continue;
       if (overlapX < overlapZ) {
         position.x += dx >= 0 ? overlapX : -overlapX;
+        if (velocity) velocity.x *= -0.25;
       } else {
         position.z += dz >= 0 ? overlapZ : -overlapZ;
+        if (velocity) velocity.y *= -0.25;
       }
       resolved = true;
+      hit = true;
     }
     if (!resolved) break;
   }
+  return hit;
 }
 
-function clampActorPosition(position) {
+function clampActorPosition(position, velocity = null) {
   clampToWorld(position);
-  resolveObstacleCollisions(position);
+  resolveObstacleCollisions(position, ACTOR_COLLISION_RADIUS, velocity);
+}
+
+function pickWanderDirection(npc) {
+  const angle = Math.random() * Math.PI * 2;
+  npc.velocity.set(Math.sin(angle), Math.cos(angle)).multiplyScalar(randomRange(0.55, 1.15));
+  npc.wanderTimer = randomRange(1.0, 3.0);
+  npc.stuckTimer = 0;
+}
+
+function nudgeActorFromObstacles(npc) {
+  const pos = npc.group.position;
+  for (let i = 0; i < 12; i += 1) {
+    if (!collidesWithObstacle(pos)) return;
+    const angle = Math.random() * Math.PI * 2;
+    pos.x += Math.sin(angle) * 0.22;
+    pos.z += Math.cos(angle) * 0.22;
+    clampActorPosition(pos);
+  }
 }
 
 function randomOpenPosition() {
@@ -1118,7 +1167,12 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
   const capAccent = makeLowPolyMat(palette.capAccent);
   const eye = makeLowPolyMat(0x111111, 0.4);
   const mouth = makeLowPolyMat(0x1a1a1a, 0.5);
-  const blackEyeMat = new THREE.MeshBasicMaterial({ color: 0x09090b, transparent: true, opacity: 0 });
+  const blackEyeMat = new THREE.MeshBasicMaterial({
+    color: 0x2a1450,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+  });
   const lipMat = new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0 });
 
   addFacetedBox(visual, 0.54, 0.5, 0.48, skin, 0, 1.44, 0);
@@ -1128,8 +1182,12 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
   addFacetedBox(visual, 0.11, 0.13, 0.05, eye, -0.13, 1.46, 0.26);
   addFacetedBox(visual, 0.11, 0.13, 0.05, eye, 0.13, 1.46, 0.26);
   addFacetedBox(visual, 0.2, 0.06, 0.04, mouth, 0, 1.3, 0.26);
-  const blackLeft = addFacetedBox(visual, 0.12, 0.1, 0.03, blackEyeMat, -0.13, 1.42, 0.27);
-  const blackRight = addFacetedBox(visual, 0.12, 0.1, 0.03, blackEyeMat.clone(), 0.13, 1.42, 0.27);
+  const blackLeft = addFacetedBox(visual, 0.17, 0.14, 0.04, blackEyeMat, -0.13, 1.4, 0.27);
+  const blackRight = addFacetedBox(visual, 0.17, 0.14, 0.04, blackEyeMat.clone(), 0.13, 1.4, 0.27);
+  const blackTopLeft = addFacetedBox(visual, 0.16, 0.05, 0.16, blackEyeMat.clone(), -0.13, 1.67, -0.02);
+  const blackTopRight = addFacetedBox(visual, 0.16, 0.05, 0.16, blackEyeMat.clone(), 0.13, 1.67, -0.02);
+  blackTopLeft.userData.isTopView = true;
+  blackTopRight.userData.isTopView = true;
   const lipMark = addFacetedBox(visual, 0.16, 0.08, 0.03, lipMat, 0, 1.28, 0.27);
   addFacetedBox(visual, 0.56, 0.4, 0.22, jacketDark, 0, 1.52, -0.3, 0.18, 0, 0);
 
@@ -1181,7 +1239,7 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
     rightArm,
     leftLeg,
     rightLeg,
-    blackMarks: [blackLeft, blackRight],
+    blackMarks: [blackLeft, blackRight, blackTopLeft, blackTopRight],
     lipMarks: [lipMark],
     baseArmRotations: {
       leftZ: leftArm.rotation.z,
@@ -1281,7 +1339,7 @@ function updatePlayer(dt) {
   if (moving) {
     player.group.position.x += playerInputVel.x * player.speed * dt;
     player.group.position.z += playerInputVel.y * player.speed * dt;
-    clampActorPosition(player.group.position);
+    clampActorPosition(player.group.position, playerInputVel);
     const targetRotation = Math.atan2(playerInputVel.x, playerInputVel.y);
     player.group.rotation.y = lerpAngle(player.group.rotation.y, targetRotation, 0.24);
   }
@@ -1347,6 +1405,8 @@ function updateGamingTarget(dt) {
     script.timer -= dt;
     const computer = levelState.computers[script.computerIndex];
     faceNpcToward(target, new THREE.Vector3(computer.x, 0, computer.z > 0 ? computer.z - 1.1 : computer.z + 1.1));
+    const playProgress = 1 - script.timer / (script.playDuration || script.timer || 1);
+    setBlackEye(target, 0.62 + playProgress * 0.28);
     if (script.timer <= 0) {
       setBlackEye(target, 1);
       script.state = "leave";
@@ -1375,6 +1435,8 @@ function updateGamingTarget(dt) {
     if (reached) {
       script.state = "play";
       script.timer = randomRange(2.2, 3.4);
+      script.playDuration = script.timer;
+      setBlackEye(target, 0.62);
     }
   }
 }
@@ -1452,9 +1514,11 @@ function randomMeetingPoint() {
 function setBlackEye(npc, intensity) {
   npc.marked = true;
   npc.markIntensity = Math.max(npc.markIntensity, intensity);
+  const i = npc.markIntensity;
   npc.group.userData.blackMarks.forEach((mesh) => {
-    mesh.material.opacity = 0.72 * npc.markIntensity;
-    mesh.scale.setScalar(0.8 + npc.markIntensity * 0.55);
+    mesh.material.opacity = 0.58 + i * 0.42;
+    const base = mesh.userData.isTopView ? 1.05 : 0.9;
+    mesh.scale.setScalar(base + i * 0.7);
   });
 }
 
@@ -1472,18 +1536,28 @@ function updateWander(npc, dt) {
     npc.pauseTimer -= dt;
     npc.walking = false;
     if (npc.pauseTimer <= 0) {
-      const angle = Math.random() * Math.PI * 2;
-      npc.velocity.set(Math.sin(angle), Math.cos(angle)).multiplyScalar(randomRange(0.55, 1.15));
-      npc.wanderTimer = randomRange(1.0, 3.0);
+      pickWanderDirection(npc);
     }
     return;
   }
 
   npc.wanderTimer -= dt;
   npc.walking = true;
+  const prevX = npc.group.position.x;
+  const prevZ = npc.group.position.z;
   npc.group.position.x += npc.velocity.x * NPC_SPEED * dt;
   npc.group.position.z += npc.velocity.y * NPC_SPEED * dt;
-  clampActorPosition(npc.group.position);
+  clampActorPosition(npc.group.position, npc.velocity);
+
+  const moved = Math.hypot(npc.group.position.x - prevX, npc.group.position.z - prevZ);
+  if (moved < NPC_SPEED * dt * 0.12) {
+    npc.stuckTimer = (npc.stuckTimer ?? 0) + dt;
+    if (npc.stuckTimer > 0.35) {
+      pickWanderDirection(npc);
+    }
+  } else {
+    npc.stuckTimer = 0;
+  }
 
   if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.2) npc.velocity.x *= -1;
   if (Math.abs(npc.group.position.z) >= WORLD_LIMIT - 0.2) npc.velocity.y *= -1;
@@ -1507,9 +1581,21 @@ function moveNpcToward(npc, waypoint, speed, dt) {
   }
 
   scratchVec3.normalize();
+  const prevX = npc.group.position.x;
+  const prevZ = npc.group.position.z;
+  scratchVec2.set(scratchVec3.x, scratchVec3.z);
   npc.group.position.x += scratchVec3.x * speed * dt;
   npc.group.position.z += scratchVec3.z * speed * dt;
-  clampActorPosition(npc.group.position);
+  const hitObstacle = resolveObstacleCollisions(npc.group.position, ACTOR_COLLISION_RADIUS, scratchVec2);
+  clampToWorld(npc.group.position);
+
+  const moved = Math.hypot(npc.group.position.x - prevX, npc.group.position.z - prevZ);
+  if (hitObstacle && moved < speed * dt * 0.2 && waypoint) {
+    waypoint.x += randomRange(-1.2, 1.2);
+    waypoint.z += randomRange(-1.2, 1.2);
+    clampToWorld(waypoint);
+  }
+
   const targetRotation = Math.atan2(scratchVec3.x, scratchVec3.z);
   npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.12);
   npc.walking = true;
