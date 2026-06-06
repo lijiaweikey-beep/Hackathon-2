@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>俯视角动作小游戏</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <canvas id="gameCanvas" aria-label="3D top-down action game"></canvas>
+
+    <main id="hud" class="hud">
+      <section class="topbar">
+        <div class="mission-strip">
+          <div id="sceneName" class="scene-name">凌晨三点</div>
+          <div id="missionText" class="mission-text">任务加载中</div>
+        </div>
+        <div class="status-strip">
+          <div class="status-chip">
+            <span class="status-label">时间</span>
+            <strong id="timerText">90</strong>
+          </div>
+          <div class="status-chip danger">
+            <span class="status-label">出拳</span>
+            <strong id="attemptText">3</strong>
+          </div>
+        </div>
+      </section>
+
+      <nav class="scene-switch" aria-label="场景切换">
+        <button id="sceneOneButton" class="scene-button active" type="button">宿舍</button>
+        <button id="sceneTwoButton" class="scene-button" type="button">图书馆</button>
+      </nav>
+
+      <section class="controls">
+        <div id="joystick" class="joystick" aria-label="虚拟摇杆">
+          <div id="joystickKnob" class="joystick-knob"></div>
+        </div>
+        <button id="attackButton" class="attack-button" type="button" aria-label="干爆">
+          <span>拳</span>
+        </button>
+      </section>
+    </main>
+
+    <section id="taskModal" class="modal visible">
+      <div class="modal-panel">
+        <div id="taskTitle" class="modal-title">任务</div>
+        <p id="taskCopy" class="modal-copy">任务加载中</p>
+        <button id="startButton" class="primary-button" type="button">开始行动</button>
+      </div>
+    </section>
+
+    <section id="resultModal" class="modal">
+      <div class="modal-panel result">
+        <div id="resultTitle" class="modal-title">结算</div>
+        <p id="resultCopy" class="modal-copy">结果加载中</p>
+        <div class="result-actions">
+          <button id="retryButton" class="primary-button" type="button">再来一局</button>
+          <button id="nextButton" class="secondary-button" type="button">换个场景</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="/src/game.js"></script>
+  </body>
+</html>

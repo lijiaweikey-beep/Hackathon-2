@@ -1,36 +1,27 @@
 # Hackathon-2
 
-A hackathon project repository.
+移动端 3D 俯视角动作小游戏，基于 Three.js + Vite 实现。
 
-## Description
+## 功能
 
-This repository contains the code and resources for Hackathon project 2.
+- 虚拟摇杆控制玩家移动
+- 单键触发攻击判定
+- 两个任务场景：宿舍/网吧、图书馆
+- 15 个相似 NPC 随机走停漫游
+- 目标特征线索：黑眼圈、口红印
+- 3 次有效出拳机会，90 秒倒计时
+- 命中后像素块消散特效
+- 胜利欢呼动作与失败结算文案
 
-## Getting Started
+## 本地运行
 
-### Prerequisites
+```sh
+npm install
+npm run dev
+```
 
-- List your prerequisites here
+构建：
 
-### Installation
-
-1. Clone the repo
-   ```sh
-   git clone https://github.com/lijiaweikey-beep/Hackathon-2.git
-   ```
-2. Install dependencies
-   ```sh
-   # Add installation commands here
-   ```
-
-## Usage
-
-Add usage instructions here.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```sh
+npm run build
+```
