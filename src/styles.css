@@ -370,6 +370,14 @@ button {
   text-shadow: 0 0 24px rgba(45, 212, 191, 0.4);
 }
 
+[hidden] {
+  display: none !important;
+}
+
+.level-select-panel.is-duel-lobby .level-select-stack {
+  display: none !important;
+}
+
 .level-select-stack {
   display: flex;
   flex-direction: column;
@@ -759,47 +767,50 @@ button {
 
 /* ---- 双人决斗大厅 ---- */
 .duel-lobby-panel {
-  margin-bottom: 18px;
-  padding: 16px 18px;
-  border: 1px solid rgba(45, 212, 191, 0.25);
-  border-radius: 12px;
-  background: rgba(45, 212, 191, 0.06);
-  text-align: left;
+  padding: 8px 4px 4px;
+  text-align: center;
   pointer-events: auto;
 }
 
 .duel-lobby-title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 900;
   color: var(--accent);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
-.duel-lobby-desc {
-  margin: 0 0 10px;
+.duel-lobby-hint {
+  margin: 0 0 18px;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--text);
-}
-
-.duel-lobby-rules {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
-  line-height: 1.6;
   color: var(--muted);
 }
 
-.duel-start-btn {
-  margin-bottom: 10px;
-  border-color: rgba(45, 212, 191, 0.45);
-  background: rgba(45, 212, 191, 0.12);
+.duel-guest-waiting {
+  padding: 28px 16px;
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  border-radius: 12px;
+  background: rgba(45, 212, 191, 0.06);
+}
+
+.duel-guest-status {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.6;
+}
+
+.duel-back-btn {
+  margin-top: 18px;
+  width: 100%;
+  pointer-events: auto;
 }
 
 /* ---- 多人联机 ---- */
-.mp-section {
-  margin-top: 20px;
-  text-align: center;
+.level-select-stack .mp-create-btn {
+  margin-top: 6px;
+  width: 100%;
 }
 
 .mp-create-btn {
@@ -825,6 +836,21 @@ button {
   border: 1px solid rgba(45, 212, 191, 0.3);
   background: rgba(45, 212, 191, 0.06);
   margin-bottom: 12px;
+}
+
+.mp-share-box--duel {
+  padding: 18px;
+  text-align: left;
+}
+
+.mp-share-box--duel .mp-link-input {
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+.mp-share-box--duel .mp-copy-btn {
+  padding: 10px 16px;
+  font-size: 13px;
 }
 
 .mp-status {

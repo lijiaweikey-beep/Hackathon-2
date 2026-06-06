@@ -21,7 +21,7 @@
             <strong id="timerText">90</strong>
           </div>
           <div class="status-chip danger">
-            <span id="attemptLabel" class="status-label">生命</span>
+            <span id="attemptLabel" class="status-label">出拳</span>
             <strong id="attemptText">3</strong>
           </div>
           <button id="pauseButton" class="pause-button" type="button" aria-label="暂停">⏸</button>
@@ -55,18 +55,26 @@
 
     <!-- 关卡选择界面 -->
     <section id="levelSelectModal" class="modal visible">
-      <div class="level-select-panel">
-        <div class="game-logo">⚔️ 图书馆决斗 ⚔️</div>
-        <div id="duelLobbyPanel" class="duel-lobby-panel">
-          <div class="duel-lobby-title">双人 PvP 模式</div>
-          <p class="duel-lobby-desc">图书馆地图 · 40 名 NPC 随机挥刀（5–10 秒间隔）· 击败对手获胜</p>
-          <ul class="duel-lobby-rules">
-            <li>队长创建房间并分享链接</li>
-            <li>选手加入后，队长点击「开始对战」</li>
-            <li>双方确认就绪后进入决斗</li>
-          </ul>
+      <div id="levelSelectPanel" class="level-select-panel">
+        <div id="gameLogo" class="game-logo">🔥 别让我逮到你 🔥</div>
+
+        <div id="duelLobbyPanel" class="duel-lobby-panel" hidden>
+          <div class="duel-lobby-title">⚔️ 图书馆决斗</div>
+          <p id="duelLobbyHint" class="duel-lobby-hint">把下方链接发给选手，选手打开即可加入</p>
+          <div id="mpShareBox" class="mp-share-box mp-share-box--duel">
+            <div class="mp-status" id="mpStatusText">🔗 正在创建房间...</div>
+            <div class="mp-link-row">
+              <input id="mpLinkInput" class="mp-link-input" readonly />
+              <button id="mpCopyBtn" class="mp-copy-btn" type="button">复制链接</button>
+            </div>
+          </div>
+          <div id="duelGuestWaiting" class="duel-guest-waiting" hidden>
+            <p id="duelGuestStatus" class="duel-guest-status">🔗 正在加入房间...</p>
+          </div>
+          <button id="duelBackBtn" class="secondary-button duel-back-btn" type="button">返回单人模式</button>
         </div>
-        <div id="soloModeStack" class="level-select-stack" hidden>
+
+        <div id="soloModeStack" class="level-select-stack">
           <div class="match-settings">
             <div class="match-settings-icon" aria-hidden="true">👥</div>
             <div class="match-settings-body">
@@ -90,17 +98,7 @@
             </div>
           </div>
           <div id="levelCards" class="level-cards"></div>
-        </div>
-        <div class="mp-section">
-          <div id="mpShareBox" class="mp-share-box" style="display:none">
-            <div class="mp-status" id="mpStatusText">🔗 房间已创建，等待对手加入...</div>
-            <div class="mp-link-row">
-              <input id="mpLinkInput" class="mp-link-input" readonly />
-              <button id="mpCopyBtn" class="mp-copy-btn" type="button">复制</button>
-            </div>
-          </div>
-          <button id="duelStartBtn" class="mp-create-btn duel-start-btn" type="button" style="display:none">⚔️ 开始对战</button>
-          <button id="mpCreateBtn" class="mp-create-btn" type="button">🎮 创建联机房间</button>
+          <button id="mpCreateBtn" class="mp-create-btn" type="button">🎮 创建联机房间（双人决斗）</button>
         </div>
       </div>
     </section>

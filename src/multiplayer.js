@@ -283,14 +283,27 @@ export function getRoomId() {
 }
 
 /**
- * 清理所有监听和连接
+ * 离开房间并清理连接
  */
-export function cleanup() {
+export function leaveRoom() {
   unsubscribes.forEach((unsub) => unsub());
   unsubscribes = [];
-  if (roomRef) {
+  if (isHost && roomRef) {
     set(roomRef, null);
+  } else if (myRef) {
+    set(myRef, null);
   }
+  roomId = null;
+  playerId = null;
+  isHost = false;
+  roomRef = null;
+  myRef = null;
+  lastSyncTime = 0;
+}
+
+/** @deprecated 使用 leaveRoom */
+export function cleanup() {
+  leaveRoom();
 }
 
 /**

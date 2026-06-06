@@ -10,7 +10,7 @@ import {
   getShareLink,
   getIsHost,
   isConnected,
-  cleanup as mpCleanup,
+  leaveRoom as mpLeaveRoom,
 } from "./multiplayer.js";
 
 const DEFAULT_NPC_COUNT = 20;
@@ -104,6 +104,7 @@ const ui = {
   attemptText: document.querySelector("#attemptText"),
   clueBar: document.querySelector("#clueBar"),
   levelSelectModal: document.querySelector("#levelSelectModal"),
+  levelSelectPanel: document.querySelector("#levelSelectPanel"),
   levelCards: document.querySelector("#levelCards"),
   taskModal: document.querySelector("#taskModal"),
   taskEmoji: document.querySelector("#taskEmoji"),
@@ -136,9 +137,13 @@ const ui = {
   mpStatusText: document.querySelector("#mpStatusText"),
   mpLinkInput: document.querySelector("#mpLinkInput"),
   mpCopyBtn: document.querySelector("#mpCopyBtn"),
+  gameLogo: document.querySelector("#gameLogo"),
   duelLobbyPanel: document.querySelector("#duelLobbyPanel"),
+  duelLobbyHint: document.querySelector("#duelLobbyHint"),
+  duelGuestWaiting: document.querySelector("#duelGuestWaiting"),
+  duelGuestStatus: document.querySelector("#duelGuestStatus"),
+  duelBackBtn: document.querySelector("#duelBackBtn"),
   soloModeStack: document.querySelector("#soloModeStack"),
-  duelStartBtn: document.querySelector("#duelStartBtn"),
   attemptLabel: document.querySelector("#attemptLabel"),
   joystick: document.querySelector("#joystick"),
   joystickKnob: document.querySelector("#joystickKnob"),
@@ -157,7 +162,7 @@ let guestReady = false;
 let guestConfirmed = false;
 let stateRevision = 0;
 let lastRemoteStateRevision = -1;
-let gameMode = "duel";
+let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
@@ -301,27 +306,79 @@ function getMatchNpcCount() {
   return matchNpcCount;
 }
 
-function readNpcCountInput() {
-  return clampNpcCount(Number(ui.npcCountInput.value));
-}
-
 function syncNpcCountInput() {
   ui.npcCountInput.value = String(matchNpcCount);
 }
 
+function parseNpcCountRaw(raw) {
+  const text = String(raw).trim();
+  if (!text) return null;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
+function getNpcCountPreview() {
+  const parsed = parseNpcCountRaw(ui.npcCountInput.value);
+  if (parsed == null) return matchNpcCount;
+  return clampNpcCount(parsed);
+}
+
+function getNpcCountForDisplay() {
+  if (document.activeElement === ui.npcCountInput) {
+    return getNpcCountPreview();
+  }
+  return matchNpcCount;
+}
+
 function formatLevelCardDesc(level) {
-  const n = getMatchNpcCount();
+  const n = getNpcCountForDisplay();
   if (level.id === "gaming") return `在 ${n} 人中找到凌晨三点还在打游戏的人`;
   if (level.id === "library") return `在 ${n} 人中找到图书馆里亲嘴的情侣`;
   if (level.id === "temple") return `在 ${n} 个苏轼影分身里找出真正吵醒怀民的苏轼`;
   return level.cardDesc;
 }
 
-function onNpcCountInputChange() {
-  matchNpcCount = readNpcCountInput();
+function onNpcCountInput() {
+  buildLevelCards();
+}
+
+function commitNpcCountInput() {
+  const parsed = parseNpcCountRaw(ui.npcCountInput.value);
+  if (parsed == null) {
+    syncNpcCountInput();
+    buildLevelCards();
+    return;
+  }
+  const next = clampNpcCount(parsed);
+  if (next === matchNpcCount) {
+    syncNpcCountInput();
+    buildLevelCards();
+    return;
+  }
+  matchNpcCount = next;
   syncNpcCountInput();
   saveMatchNpcCount();
   buildLevelCards();
+}
+
+function bindNpcCountInput() {
+  const input = ui.npcCountInput;
+  input.addEventListener("input", onNpcCountInput);
+  input.addEventListener("change", commitNpcCountInput);
+  input.addEventListener("blur", commitNpcCountInput);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      input.blur();
+      return;
+    }
+    if (["e", "E", "+", "-", "."].includes(event.key)) {
+      event.preventDefault();
+    }
+  });
+  input.addEventListener("wheel", (event) => {
+    if (document.activeElement === input) event.preventDefault();
+  }, { passive: false });
 }
 
 /* ---- 关卡选择 ---- */
@@ -334,7 +391,32 @@ function isDuelLevel(level = levelState?.level) {
 }
 
 function isDuelActive() {
-  return gameMode === "duel" || isDuelLevel();
+  return isDuelLevel() || (gameMode === "duel" && isConnected());
+}
+
+function hasRoomInUrl() {
+  return Boolean(new URLSearchParams(window.location.search).get("room"));
+}
+
+function clearRoomFromUrl() {
+  const url = new URL(window.location);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url);
+}
+
+function leaveDuelLobby() {
+  mpLeaveRoom();
+  clearRoomFromUrl();
+  gameMode = "solo";
+  mpStatus = "none";
+  guestReady = false;
+  guestConfirmed = false;
+  remotePlayer = null;
+  showLevelSelect();
+}
+
+function isInDuelLobby() {
+  return gameMode === "duel" && gameStatus === "levelSelect" && (isConnected() || hasRoomInUrl());
 }
 
 function canHostPickLevel() {
@@ -342,15 +424,29 @@ function canHostPickLevel() {
 }
 
 function updateDuelLobbyUI() {
-  const inDuel = gameMode === "duel";
-  if (ui.duelLobbyPanel) ui.duelLobbyPanel.hidden = !inDuel;
-  if (ui.soloModeStack) ui.soloModeStack.hidden = inDuel;
+  const inDuelLobby = isInDuelLobby();
+  const isGuest = isConnected() && !getIsHost();
 
-  if (!inDuel || !ui.duelStartBtn) return;
+  if (ui.levelSelectPanel) {
+    ui.levelSelectPanel.classList.toggle("is-duel-lobby", inDuelLobby);
+  }
+  if (ui.duelLobbyPanel) ui.duelLobbyPanel.hidden = !inDuelLobby;
+  if (ui.soloModeStack) ui.soloModeStack.hidden = inDuelLobby;
+  if (ui.gameLogo) {
+    ui.gameLogo.textContent = inDuelLobby ? "⚔️ 图书馆决斗 ⚔️" : "🔥 别让我逮到你 🔥";
+  }
 
-  const showStart = isConnected() && getIsHost() && mpStatus === "connected" && gameStatus === "levelSelect";
-  ui.duelStartBtn.style.display = showStart ? "" : "none";
-  ui.duelStartBtn.disabled = !showStart;
+  if (!inDuelLobby) return;
+
+  if (isGuest) {
+    if (ui.duelLobbyHint) ui.duelLobbyHint.hidden = true;
+    if (ui.mpShareBox) ui.mpShareBox.hidden = true;
+    if (ui.duelGuestWaiting) ui.duelGuestWaiting.hidden = false;
+  } else {
+    if (ui.duelLobbyHint) ui.duelLobbyHint.hidden = false;
+    if (ui.mpShareBox) ui.mpShareBox.hidden = false;
+    if (ui.duelGuestWaiting) ui.duelGuestWaiting.hidden = true;
+  }
 }
 
 function buildLevelCards() {
@@ -359,6 +455,8 @@ function buildLevelCards() {
   const mpHostWaiting = isConnected() && getIsHost() && mpStatus !== "connected";
 
   LEVELS.forEach((level, i) => {
+    if (level.duelMode) return;
+
     const best = getBestScore(level.id);
     const stars = "★".repeat(level.difficulty) + "☆".repeat(3 - level.difficulty);
     const bestText = best ? `${best.grade} · ${best.time}s` : "--";
@@ -399,13 +497,14 @@ function showLevelSelect() {
   gameStatus = "levelSelect";
   guestReady = false;
   guestConfirmed = false;
+  if (!isConnected() && !hasRoomInUrl()) gameMode = "solo";
   if (isConnected() && getIsHost()) {
     clearGuestReady();
-    pushGameState({ phase: "lobby", levelIndex: null, started: false });
+    pushGameState({ phase: "lobby", levelIndex: null, started: false, mode: gameMode });
   }
   syncNpcCountInput();
-  if (gameMode === "duel") updateDuelLobbyUI();
-  else buildLevelCards();
+  if (!isInDuelLobby()) buildLevelCards();
+  updateDuelLobbyUI();
   updateMpUI();
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
@@ -413,41 +512,48 @@ function showLevelSelect() {
 }
 
 function updateMpUI() {
-  if (isConnected()) {
+  if (gameMode === "duel") {
     ui.mpCreateBtn.style.display = "none";
-    ui.mpShareBox.style.display = "block";
-    ui.mpLinkInput.value = getShareLink();
-    const isGuest = !getIsHost();
-    if (isGuest) {
-      ui.mpLinkInput.style.display = "none";
-      ui.mpCopyBtn.style.display = "none";
-      if (gameStatus === "levelSelect") {
-        ui.mpStatusText.textContent = mpStatus === "connected"
-          ? "✅ 已加入房间，等待队长开始对战..."
+
+    if (isConnected()) {
+      const isGuest = !getIsHost();
+      if (isGuest) {
+        const guestText = mpStatus === "connected"
+          ? "✅ 已加入房间，等待队长开始..."
           : "🔗 正在加入房间...";
+        if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = guestText;
       } else {
-        ui.mpStatusText.textContent = "✅ 已加入对战";
+        ui.mpLinkInput.value = getShareLink();
+        if (mpStatus === "connected") {
+          ui.mpStatusText.textContent = "✅ 选手已加入，等待确认就绪";
+          ui.mpStatusText.style.color = "#4ade80";
+          if (ui.duelLobbyHint) {
+            ui.duelLobbyHint.textContent = "选手已加入，确认就绪后即可开始游戏";
+          }
+        } else {
+          ui.mpStatusText.textContent = "🔗 等待选手加入";
+          ui.mpStatusText.style.color = "";
+          if (ui.duelLobbyHint) {
+            ui.duelLobbyHint.textContent = "把下方链接发给选手，选手打开即可加入";
+          }
+        }
       }
-      ui.mpStatusText.style.color = "#4ade80";
-    } else {
-      ui.mpLinkInput.style.display = "";
-      ui.mpCopyBtn.style.display = "";
-      if (mpStatus === "connected") {
-        ui.mpStatusText.textContent = gameMode === "duel"
-          ? "✅ 选手已加入！点击「开始对战」"
-          : "✅ 选手已加入！请选择关卡";
-        ui.mpStatusText.style.color = "#4ade80";
-      } else {
-        ui.mpStatusText.textContent = "🔗 等待选手加入...（请分享下方链接）";
-        ui.mpStatusText.style.color = "";
-      }
+    } else if (hasRoomInUrl()) {
+      if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = "🔗 正在加入房间...";
+    }
+  } else if (isConnected()) {
+    ui.mpCreateBtn.style.display = "none";
+    ui.mpShareBox.hidden = false;
+    ui.mpLinkInput.value = getShareLink();
+    if (getIsHost()) {
+      ui.mpStatusText.textContent = mpStatus === "connected"
+        ? "✅ 选手已加入！请选择关卡"
+        : "🔗 等待选手加入...";
     }
   } else {
     ui.mpCreateBtn.style.display = "";
-    ui.mpShareBox.style.display = "none";
-    ui.mpLinkInput.style.display = "";
-    ui.mpCopyBtn.style.display = "";
   }
+
   updateDuelLobbyUI();
 }
 
@@ -512,10 +618,10 @@ function updateTaskMpUI() {
   ui.taskMpHint.hidden = false;
 
   if (getIsHost()) {
-    ui.startButton.textContent = isDuelActive() ? "开始决斗" : "开始行动";
+    ui.startButton.textContent = isDuelActive() ? "开始游戏" : "开始行动";
     ui.startButton.disabled = !guestReady;
     ui.taskMpHint.textContent = guestReady
-      ? "✅ 选手已确认，可以开始对战"
+      ? "✅ 选手已确认，点击「开始游戏」"
       : "⏳ 等待选手阅读规则并点击「确认就绪」";
   } else {
     ui.startButton.textContent = guestConfirmed ? "已确认" : "确认就绪";
@@ -556,18 +662,17 @@ function createMpCallbacks() {
     },
     onGuestJoined() {
       mpStatus = "connected";
-      if (gameMode === "duel") updateDuelLobbyUI();
-      else buildLevelCards();
+      updateDuelLobbyUI();
       updateMpUI();
-      // 仅当房主已选关时才同步，避免把默认关卡 0 推给选手
-      if (gameStatus !== "levelSelect") {
+      if (gameMode === "duel" && getIsHost() && gameStatus === "levelSelect") {
+        startDuelBriefing();
+      } else if (gameStatus !== "levelSelect") {
         pushGameState();
       }
     },
     onRoomReady() {
       mpStatus = "connected";
-      if (gameMode === "duel") updateDuelLobbyUI();
-      else buildLevelCards();
+      updateDuelLobbyUI();
       updateMpUI();
     },
     onGuestReady() {
@@ -581,10 +686,10 @@ function createMpCallbacks() {
 }
 
 function selectLevel(index) {
+  if (isConnected() && gameMode === "duel") return;
   if (isConnected() && !canHostPickLevel()) return;
   if (getIsHost() || !isConnected()) {
-    matchNpcCount = readNpcCountInput();
-    saveMatchNpcCount();
+    commitNpcCountInput();
   }
   guestReady = false;
   guestConfirmed = false;
@@ -745,10 +850,10 @@ function boot() {
   setupUi();
   resize();
   window.addEventListener("resize", resize);
-  window.addEventListener("beforeunload", mpCleanup);
+  window.addEventListener("beforeunload", mpLeaveRoom);
 
-  // 如果 URL 有 room 参数，自动加入房间（guest 模式）
-  if (new URLSearchParams(window.location.search).get("room")) {
+  if (hasRoomInUrl()) {
+    gameMode = "duel";
     mpStatus = "waiting";
     initMultiplayer(createMpCallbacks());
   }
@@ -761,8 +866,7 @@ function boot() {
 function setupUi() {
   matchNpcCount = loadMatchNpcCount();
   syncNpcCountInput();
-  ui.npcCountInput.addEventListener("change", onNpcCountInputChange);
-  ui.npcCountInput.addEventListener("input", onNpcCountInputChange);
+  bindNpcCountInput();
 
   ui.startButton.addEventListener("click", () => {
     if (gameStatus !== "briefing") return;
@@ -821,23 +925,26 @@ function setupUi() {
     triggerAttack();
   });
 
-  // 多人联机按钮
+  // 多人联机按钮（创建房间 = 双人决斗模式）
   ui.mpCreateBtn.addEventListener("click", () => {
     if (isConnected()) return;
+    gameMode = "duel";
     initMultiplayer(createMpCallbacks());
     mpStatus = "waiting";
+    ui.mpLinkInput.value = getShareLink();
+    updateDuelLobbyUI();
     updateMpUI();
   });
-
-  ui.duelStartBtn?.addEventListener("click", () => startDuelBriefing());
 
   ui.mpCopyBtn.addEventListener("click", () => {
     const link = getShareLink();
     navigator.clipboard.writeText(link).then(() => {
       ui.mpCopyBtn.textContent = "已复制!";
-      setTimeout(() => { ui.mpCopyBtn.textContent = "复制"; }, 1500);
+      setTimeout(() => { ui.mpCopyBtn.textContent = "复制链接"; }, 1500);
     });
   });
+
+  ui.duelBackBtn?.addEventListener("click", () => leaveDuelLobby());
 }
 
 function setupInput() {
