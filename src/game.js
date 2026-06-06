@@ -14,7 +14,12 @@ const LEVELS = [
   {
     id: "gaming",
     sceneName: "凌晨三点",
-    mission: "任务：干爆凌晨三点打游戏的人",
+    emoji: "🌙",
+    cardDesc: "在 20 人中找到凌晨三点还在打游戏的人",
+    mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
+    clue: "目标特征：有明显黑眼圈",
+    targetDesc: "打游戏的人",
+    difficulty: 2,
     success: "精准命中，宿舍终于安静了。",
     failure: "这个人游戏打爽了，大家都被吵醒了",
     lighting: "night",
@@ -22,7 +27,12 @@ const LEVELS = [
   {
     id: "library",
     sceneName: "图书馆",
-    mission: "任务：干爆图书馆里亲嘴的男女",
+    emoji: "📚",
+    cardDesc: "在 20 人中找到图书馆里亲嘴的情侣",
+    mission: "图书馆里有一对情侣在亲嘴，太辣眼睛了！",
+    clue: "目标特征：两个人贴在一起，嘴上有口红印",
+    targetDesc: "亲嘴的情侣",
+    difficulty: 3,
     success: "精准命中，图书馆恢复了该有的安静。",
     failure: "这对情侣亲爽了",
     lighting: "library",
@@ -35,17 +45,32 @@ const ui = {
   missionText: document.querySelector("#missionText"),
   timerText: document.querySelector("#timerText"),
   attemptText: document.querySelector("#attemptText"),
+  clueBar: document.querySelector("#clueBar"),
+  levelSelectModal: document.querySelector("#levelSelectModal"),
+  levelCards: document.querySelector("#levelCards"),
   taskModal: document.querySelector("#taskModal"),
+  taskEmoji: document.querySelector("#taskEmoji"),
   taskTitle: document.querySelector("#taskTitle"),
   taskCopy: document.querySelector("#taskCopy"),
+  taskClue: document.querySelector("#taskClue"),
+  taskTime: document.querySelector("#taskTime"),
+  taskAttempts: document.querySelector("#taskAttempts"),
+  targetPreviewCanvas: document.querySelector("#targetPreviewCanvas"),
+  targetLabel: document.querySelector("#targetLabel"),
   startButton: document.querySelector("#startButton"),
   resultModal: document.querySelector("#resultModal"),
+  resultRating: document.querySelector("#resultRating"),
   resultTitle: document.querySelector("#resultTitle"),
   resultCopy: document.querySelector("#resultCopy"),
+  statTime: document.querySelector("#statTime"),
+  statAttempts: document.querySelector("#statAttempts"),
   retryButton: document.querySelector("#retryButton"),
-  nextButton: document.querySelector("#nextButton"),
-  sceneOneButton: document.querySelector("#sceneOneButton"),
-  sceneTwoButton: document.querySelector("#sceneTwoButton"),
+  backToSelectButton: document.querySelector("#backToSelectButton"),
+  pauseButton: document.querySelector("#pauseButton"),
+  pauseModal: document.querySelector("#pauseModal"),
+  resumeButton: document.querySelector("#resumeButton"),
+  backFromPauseButton: document.querySelector("#backFromPauseButton"),
+  backFromTaskButton: document.querySelector("#backFromTaskButton"),
   joystick: document.querySelector("#joystick"),
   joystickKnob: document.querySelector("#joystickKnob"),
   attackButton: document.querySelector("#attackButton"),
@@ -64,6 +89,148 @@ let punchEffects = [];
 let gameStatus = "briefing";
 let punchCooldown = 0;
 let totalTime = 0;
+
+/* ---- 3D 目标预览渲染器 ---- */
+let previewRenderer = null;
+let previewScene = null;
+let previewCamera = null;
+
+function initPreviewRenderer() {
+  if (previewRenderer) return;
+  previewRenderer = new THREE.WebGLRenderer({
+    canvas: ui.targetPreviewCanvas,
+    antialias: true,
+    alpha: true,
+  });
+  previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  previewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  previewScene = new THREE.Scene();
+  previewCamera = new THREE.PerspectiveCamera(28, 200 / 220, 0.1, 50);
+  previewCamera.position.set(0, 2.2, 3.6);
+  previewCamera.lookAt(0, 0.9, 0);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+  previewScene.add(ambient);
+  const key = new THREE.DirectionalLight(0xffffff, 1.2);
+  key.position.set(2, 4, 3);
+  previewScene.add(key);
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
+  fill.position.set(-2, 2, -1);
+  previewScene.add(fill);
+}
+
+function renderTargetPreview(level) {
+  initPreviewRenderer();
+  // 清除旧模型
+  while (previewScene.children.length > 3) {
+    previewScene.remove(previewScene.children[3]);
+  }
+
+  const bg = level.lighting === "night" ? 0x0c1424 : 0xd0dce8;
+  previewScene.background = new THREE.Color(bg);
+
+  if (level.id === "gaming") {
+    const npc = createPerson({ body: 0x64748b, pants: 0x293241, hair: 0x16181e });
+    // 渲染黑眼圈效果
+    npc.group.userData.blackMarks.forEach((m) => {
+      m.material = m.material.clone();
+      m.material.opacity = 0.72;
+      m.scale.setScalar(1.35);
+    });
+    previewScene.add(npc.group);
+  } else {
+    // 情侣：两个人面对面
+    const a = createPerson({ body: 0x64748b, pants: 0x293241, hair: 0x16181e });
+    const b = createPerson({ body: 0x5b6b7f, pants: 0x24303e, hair: 0x16181e });
+    a.group.position.set(-0.32, 0, 0);
+    b.group.position.set(0.32, 0, 0);
+    a.group.rotation.y = 0.5;
+    b.group.rotation.y = -0.5;
+    // 渲染口红印效果
+    [a, b].forEach((npc) => {
+      npc.group.userData.lipMarks.forEach((m) => {
+        m.material = m.material.clone();
+        m.material.opacity = 0.9;
+        m.scale.set(3.8, 2.8, 1);
+      });
+    });
+    previewScene.add(a.group, b.group);
+  }
+
+  previewRenderer.render(previewScene, previewCamera);
+}
+
+/* ---- 最佳成绩 (localStorage) ---- */
+function getBestScore(levelId) {
+  try {
+    const data = JSON.parse(localStorage.getItem("nightAction_best") || "{}");
+    return data[levelId] || null;
+  } catch { return null; }
+}
+
+function saveBestScore(levelId, score) {
+  try {
+    const data = JSON.parse(localStorage.getItem("nightAction_best") || "{}");
+    const prev = data[levelId];
+    // 评价更好，或评价相同但用时更短
+    if (!prev || score.rating < prev.rating || (score.rating === prev.rating && score.time < prev.time)) {
+      data[levelId] = score;
+      localStorage.setItem("nightAction_best", JSON.stringify(data));
+    }
+  } catch { /* ignore */ }
+}
+
+function calcRating(won, timeUsed, attemptsLeft) {
+  if (!won) return { grade: "C", rating: 4 };
+  if (timeUsed <= 30 && attemptsLeft >= 3) return { grade: "S", rating: 1 };
+  if (timeUsed <= 50 && attemptsLeft >= 2) return { grade: "A", rating: 2 };
+  if (timeUsed <= 70) return { grade: "B", rating: 3 };
+  return { grade: "C", rating: 4 };
+}
+
+/* ---- 关卡选择 ---- */
+function buildLevelCards() {
+  ui.levelCards.innerHTML = "";
+  LEVELS.forEach((level, i) => {
+    const best = getBestScore(level.id);
+    const stars = "★".repeat(level.difficulty) + "☆".repeat(3 - level.difficulty);
+    const bestText = best ? `${best.grade} · ${best.time}s` : "--";
+
+    const card = document.createElement("button");
+    card.className = "level-card";
+    card.type = "button";
+    card.innerHTML = `
+      <div class="level-card-icon">${level.emoji}</div>
+      <div class="level-card-body">
+        <div class="level-card-name">${level.sceneName}</div>
+        <div class="level-card-desc">${level.cardDesc}</div>
+        <div class="level-card-meta">
+          <span>难度 ${stars}</span>
+          <span>最佳 <span class="best">${bestText}</span></span>
+        </div>
+      </div>
+      <div class="level-card-arrow">›</div>
+    `;
+    card.addEventListener("click", () => selectLevel(i));
+    ui.levelCards.appendChild(card);
+  });
+}
+
+function showLevelSelect() {
+  disposeScene();
+  scene = null;
+  gameStatus = "levelSelect";
+  buildLevelCards();
+  ui.levelSelectModal.classList.add("visible");
+  ui.taskModal.classList.remove("visible");
+  ui.resultModal.classList.remove("visible");
+}
+
+function selectLevel(index) {
+  ui.levelSelectModal.classList.remove("visible");
+  resetLevel(index);
+}
 
 const input = {
   joystick: new THREE.Vector2(),
@@ -192,7 +359,8 @@ function boot() {
   resize();
   window.addEventListener("resize", resize);
 
-  resetLevel(0);
+  // 初始显示关卡选择，不直接加载关卡
+  showLevelSelect();
   renderer.setAnimationLoop(tick);
 }
 
@@ -200,13 +368,35 @@ function setupUi() {
   ui.startButton.addEventListener("click", () => {
     if (gameStatus !== "briefing") return;
     gameStatus = "playing";
+    levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
   });
 
+  ui.backFromTaskButton.addEventListener("click", () => {
+    if (gameStatus !== "briefing") return;
+    showLevelSelect();
+  });
+
+  ui.pauseButton.addEventListener("click", () => {
+    if (gameStatus !== "playing") return;
+    gameStatus = "paused";
+    ui.pauseModal.classList.add("visible");
+  });
+
+  ui.resumeButton.addEventListener("click", () => {
+    if (gameStatus !== "paused") return;
+    gameStatus = "playing";
+    ui.pauseModal.classList.remove("visible");
+  });
+
+  ui.backFromPauseButton.addEventListener("click", () => {
+    if (gameStatus !== "paused") return;
+    ui.pauseModal.classList.remove("visible");
+    showLevelSelect();
+  });
+
   ui.retryButton.addEventListener("click", () => resetLevel(currentLevelIndex));
-  ui.nextButton.addEventListener("click", () => resetLevel((currentLevelIndex + 1) % LEVELS.length));
-  ui.sceneOneButton.addEventListener("click", () => resetLevel(0));
-  ui.sceneTwoButton.addEventListener("click", () => resetLevel(1));
+  ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
   ui.attackButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     triggerAttack();
@@ -302,11 +492,18 @@ function disposeScene() {
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       mats.forEach((mat) => {
-        if (mat.map) mat.map.dispose();
+        // 不 dispose 缓存中的纹理（floor/wall texture cache 管理）
+        if (mat.map && !isCachedTexture(mat.map)) mat.map.dispose();
         mat.dispose();
       });
     }
   });
+}
+
+function isCachedTexture(tex) {
+  for (const key in textureCache.floor) if (textureCache.floor[key] === tex) return true;
+  for (const key in textureCache.wall) if (textureCache.wall[key] === tex) return true;
+  return false;
 }
 
 function getCachedTexture(cache, key, factory) {
@@ -339,6 +536,7 @@ function resetLevel(index) {
     attempts: ATTEMPTS,
     computers: [],
     pair: null,
+    startTime: 0,
   };
 
   buildWorld(level);
@@ -348,19 +546,23 @@ function resetLevel(index) {
   spawnNpcs(level);
   updateHud();
   showTask();
-  updateSceneButtons();
 }
 
 function showTask() {
-  ui.taskTitle.textContent = "任务";
-  ui.taskCopy.textContent = levelState.level.mission;
+  const level = levelState.level;
+  ui.taskEmoji.textContent = level.emoji;
+  ui.taskTitle.textContent = level.sceneName;
+  ui.taskCopy.textContent = level.mission;
+  ui.taskClue.textContent = "🔍 " + level.clue;
+  ui.taskTime.textContent = ROUND_SECONDS;
+  ui.taskAttempts.textContent = ATTEMPTS;
+  ui.targetLabel.textContent = level.targetDesc;
+  ui.levelSelectModal.classList.remove("visible");
   ui.taskModal.classList.add("visible");
   ui.resultModal.classList.remove("visible");
-}
 
-function updateSceneButtons() {
-  ui.sceneOneButton.classList.toggle("active", currentLevelIndex === 0);
-  ui.sceneTwoButton.classList.toggle("active", currentLevelIndex === 1);
+  // 渲染 3D 目标预览
+  renderTargetPreview(level);
 }
 
 function buildWorld(level) {
@@ -865,10 +1067,18 @@ function tick() {
   const rawDt = clock.getDelta();
   const clampedDt = Math.min(rawDt, 0.033);
 
+  // 关卡选择状态或无场景时不渲染
+  if (!scene || gameStatus === "levelSelect") return;
+
+  // 暂停状态：只渲染，不更新逻辑
+  if (gameStatus === "paused") {
+    renderer.render(scene, camera);
+    return;
+  }
+
   // hitstop：命中时冻结游戏几帧
   if (hitstopTimer > 0) {
     hitstopTimer -= clampedDt;
-    // hitstop 期间只渲染，不更新游戏逻辑
     updateShake(clampedDt);
     renderer.render(scene, camera);
     return;
@@ -1363,10 +1573,26 @@ function finishRound(won) {
   gameStatus = won ? "won" : "lost";
   player.cheer = won;
   if (won) sfxWin(); else sfxLose();
+
+  const timeUsed = Math.round(totalTime - levelState.startTime);
+  const attemptsLeft = levelState.attempts;
+  const rating = calcRating(won, timeUsed, attemptsLeft);
+
   ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
   ui.resultCopy.textContent = won ? levelState.level.success : levelState.level.failure;
+  ui.resultRating.textContent = rating.grade;
+  ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
+  ui.statTime.textContent = timeUsed + " 秒";
+  ui.statAttempts.textContent = attemptsLeft + " 次";
+
   ui.resultModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
+
+  // 保存最佳成绩
+  if (won) {
+    saveBestScore(levelState.level.id, { grade: rating.grade, rating: rating.rating, time: timeUsed });
+  }
+
   if (!won) {
     const data = player.group.userData;
     data.visual.position.y = 0;
@@ -1380,6 +1606,7 @@ function updateHud() {
   ui.missionText.textContent = levelState.level.mission;
   ui.timerText.textContent = Math.ceil(levelState.remaining).toString();
   ui.attemptText.textContent = levelState.attempts.toString();
+  ui.clueBar.textContent = "🔍 " + levelState.level.clue;
 }
 
 function clampToWorld(position) {
