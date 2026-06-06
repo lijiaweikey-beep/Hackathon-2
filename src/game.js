@@ -39,6 +39,21 @@ const LEVELS = [
     failure: "这对情侣亲爽了",
     lighting: "library",
   },
+  {
+    id: "temple",
+    sceneName: "承天寺夜游",
+    emoji: "🌕",
+    cardDesc: "在 20 个苏轼影分身里找出真正吵醒怀民的苏轼",
+    mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
+    hudMission: "观察月下显形线索，找出真正的苏轼。",
+    clue: "目标特征：会在月色最亮的中庭停留，随后衣襟泛月白光，身上有竹柏影纹，手里拿着诗卷",
+    hudClue: "目标特征：会在月光中庭停留，随后显现月白衣襟、竹柏影纹和诗卷",
+    targetDesc: "真正的苏轼",
+    difficulty: 3,
+    success: "精准命中，怀民终于能回去睡觉了。",
+    failure: "苏轼月下散步爽了，怀民彻底睡不着了",
+    lighting: "night",
+  },
 ];
 
 const canvas = document.querySelector("#gameCanvas");
@@ -146,7 +161,7 @@ function renderTargetPreview(level) {
       m.scale.setScalar(1.35);
     });
     previewScene.add(npc.group);
-  } else {
+  } else if (level.id === "library") {
     // 情侣：两个人面对面
     const a = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
     const b = createLowPolyPerson(LOW_POLY_NPC_PALETTES[1]);
@@ -163,6 +178,11 @@ function renderTargetPreview(level) {
       });
     });
     previewScene.add(a.group, b.group);
+  } else {
+    const npc = createLowPolyPerson(LOW_POLY_TEMPLE_PALETTE, { temple: true });
+    npc.group.rotation.y = -0.35;
+    setSuShiClues(npc, 1);
+    previewScene.add(npc.group);
   }
 
   previewRenderer.render(previewScene, previewCamera);
@@ -626,8 +646,10 @@ function buildWorld(level) {
 
   if (level.id === "gaming") {
     buildGamingRoom();
-  } else {
+  } else if (level.id === "library") {
     buildLibrary();
+  } else {
+    buildTempleCourtyard();
   }
 }
 
@@ -659,7 +681,7 @@ function makeFloorTexture(kind) {
       ctx.lineTo(i, 1024);
       ctx.stroke();
     }
-  } else {
+  } else if (kind === "library") {
     ctx.fillStyle = "#d9caa5";
     ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
     for (let y = 0; y < 1024; y += 72) {
@@ -677,6 +699,37 @@ function makeFloorTexture(kind) {
     ctx.fillStyle = "rgba(60, 96, 120, 0.16)";
     for (let i = 0; i < 7; i += 1) {
       ctx.fillRect(90 + i * 128, 96, 70, 730);
+    }
+  } else {
+    const gradient = ctx.createRadialGradient(512, 500, 90, 512, 500, 690);
+    gradient.addColorStop(0, "#dbeafe");
+    gradient.addColorStop(0.32, "#9db8c8");
+    gradient.addColorStop(1, "#233447");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
+
+    ctx.fillStyle = "rgba(225, 238, 248, 0.24)";
+    for (let y = 0; y < 1024; y += 96) {
+      ctx.fillRect(0, y + 28, 1024, 18);
+    }
+
+    ctx.strokeStyle = "rgba(19, 41, 55, 0.34)";
+    ctx.lineWidth = 7;
+    for (let x = -120; x < 1120; x += 160) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + 320, 1024);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = "rgba(22, 101, 52, 0.22)";
+    ctx.lineWidth = 12;
+    for (let i = 0; i < 14; i += 1) {
+      const x = 70 + i * 74;
+      ctx.beginPath();
+      ctx.moveTo(x, 180 + Math.sin(i) * 50);
+      ctx.bezierCurveTo(x + 34, 360, x - 64, 560, x + 20, 830);
+      ctx.stroke();
     }
   }
 
@@ -839,12 +892,156 @@ function buildLibrary() {
   });
 }
 
+function buildTempleCourtyard() {
+  levelState.temple = {
+    moonPoint: new THREE.Vector3(0, 0, 0.15),
+  };
+
+  const wallTex = getCachedTexture(textureCache.wall, "temple", () => makeWallTexture("temple"));
+  const wallMaterial = new THREE.MeshStandardMaterial({
+    map: wallTex,
+    color: 0x92a3b4,
+    roughness: 0.68,
+  });
+  addWall(0, -11.8, 0, wallMaterial);
+  addWall(0, 11.8, Math.PI, wallMaterial);
+  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
+  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
+
+  const moonLight = new THREE.PointLight(0xdbeafe, 1.15, 12.5);
+  moonLight.position.set(0, 5.2, 0.1);
+  scene.add(moonLight);
+
+  const moonDisk = new THREE.Mesh(
+    new THREE.CircleGeometry(0.78, 36),
+    new THREE.MeshBasicMaterial({ color: 0xf6f0c7, transparent: true, opacity: 0.92 }),
+  );
+  moonDisk.position.set(7.1, 5.0, -11.76);
+  scene.add(moonDisk);
+
+  const moonPool = new THREE.Mesh(
+    new THREE.CircleGeometry(4.55, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0xdcefff,
+      emissive: 0x8bbcff,
+      emissiveIntensity: 0.25,
+      roughness: 0.28,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+    }),
+  );
+  moonPool.rotation.x = -Math.PI / 2;
+  moonPool.position.set(0, 0.026, 0.15);
+  scene.add(moonPool);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(4.45, 4.62, 64),
+    new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.18, depthWrite: false }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(0, 0.033, 0.15);
+  scene.add(ring);
+
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x12352f,
+    transparent: true,
+    opacity: 0.26,
+    depthWrite: false,
+  });
+  for (let i = 0; i < 11; i += 1) {
+    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(randomRange(0.18, 0.34), randomRange(5.8, 8.4)), shadowMat.clone());
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.rotation.z = -0.62 + i * 0.075;
+    shadow.position.set(-4.8 + i * 0.92, 0.041, -0.7 + Math.sin(i * 0.8) * 1.5);
+    scene.add(shadow);
+  }
+
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6f8190, roughness: 0.84 });
+  [-8.8, -4.4, 4.4, 8.8].forEach((x) => {
+    [-8.6, 8.7].forEach((z) => {
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.92), stoneMat);
+      slab.position.set(x, 0.06, z);
+      slab.receiveShadow = true;
+      scene.add(slab);
+    });
+  });
+
+  const lanternMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.82 });
+  const lanternLightMat = new THREE.MeshStandardMaterial({
+    color: 0xfff4c0,
+    emissive: 0xffd580,
+    emissiveIntensity: 0.55,
+    roughness: 0.4,
+  });
+  [
+    [-6.2, -6.2],
+    [6.2, -6.2],
+    [-6.2, 6.3],
+    [6.2, 6.3],
+  ].forEach(([x, z]) => {
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.42), lanternMat);
+    base.position.set(x, 0.14, z);
+    base.castShadow = true;
+    scene.add(base);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.38, 0.34), lanternLightMat);
+    lamp.position.set(x, 0.46, z);
+    lamp.castShadow = true;
+    scene.add(lamp);
+    registerObstacle(x, z, 0.24, 0.24);
+  });
+
+  addBambooCluster(-10.0, -4.8);
+  addBambooCluster(-10.4, 4.9);
+  addBambooCluster(10.1, -4.6);
+  addBambooCluster(10.4, 5.2);
+  addCypress(-8.7, 0.4, 1.05);
+  addCypress(8.6, 0.2, 1.0);
+}
+
+function addBambooCluster(x, z) {
+  const bambooMat = new THREE.MeshStandardMaterial({ color: 0x2f6b3f, roughness: 0.66 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f8b54, roughness: 0.74 });
+  for (let i = 0; i < 5; i += 1) {
+    const offsetX = (i - 2) * 0.16;
+    const offsetZ = Math.sin(i * 1.4) * 0.2;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.8 + i * 0.12, 6), bambooMat);
+    stem.position.set(x + offsetX, 1.4 + i * 0.04, z + offsetZ);
+    stem.rotation.z = randomRange(-0.08, 0.08);
+    stem.castShadow = true;
+    scene.add(stem);
+
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.055, 0.16), leafMat);
+    leaf.position.set(x + offsetX * 1.4, 2.75 + i * 0.05, z + offsetZ);
+    leaf.rotation.y = randomRange(-0.9, 0.9);
+    leaf.rotation.z = randomRange(-0.2, 0.2);
+    leaf.castShadow = true;
+    scene.add(leaf);
+  }
+  registerObstacle(x, z, 0.45, 0.48);
+}
+
+function addCypress(x, z, scale) {
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x513b2c, roughness: 0.78 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x1f4d40, roughness: 0.7 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.17 * scale, 2.0 * scale, 8), trunkMat);
+  trunk.position.set(x, 1.0 * scale, z);
+  trunk.castShadow = true;
+  scene.add(trunk);
+
+  const crown = new THREE.Mesh(new THREE.ConeGeometry(0.78 * scale, 2.15 * scale, 12), leafMat);
+  crown.position.set(x, 2.35 * scale, z);
+  crown.castShadow = true;
+  scene.add(crown);
+  registerObstacle(x, z, 0.55 * scale, 0.55 * scale);
+}
+
 function makeWallTexture(kind) {
   const canvasTexture = document.createElement("canvas");
   canvasTexture.width = 1024;
   canvasTexture.height = 512;
   const ctx = canvasTexture.getContext("2d");
-  ctx.fillStyle = kind === "gaming" ? "#121b2d" : "#ead7b5";
+  ctx.fillStyle = kind === "gaming" ? "#121b2d" : kind === "library" ? "#ead7b5" : "#7f90a2";
   ctx.fillRect(0, 0, 1024, 512);
 
   if (kind === "gaming") {
@@ -857,7 +1054,7 @@ function makeWallTexture(kind) {
     }
     ctx.fillStyle = "rgba(255,255,255,0.05)";
     ctx.fillRect(0, 318, 1024, 8);
-  } else {
+  } else if (kind === "library") {
     ctx.fillStyle = "#b58a54";
     for (let x = 36; x < 980; x += 150) {
       ctx.fillRect(x, 60, 110, 300);
@@ -869,6 +1066,28 @@ function makeWallTexture(kind) {
     }
     ctx.fillStyle = "rgba(120, 90, 58, 0.22)";
     ctx.fillRect(0, 382, 1024, 10);
+  } else {
+    ctx.fillStyle = "#5d7184";
+    ctx.fillRect(0, 340, 1024, 24);
+    ctx.fillStyle = "#273548";
+    for (let x = 48; x < 1024; x += 124) {
+      ctx.fillRect(x, 86, 72, 224);
+      ctx.fillStyle = "rgba(219, 234, 254, 0.2)";
+      ctx.fillRect(x + 10, 106, 52, 56);
+      ctx.fillStyle = "#273548";
+    }
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.lineWidth = 5;
+    for (let y = 58; y < 330; y += 76) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(1024, y + 16);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(18, 53, 47, 0.24)";
+    for (let x = 0; x < 1024; x += 88) {
+      ctx.fillRect(x, 372 + Math.sin(x) * 8, 42, 118);
+    }
   }
 
   const texture = new THREE.CanvasTexture(canvasTexture);
@@ -904,7 +1123,7 @@ function spawnNpcs(level) {
     for (let i = 1; i < NPC_COUNT; i += 1) {
       addWanderNpc(i);
     }
-  } else {
+  } else if (level.id === "library") {
     const a = createNpc(0, { lover: true });
     const b = createNpc(1, { lover: true });
     a.group.position.set(-0.38, 0, -0.2);
@@ -925,11 +1144,29 @@ function spawnNpcs(level) {
     for (let i = 2; i < NPC_COUNT; i += 1) {
       addWanderNpc(i);
     }
+  } else {
+    const target = createNpc(0, { suShiTarget: true, templeClone: true });
+    const start = randomOpenPosition();
+    target.group.position.set(start.x, 0, start.z);
+    target.script = {
+      state: "seekMoon",
+      timer: 0,
+      waypoint: levelState.temple.moonPoint.clone(),
+      moonPoint: levelState.temple.moonPoint.clone(),
+      revealProgress: 0,
+      exposed: false,
+    };
+    npcs.push(target);
+    scene.add(target.group);
+
+    for (let i = 1; i < NPC_COUNT; i += 1) {
+      addWanderNpc(i);
+    }
   }
 
   // 从普通漫游 NPC 中随机选几个作为替身
-  const decoyCount = level.id === "library" ? 4 : 3;
-  const wanderNpcs = npcs.filter((n) => !n.isGamingTarget && !n.isLover && n.alive);
+  const decoyCount = level.id === "temple" ? 5 : level.id === "library" ? 4 : 3;
+  const wanderNpcs = npcs.filter((n) => !n.isGamingTarget && !n.isLover && !n.isSuShiTarget && n.alive);
   shuffleArray(wanderNpcs);
   for (let i = 0; i < Math.min(decoyCount, wanderNpcs.length); i += 1) {
     initDecoy(wanderNpcs[i]);
@@ -1083,6 +1320,16 @@ const LOW_POLY_NPC_PALETTES = [
   { jacket: 0xa78bfa, jacketDark: 0x7c3aed, shorts: 0x166534, shortsDark: 0x14532d, cap: 0x0ea5e9, capAccent: 0xfcd34d, sock: 0xbae6fd },
 ];
 
+const LOW_POLY_TEMPLE_PALETTE = {
+  jacket: 0xc8d4dc,
+  jacketDark: 0x8796a4,
+  shorts: 0x57666f,
+  shortsDark: 0x3f4b54,
+  cap: 0x111827,
+  capAccent: 0xf7e9bc,
+  sock: 0xdbeafe,
+};
+
 function makeLowPolyMat(color, roughness = 0.62) {
   return new THREE.MeshStandardMaterial({
     color,
@@ -1101,11 +1348,12 @@ function addFacetedBox(parent, w, h, d, material, x, y, z, rx = 0, ry = 0, rz = 
   return mesh;
 }
 
-function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
+function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE, options = {}) {
   const group = new THREE.Group();
   const visual = new THREE.Group();
   group.add(visual);
 
+  const isTempleStyle = options.temple === true;
   const skin = makeLowPolyMat(0xf0b88c);
   const jacket = makeLowPolyMat(palette.jacket);
   const jacketDark = makeLowPolyMat(palette.jacketDark);
@@ -1120,14 +1368,30 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
   const mouth = makeLowPolyMat(0x1a1a1a, 0.5);
   const blackEyeMat = new THREE.MeshBasicMaterial({ color: 0x09090b, transparent: true, opacity: 0 });
   const lipMat = new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0 });
+  const moonShadowMat = new THREE.MeshBasicMaterial({ color: 0x12352f, transparent: true, opacity: 0, depthWrite: false });
+
+  if (isTempleStyle) {
+    jacket.emissive = new THREE.Color(0xb8dcff);
+    jacket.emissiveIntensity = 0;
+    jacketDark.emissive = new THREE.Color(0xb8dcff);
+    jacketDark.emissiveIntensity = 0;
+  }
 
   addFacetedBox(visual, 0.54, 0.5, 0.48, skin, 0, 1.44, 0);
   addFacetedBox(visual, 0.58, 0.07, 0.34, cap, 0, 1.7, 0.1);
   addFacetedBox(visual, 0.5, 0.16, 0.46, cap, 0, 1.78, -0.03);
   addFacetedBox(visual, 0.5, 0.16, 0.1, capAccent, 0, 1.78, 0.24);
+  if (isTempleStyle) {
+    addFacetedBox(visual, 0.2, 0.18, 0.2, cap, 0, 1.96, -0.02);
+    addFacetedBox(visual, 0.38, 0.05, 0.04, cap, 0, 1.86, 0.15);
+  }
   addFacetedBox(visual, 0.11, 0.13, 0.05, eye, -0.13, 1.46, 0.26);
   addFacetedBox(visual, 0.11, 0.13, 0.05, eye, 0.13, 1.46, 0.26);
   addFacetedBox(visual, 0.2, 0.06, 0.04, mouth, 0, 1.3, 0.26);
+  if (isTempleStyle) {
+    addFacetedBox(visual, 0.25, 0.03, 0.04, cap, 0, 1.36, 0.285);
+    addFacetedBox(visual, 0.1, 0.18, 0.04, cap, 0, 1.23, 0.285);
+  }
   const blackLeft = addFacetedBox(visual, 0.12, 0.1, 0.03, blackEyeMat, -0.13, 1.42, 0.27);
   const blackRight = addFacetedBox(visual, 0.12, 0.1, 0.03, blackEyeMat.clone(), 0.13, 1.42, 0.27);
   const lipMark = addFacetedBox(visual, 0.16, 0.08, 0.03, lipMat, 0, 1.28, 0.27);
@@ -1137,6 +1401,22 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
   addFacetedBox(visual, 0.2, 0.3, 0.05, shirt, 0, 1.06, 0.18);
   addFacetedBox(visual, 0.13, 0.34, 0.12, jacketDark, -0.15, 1.06, 0.1, 0, 0.22, 0);
   addFacetedBox(visual, 0.13, 0.34, 0.12, jacketDark, 0.15, 1.06, 0.1, 0, -0.22, 0);
+  const moonMarks = [];
+  let moonGlow = null;
+  let scroll = null;
+  if (isTempleStyle) {
+    [-0.14, 0.02, 0.16].forEach((x, i) => {
+      const mark = addFacetedBox(visual, 0.055, 0.46, 0.025, moonShadowMat.clone(), x, 1.0 + i * 0.03, 0.205, 0, 0, -0.22 + i * 0.2);
+      moonMarks.push(mark);
+    });
+    moonGlow = new THREE.Mesh(
+      new THREE.TorusGeometry(0.5, 0.018, 8, 36),
+      new THREE.MeshBasicMaterial({ color: 0xdbeafe, transparent: true, opacity: 0, depthWrite: false }),
+    );
+    moonGlow.rotation.x = Math.PI / 2;
+    moonGlow.position.set(0, 0.96, 0);
+    visual.add(moonGlow);
+  }
   addFacetedBox(visual, 0.44, 0.24, 0.36, shorts, 0, 0.74, 0);
   addFacetedBox(visual, 0.46, 0.08, 0.38, shortsDark, 0, 0.62, 0);
 
@@ -1148,6 +1428,22 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
   addFacetedBox(rightArm, 0.13, 0.38, 0.13, jacket, 0, -0.2, 0);
   addFacetedBox(leftArm, 0.11, 0.11, 0.11, skin, 0, -0.42, 0);
   addFacetedBox(rightArm, 0.11, 0.11, 0.11, skin, 0, -0.42, 0);
+  if (isTempleStyle) {
+    addFacetedBox(leftArm, 0.21, 0.28, 0.18, jacketDark, 0, -0.22, 0);
+    addFacetedBox(rightArm, 0.21, 0.28, 0.18, jacketDark, 0, -0.22, 0);
+    scroll = new THREE.Group();
+    const paperMat = makeLowPolyMat(0xf7e9bc, 0.68);
+    const inkMat = new THREE.MeshBasicMaterial({ color: 0x3b2f2f, transparent: true, opacity: 0.62 });
+    const scrollRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.46, 12), paperMat);
+    scrollRoll.rotation.z = Math.PI / 2;
+    scrollRoll.castShadow = true;
+    scroll.add(scrollRoll);
+    addFacetedBox(scroll, 0.3, 0.01, 0.012, inkMat, 0, 0.052, 0);
+    scroll.position.set(0.5, 0.95, 0.26);
+    scroll.rotation.set(0.18, 0.18, -0.38);
+    scroll.visible = false;
+    visual.add(scroll);
+  }
   leftArm.rotation.z = 0.35;
   rightArm.rotation.z = -0.35;
   visual.add(leftArm, rightArm);
@@ -1183,18 +1479,25 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE) {
     rightLeg,
     blackMarks: [blackLeft, blackRight],
     lipMarks: [lipMark],
+    moonMarks,
+    moonGlow,
+    scroll,
+    robeMaterials: isTempleStyle ? [jacket, jacketDark] : [],
     baseArmRotations: {
       leftZ: leftArm.rotation.z,
       rightZ: rightArm.rotation.z,
     },
-    colors: [palette.jacket, palette.shorts, 0xf0b88c, palette.cap, palette.capAccent, 0xf8fafc],
+    colors: isTempleStyle
+      ? [palette.jacket, palette.shorts, 0xf0b88c, palette.cap, palette.capAccent, 0xf7e9bc, 0x12352f]
+      : [palette.jacket, palette.shorts, 0xf0b88c, palette.cap, palette.capAccent, 0xf8fafc],
   };
 
   return { group };
 }
 
 function createPlayer() {
-  const actor = createLowPolyPerson(LOW_POLY_PLAYER_PALETTE);
+  const isTemple = levelState?.level?.id === "temple";
+  const actor = createLowPolyPerson(isTemple ? LOW_POLY_TEMPLE_PALETTE : LOW_POLY_PLAYER_PALETTE, { temple: isTemple });
   actor.speed = PLAYER_SPEED;
   actor.punchTimer = 0;
   actor.cheer = false;
@@ -1202,10 +1505,15 @@ function createPlayer() {
 }
 
 function createNpc(id, flags) {
-  const actor = createLowPolyPerson(LOW_POLY_NPC_PALETTES[id % LOW_POLY_NPC_PALETTES.length]);
+  const isTemple = flags.templeClone || flags.suShiTarget || levelState?.level?.id === "temple";
+  const actor = createLowPolyPerson(
+    isTemple ? LOW_POLY_TEMPLE_PALETTE : LOW_POLY_NPC_PALETTES[id % LOW_POLY_NPC_PALETTES.length],
+    { temple: isTemple },
+  );
   actor.id = id;
   actor.isGamingTarget = Boolean(flags.gamingTarget);
   actor.isLover = Boolean(flags.lover);
+  actor.isSuShiTarget = Boolean(flags.suShiTarget);
   actor.alive = true;
   actor.marked = false;
   actor.markIntensity = 0;
@@ -1316,16 +1624,19 @@ function animateCheer(dt) {
 function updateNpcs(dt) {
   if (levelState.level.id === "gaming") {
     updateGamingTarget(dt);
-  } else {
+  } else if (levelState.level.id === "library") {
     updateLovers(dt);
+  } else {
+    updateTempleTarget(dt);
   }
 
   npcs.forEach((npc) => {
     if (!npc.alive) return;
-    if (npc.isGamingTarget || npc.isLover) {
+    if (npc.isGamingTarget) {
       animateActor(npc, dt, npc.walking);
       return;
     }
+    if (npc.isLover || npc.isSuShiTarget) return;
     if (npc.isDecoy) {
       updateDecoy(npc, dt);
     } else {
@@ -1439,6 +1750,57 @@ function updateLovers(dt) {
   }
 }
 
+function updateTempleTarget(dt) {
+  const target = npcs.find((npc) => npc.isSuShiTarget);
+  if (!target || !target.alive || !target.script) return;
+  const script = target.script;
+
+  if (target.marked) pulseSuShiClues(target);
+
+  if (script.state === "seekMoon") {
+    target.walking = true;
+    const reached = moveNpcToward(target, script.moonPoint, NPC_SPEED * 0.96, dt);
+    if (reached) {
+      script.state = "moonPause";
+      script.timer = randomRange(2.2, 3.0);
+    }
+    animateActor(target, dt, target.walking);
+    return;
+  }
+
+  if (script.state === "moonPause") {
+    target.walking = false;
+    script.timer -= dt;
+    faceNpcToward(target, new THREE.Vector3(7.1, 0, -10.4));
+
+    if (script.timer <= 1.45 || script.exposed) {
+      script.exposed = true;
+      script.revealProgress = Math.min(1, script.revealProgress + dt * 0.9);
+      setSuShiClues(target, script.revealProgress);
+    }
+
+    if (script.timer <= 0) {
+      setSuShiClues(target, 1);
+      script.state = "wander";
+      script.timer = randomRange(4.2, 6.4);
+      script.waypoint = randomOpenPosition();
+    }
+    animateActor(target, dt, false);
+    return;
+  }
+
+  if (script.state === "wander") {
+    target.walking = true;
+    const reached = moveNpcToward(target, script.waypoint, NPC_SPEED * 1.02, dt);
+    script.timer -= dt;
+    if (reached || script.timer <= 0) {
+      script.state = "seekMoon";
+      script.waypoint = script.moonPoint.clone();
+    }
+    animateActor(target, dt, true);
+  }
+}
+
 function randomMeetingPoint() {
   let point;
   let tries = 0;
@@ -1464,6 +1826,46 @@ function setLipstick(npc, intensity) {
   npc.group.userData.lipMarks.forEach((mesh) => {
     mesh.material.opacity = 0.25 + npc.markIntensity * 0.75;
     mesh.scale.set(1 + npc.markIntensity * 2.8, 1 + npc.markIntensity * 1.8, 1);
+  });
+}
+
+function setSuShiClues(npc, intensity) {
+  npc.marked = true;
+  npc.markIntensity = Math.max(npc.markIntensity, intensity);
+  const level = THREE.MathUtils.clamp(npc.markIntensity, 0, 1);
+  const data = npc.group.userData;
+
+  data.moonMarks?.forEach((mesh, index) => {
+    mesh.material.opacity = level * (0.42 + index * 0.12);
+    mesh.scale.set(1 + level * 0.18, 1 + level * 0.28, 1);
+  });
+
+  if (data.moonGlow) {
+    data.moonGlow.material.opacity = 0.12 + level * 0.28;
+    data.moonGlow.scale.setScalar(0.82 + level * 0.26);
+  }
+
+  if (data.scroll) {
+    data.scroll.visible = level > 0.22;
+    data.scroll.scale.setScalar(0.82 + level * 0.18);
+  }
+
+  data.robeMaterials?.forEach((material) => {
+    material.emissiveIntensity = level * 0.22;
+  });
+}
+
+function pulseSuShiClues(npc) {
+  if (!npc.marked) return;
+  const data = npc.group.userData;
+  const pulse = 0.5 + Math.sin(totalTime * 3.2) * 0.5;
+
+  if (data.moonGlow) {
+    data.moonGlow.material.opacity = 0.22 + pulse * 0.15;
+  }
+
+  data.robeMaterials?.forEach((material) => {
+    material.emissiveIntensity = 0.14 + pulse * 0.12;
   });
 }
 
@@ -1683,7 +2085,7 @@ function findHitTarget() {
   if (!best) return null;
   return {
     npc: best,
-    correct: best.isGamingTarget || best.isLover,
+    correct: best.isGamingTarget || best.isLover || best.isSuShiTarget,
   };
 }
 
@@ -1783,10 +2185,10 @@ function finishRound(won) {
 
 function updateHud() {
   ui.sceneName.textContent = levelState.level.sceneName;
-  ui.missionText.textContent = levelState.level.mission;
+  ui.missionText.textContent = levelState.level.hudMission || levelState.level.mission;
   ui.timerText.textContent = Math.ceil(levelState.remaining).toString();
   ui.attemptText.textContent = levelState.attempts.toString();
-  ui.clueBar.textContent = "🔍 " + levelState.level.clue;
+  ui.clueBar.textContent = "🔍 " + (levelState.level.hudClue || levelState.level.clue);
 
   // 出拳冷却动画
   if (punchCooldown > 0 && punchCooldownMax > 0) {
