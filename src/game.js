@@ -686,7 +686,7 @@ function createMpCallbacks() {
 }
 
 function selectLevel(index) {
-  if (isConnected() && gameMode === "duel") return;
+  if (isConnected() && gameMode === "duel" && !isDuelLevel(LEVELS[index])) return;
   if (isConnected() && !canHostPickLevel()) return;
   if (getIsHost() || !isConnected()) {
     commitNpcCountInput();
