@@ -894,8 +894,12 @@ function createMpCallbacks() {
       if (data.punchId && data.punchId === lastRemotePunchId) return;
       if (data.punchId) lastRemotePunchId = data.punchId;
       if (remotePlayer) remotePlayer.punchTimer = PUNCH_SWING;
-      // 联机 PvP：以被打方本地位置为准校验，不依赖攻击方的 attempt 标记
       if (isDuelActive() && isConnected()) {
+        if (data.npcId != null) {
+          applyRemoteDuelNpcKill(data.npcId);
+          return;
+        }
+        // 联机 PvP：以被打方本地位置为准校验，不依赖攻击方的 attempt 标记
         if (validatePvpHit(data, player)) {
           applyPlayerDamage(1, "对手出拳");
         }
@@ -2128,6 +2132,15 @@ function damageRemotePlayer() {
 }
 
 function damageDuelNpc(npc) {
+  if (!npc?.alive) return false;
+  dissolveNpc(npc);
+  compactDeadNpcs();
+  return true;
+}
+
+function applyRemoteDuelNpcKill(npcId) {
+  if (!isDuelActive() || npcId == null) return false;
+  const npc = npcs.find((n) => n.id === npcId);
   if (!npc?.alive) return false;
   dissolveNpc(npc);
   compactDeadNpcs();
@@ -3584,6 +3597,7 @@ function triggerAttack() {
         {
           roundId: duelRoundId,
           punchId: nextLocalEventId("punch"),
+          ...(npcHit ? { npcId: punchTarget.actor.id } : {}),
         },
       );
     }
