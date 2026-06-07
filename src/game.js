@@ -1,5 +1,103 @@
 import * as THREE from "three";
 import {
+  DEFAULT_NPC_COUNT,
+  WORLD_LIMIT,
+  PLAY_Z_MIN,
+  HIT_RANGE,
+  HIT_PAIR_RANGE,
+  HIT_FACING_DOT,
+  PLAYER_SPEED,
+  NPC_SPEED,
+  ROUND_SECONDS,
+  ATTEMPTS,
+  DUEL_NPC_COUNT,
+  DUEL_PLAYER_HP,
+  DUEL_NPC_HP,
+  PUNCH_SWING,
+  NPC_PUNCH_INTERVAL,
+  NPC_PUNCH_RANGE,
+  NPC_PUNCH_SWING,
+  NPC_PUNCH_DAMAGE,
+  HIT_INVULN,
+  PLAYER_LERP,
+  ACTION_INTERVAL_MS,
+  REVERSE_INPUT_LOCK_MS,
+  REVERSE_INPUT_DOT_THRESHOLD,
+  TEMPLE_MOON_RADIUS,
+  TEMPLE_SHADOW_FADE,
+  TEMPLE_DECOY_SHADOW_STYLES,
+  TEMPLE_TRUE_SHADOW_MAX,
+  TEMPLE_TRUE_REVEAL_AT,
+  TEMPLE_TRUE_INITIAL_MOON_DELAY,
+  SU_SHI_SHADOW_PATTERN,
+  REMOTE_POS_LERP,
+  REMOTE_SNAP_DIST,
+  REMOTE_STALE_MS,
+  DUEL_SPAWN_MIN_DIST,
+  DUEL_GATHER_INTERVAL,
+  DUEL_GATHER_PREVIEW,
+  DUEL_GATHER_WINDOW,
+  DUEL_GATHER_RADIUS,
+  DUEL_HERD_INTERVAL,
+  DUEL_HERD_DURATION,
+  GATHER_COLOR_PREVIEW,
+  GATHER_COLOR_URGENT,
+  GATHER_COLOR_SUCCESS,
+  ACTOR_COLLISION_RADIUS,
+  PVP_HIT_RANGE,
+  PROXIMITY_MIN_DIST,
+  PROXIMITY_MAX_DIST,
+  BLOODMOON_SANITY_MAX,
+  BLOODMOON_WOLF_COOLDOWN,
+  BLOODMOON_NPC_HIT_RANGE,
+  BLOODMOON_NPC_HIT_DAMAGE,
+  BLOODMOON_LIGHTNING_INTERVAL,
+  BLOODMOON_CLUE_SECONDS,
+  BLOODMOON_DECOY_CUES,
+  BLOODMOON_HUNT_SECONDS,
+  BLOODMOON_PHASE2_HP_MAX,
+  BLOODMOON_SUMMON_COUNT,
+  BLOODMOON_SAFE_ZONE_COUNT,
+  BLOODMOON_GUARD_SPEED,
+  BLOODMOON_GUARD_DAMAGE,
+  BLOODMOON_HUNT_INTRO_SECONDS,
+  PUNCH_COOLDOWNS,
+  PUNCH_RESET_DELAY,
+  GRID_CELL,
+  CAMERA_BASE_POS,
+} from "./config/constants.js";
+import {
+  LEVELS,
+  getDuelLevelIndex,
+  isDuelLevel as checkDuelLevel,
+} from "./config/levels.js";
+import { canvas, ui } from "./ui/dom.js";
+import { clampToWorld, lerpAngle, gridKey } from "./utils/math.js";
+import { createSeededRng } from "./utils/rng.js";
+import {
+  clampNpcCount,
+  loadMatchNpcCount,
+  saveMatchNpcCount,
+  getBestScore,
+  saveBestScore,
+  parseNpcCountRaw,
+} from "./utils/storage.js";
+import { formatHearts, calcRating } from "./utils/format.js";
+import {
+  sfxPunch,
+  sfxPunchHeavy,
+  sfxHurt,
+  sfxHit,
+  sfxWolfPunch,
+  sfxWolfHowl,
+  sfxThunder,
+  sfxMiss,
+  sfxNpcHit,
+  sfxWin,
+  sfxLose,
+  resumeAudioOnInteraction,
+} from "./systems/AudioSystem.js";
+import {
   initMultiplayer,
   syncPosition,
   syncPunch,
@@ -14,226 +112,22 @@ import {
   leaveRoom as mpLeaveRoom,
   clearStoredHostRoom,
 } from "./multiplayer.js";
-
-const DEFAULT_NPC_COUNT = 20;
-const MIN_NPC_COUNT = 10;
-const MAX_NPC_COUNT = 100;
-const NPC_COUNT_STORAGE_KEY = "nightAction_npcCount";
-const HOST_ROOM_KEY = "nightAction_hostRoom";
-const WORLD_LIMIT = 10.8;
-const PLAY_Z_MIN = -5.0; // 屏幕上方区域不可进入
-const HIT_RANGE = 1.85;
-const HIT_PAIR_RANGE = 2.15;
-const HIT_FACING_DOT = 0.12;
-const PLAYER_SPEED = 3;
-const NPC_SPEED = 3;
-const ROUND_SECONDS = 90;
-const ATTEMPTS = 3;
-const DUEL_NPC_COUNT = 40;
-const DUEL_PLAYER_HP = 5;
-const DUEL_NPC_HP = 3;
-const PUNCH_SWING = 0.32;
-const NPC_PUNCH_INTERVAL = 10;
-const NPC_PUNCH_RANGE = 1.65;
-const NPC_PUNCH_SWING = 0.42;
-const NPC_PUNCH_DAMAGE = 0.5;
-const HIT_INVULN = 0.55;
-const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延迟）
-const ACTION_INTERVAL_MS = 500; // 任意动作切换最小间隔，防止摇头找自己
-const REVERSE_INPUT_LOCK_MS = 500; // 反向输入锁窗口（毫秒）
-const REVERSE_INPUT_DOT_THRESHOLD = -0.35; // 小于该值视为“反向输入”
-const TEMPLE_MOON_RADIUS = 4.55;
-const TEMPLE_SHADOW_FADE = 0.55;
-const TEMPLE_DECOY_SHADOW_STYLES = ["fan", "moon", "window", "stone", "leaf", "willow"];
-const TEMPLE_TRUE_SHADOW_MAX = 0.68;
-const TEMPLE_TRUE_REVEAL_AT = 0.75;
-const TEMPLE_TRUE_INITIAL_MOON_DELAY = [12, 16];
-const SU_SHI_SHADOW_PATTERN = [
-  { x: -0.58, z: -0.08, length: 1.9, width: 0.12, rz: -0.72, opacity: 0.38, accent: false },
-  { x: -0.34, z: 0.22, length: 1.55, width: 0.1, rz: -0.28, opacity: 0.33, accent: false },
-  { x: 0.18, z: -0.16, length: 1.7, width: 0.1, rz: 0.42, opacity: 0.36, accent: false },
-  { x: 0.48, z: 0.18, length: 1.35, width: 0.09, rz: 0.88, opacity: 0.31, accent: false },
-  { x: -0.1, z: 0.0, length: 1.25, width: 0.08, rz: 1.36, opacity: 0.28, accent: false },
-  { x: 0.05, z: 0.32, length: 0.92, width: 0.075, rz: -1.25, opacity: 0.27, accent: false },
-  { x: -0.44, z: -0.32, length: 0.98, width: 0.075, rz: 1.08, opacity: 0.27, accent: false },
-  { x: -0.02, z: 0.02, length: 1.05, width: 0.055, rz: -0.72, opacity: 0.28, accent: true },
-  { x: 0.04, z: 0.0, length: 0.92, width: 0.055, rz: 0.74, opacity: 0.24, accent: true },
-];
-const REMOTE_POS_LERP = 14; // 对手位置插值速度（越大越跟手）
-const REMOTE_SNAP_DIST = 2.2; // 偏差过大时直接瞬移，避免长时间拉扯
-const REMOTE_STALE_MS = 900; // 网络延迟容忍；过大才瞬移对齐
-const DUEL_SPAWN_MIN_DIST = 4.2;
-const DUEL_GATHER_INTERVAL = 90; // 1.5 分钟一轮集合
-const DUEL_GATHER_PREVIEW = 30; // 提前 30 秒显示集合圈
-const DUEL_GATHER_WINDOW = 5; // 最后 5 秒内需站在圈内
-const DUEL_GATHER_RADIUS = 2.2;
-const DUEL_HERD_INTERVAL = 20;
-const DUEL_HERD_DURATION = 2.8;
-const GATHER_COLOR_PREVIEW = 0x15803d;
-const GATHER_COLOR_URGENT = 0xb91c1c;
-const GATHER_COLOR_SUCCESS = 0x14532d;
-const ACTOR_COLLISION_RADIUS = 0.38;
-const PVP_HIT_RANGE = HIT_RANGE + ACTOR_COLLISION_RADIUS * 2 + 0.25; // 联机留容差，补偿位置同步延迟
-const PROXIMITY_BODY_LEN = ACTOR_COLLISION_RADIUS * 2;
-const PROXIMITY_MIN_DIST = PROXIMITY_BODY_LEN * 2;
-const PROXIMITY_MAX_DIST = PROXIMITY_BODY_LEN * 4;
-const BLOODMOON_SANITY_MAX = 100;
-const BLOODMOON_WOLF_COOLDOWN = 0.28;
-const BLOODMOON_NPC_HIT_RANGE = 1.45;
-const BLOODMOON_NPC_HIT_DAMAGE = 18;
-const BLOODMOON_LIGHTNING_INTERVAL = [2.6, 4.2];
-const BLOODMOON_CLUE_SECONDS = 1.35;
-const BLOODMOON_DECOY_CUES = 3;
-const BLOODMOON_HUNT_SECONDS = 20;
-const BLOODMOON_PHASE2_HP_MAX = 3;
-const BLOODMOON_SUMMON_COUNT = 10;
-const BLOODMOON_SAFE_ZONE_COUNT = 3;
-const BLOODMOON_GUARD_SPEED = 2.0;
-const BLOODMOON_GUARD_DAMAGE = 24;
-const BLOODMOON_HUNT_INTRO_SECONDS = 2.8;
-
-const LEVELS = [
-  {
-    id: "gaming",
-    sceneName: "凌晨三点",
-    emoji: "🌙",
-    cardDesc: "在人群中找到凌晨三点还在打游戏的人",
-    mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
-    clue: "目标特征：有明显黑眼圈",
-    targetDesc: "打游戏的人",
-    difficulty: 2,
-    success: "精准命中，宿舍终于安静了。",
-    failure: "这个人游戏打爽了，大家都被吵醒了",
-    lighting: "night",
-  },
-  {
-    id: "library",
-    sceneName: "图书馆",
-    emoji: "📚",
-    cardDesc: "在人群中找到图书馆里亲嘴的情侣",
-    mission: "图书馆里有一对情侣在亲嘴，太辣眼睛了！",
-    clue: "目标特征：两个人贴在一起，嘴上有口红印",
-    targetDesc: "亲嘴的情侣",
-    difficulty: 3,
-    success: "精准命中，图书馆恢复了该有的安静。",
-    failure: "这对情侣亲爽了",
-    lighting: "library",
-  },
-  {
-    id: "library_duel",
-    mapId: "library",
-    sceneName: "图书馆决斗",
-    emoji: "⚔️",
-    cardDesc: "在出拳人群中击败对手",
-    mission: "图书馆里挤满了出拳的读者，击败你的对手！",
-    hudMission: "击败对手，同时躲避 NPC 的拳头",
-    clue: "NPC 每 10 秒挥拳一次；每 1.5 分钟需到集合圈报到，否则扣 1 滴血",
-    hudClue: "NPC 每 10 秒挥拳 · 1.5 分钟集合 · 双方各 5 滴血",
-    targetDesc: "对手",
-    difficulty: 3,
-    success: "你击败了对手，图书馆归于“平静”。",
-    failure: "你被击败了",
-    lighting: "library",
-    duelMode: true,
-  },
-  {
-    id: "temple",
-    sceneName: "承天寺夜游",
-    emoji: "🌕",
-    cardDesc: "在苏轼影分身里找出真正吵醒怀民的苏轼",
-    mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
-    hudMission: "观察月下显形线索，找出真正的苏轼。",
-    clue: "目标特征：会在月色最亮的中庭停留，脚下竹柏影会像藻荇一样交横聚拢",
-    hudClue: "目标特征：月光中庭停留时，脚下会聚起交横竹柏影",
-    targetDesc: "真正的苏轼",
-    difficulty: 3,
-    success: "精准命中，怀民终于能回去睡觉了。",
-    failure: "苏轼月下散步爽了，怀民彻底睡不着了",
-    lighting: "night",
-  },
-  {
-    id: "bloodmoon",
-    sceneName: "血月街区",
-    emoji: "🌕",
-    cardDesc: "为了你变成狼人，在雷暴里找出血月引路人",
-    mission: "血月升起，你收到一句求救：“别让我在血月里认不出你。”为了赶到对方身边，你主动踏进血月，变成狼人模样。找出伪装在人群里的血月引路人，击倒他，解除狼化。",
-    hudMission: "为了你，我变成狼人模样。找出血月引路人。",
-    clue: "电光照亮时，真正的血月引路人脚下会露出狼爪影",
-    hudClue: "电光照亮时，真正的血月引路人脚下会露出狼爪影。",
-    targetDesc: "血月引路人",
-    difficulty: 3,
-    success: "血月退潮，你终于把自己的影子从狼形里拽了回来。",
-    failure: "雷声盖过了那句求救，整条街都开始长出狼影。",
-    lighting: "bloodmoon",
-  },
-];
-
-const canvas = document.querySelector("#gameCanvas");
-const ui = {
-  hud: document.querySelector("#hud"),
-  sceneName: document.querySelector("#sceneName"),
-  missionText: document.querySelector("#missionText"),
-  mechanicHint: document.querySelector("#mechanicHint"),
-  attemptChip: document.querySelector(".status-chip.danger"),
-  timerText: document.querySelector("#timerText"),
-  attemptText: document.querySelector("#attemptText"),
-  clueBar: document.querySelector("#clueBar"),
-  gatherBanner: document.querySelector("#gatherBanner"),
-  gatherBannerTitle: document.querySelector("#gatherBannerTitle"),
-  gatherBannerCountdown: document.querySelector("#gatherBannerCountdown"),
-  gatherBannerHint: document.querySelector("#gatherBannerHint"),
-  levelSelectModal: document.querySelector("#levelSelectModal"),
-  levelSelectPanel: document.querySelector("#levelSelectPanel"),
-  levelCards: document.querySelector("#levelCards"),
-  taskModal: document.querySelector("#taskModal"),
-  taskEmoji: document.querySelector("#taskEmoji"),
-  taskTitle: document.querySelector("#taskTitle"),
-  taskCopy: document.querySelector("#taskCopy"),
-  taskClue: document.querySelector("#taskClue"),
-  taskTime: document.querySelector("#taskTime"),
-  taskAttempts: document.querySelector("#taskAttempts"),
-  taskAttemptsChip: document.querySelector("#taskAttempts")?.parentElement,
-  taskNpcCount: document.querySelector("#taskNpcCount"),
-  npcCountInput: document.querySelector("#npcCountInput"),
-  targetPreviewCanvas: document.querySelector("#targetPreviewCanvas"),
-  targetLabel: document.querySelector("#targetLabel"),
-  attackIcon: document.querySelector("#attackButton span"),
-  startButton: document.querySelector("#startButton"),
-  taskMpHint: document.querySelector("#taskMpHint"),
-  resultModal: document.querySelector("#resultModal"),
-  resultRating: document.querySelector("#resultRating"),
-  resultTitle: document.querySelector("#resultTitle"),
-  resultCopy: document.querySelector("#resultCopy"),
-  statTime: document.querySelector("#statTime"),
-  statAttempts: document.querySelector("#statAttempts"),
-  statAttemptsLabel: document.querySelector("#statAttemptsLabel"),
-  damageFlash: document.querySelector("#damageFlash"),
-  proximityPulse: document.querySelector("#proximityPulse"),
-  retryButton: document.querySelector("#retryButton"),
-  backToSelectButton: document.querySelector("#backToSelectButton"),
-  pauseButton: document.querySelector("#pauseButton"),
-  pauseModal: document.querySelector("#pauseModal"),
-  resumeButton: document.querySelector("#resumeButton"),
-  backFromPauseButton: document.querySelector("#backFromPauseButton"),
-  backFromTaskButton: document.querySelector("#backFromTaskButton"),
-  mpCreateBtn: document.querySelector("#mpCreateBtn"),
-  mpShareBox: document.querySelector("#mpShareBox"),
-  mpStatusText: document.querySelector("#mpStatusText"),
-  mpLinkInput: document.querySelector("#mpLinkInput"),
-  mpCopyBtn: document.querySelector("#mpCopyBtn"),
-  gameLogo: document.querySelector("#gameLogo"),
-  duelLobbyPanel: document.querySelector("#duelLobbyPanel"),
-  duelLobbyHint: document.querySelector("#duelLobbyHint"),
-  duelGuestWaiting: document.querySelector("#duelGuestWaiting"),
-  duelGuestStatus: document.querySelector("#duelGuestStatus"),
-  duelBackBtn: document.querySelector("#duelBackBtn"),
-  soloModeStack: document.querySelector("#soloModeStack"),
-  attemptLabel: document.querySelector("#attemptLabel"),
-  joystick: document.querySelector("#joystick"),
-  joystickKnob: document.querySelector("#joystickKnob"),
-  attackButton: document.querySelector("#attackButton"),
-  cooldownOverlay: document.querySelector("#cooldownOverlay"),
-};
+import { createWorldBuilder } from "./world/createWorldBuilder.js";
+import { createFxSystem } from "./systems/FxSystem.js";
+import { createLightningBolt } from "./world/lightning.js";
+import { isCachedTexture } from "./world/textures.js";
+import {
+  registerObstacle as registerObstacleInLevel,
+  collidesWithObstacle as collidesWithObstacleInLevel,
+  resolveObstacleCollisions as resolveObstacleCollisionsInLevel,
+  clampActorPosition as clampActorPositionInLevel,
+} from "./world/obstacles.js";
+import {
+  buildDuelPuncherSet,
+  validatePvpHit,
+  collectDuelSnapshot as collectDuelSnapshotFromState,
+  buildGameStatePayload as buildGameStatePayloadFromState,
+} from "./multiplayer/duelSync.js";
 
 let renderer;
 let scene;
@@ -266,6 +160,13 @@ let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
+let fx;
+let worldBuilder;
+
+function isDuelLevel(level = levelState?.level) {
+  return checkDuelLevel(level);
+}
+
 let npcs = [];
 let particles = [];
 let gameStatus = "briefing";
@@ -273,8 +174,6 @@ let punchCooldown = 0;
 let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
 let punchTier = 0; // 0=第1拳(1s), 1+=后续(2s)
 let punchResetTimer = 0; // 停止出拳后重置计时
-const PUNCH_COOLDOWNS = [2.0, 4.0, 6.0]; // 第1拳2秒，第2拳4秒，第3拳6秒
-const PUNCH_RESET_DELAY = 2.0; // 停止出拳多久后重置回第1档
 let totalTime = 0;
 
 /* ---- 3D 目标预览渲染器 ---- */
@@ -371,65 +270,13 @@ function renderTargetPreview(level) {
   previewRenderer.render(previewScene, previewCamera);
 }
 
-/* ---- 最佳成绩 (localStorage) ---- */
-function getBestScore(levelId) {
-  try {
-    const data = JSON.parse(localStorage.getItem("nightAction_best") || "{}");
-    return data[levelId] || null;
-  } catch { return null; }
-}
-
-function saveBestScore(levelId, score) {
-  try {
-    const data = JSON.parse(localStorage.getItem("nightAction_best") || "{}");
-    const prev = data[levelId];
-    // 评价更好，或评价相同但用时更短
-    if (!prev || score.rating < prev.rating || (score.rating === prev.rating && score.time < prev.time)) {
-      data[levelId] = score;
-      localStorage.setItem("nightAction_best", JSON.stringify(data));
-    }
-  } catch { /* ignore */ }
-}
-
-function calcRating(won, timeUsed, attemptsLeft) {
-  if (!won) return { grade: "C", rating: 4 };
-  if (timeUsed <= 30 && attemptsLeft >= 3) return { grade: "S", rating: 1 };
-  if (timeUsed <= 50 && attemptsLeft >= 2) return { grade: "A", rating: 2 };
-  if (timeUsed <= 70) return { grade: "B", rating: 3 };
-  return { grade: "C", rating: 4 };
-}
-
-function clampNpcCount(value) {
-  return THREE.MathUtils.clamp(Math.round(value), MIN_NPC_COUNT, MAX_NPC_COUNT);
-}
-
-function loadMatchNpcCount() {
-  try {
-    const saved = Number(localStorage.getItem(NPC_COUNT_STORAGE_KEY));
-    if (Number.isFinite(saved)) return clampNpcCount(saved);
-  } catch { /* ignore */ }
-  return DEFAULT_NPC_COUNT;
-}
-
-function saveMatchNpcCount() {
-  try {
-    localStorage.setItem(NPC_COUNT_STORAGE_KEY, String(matchNpcCount));
-  } catch { /* ignore */ }
-}
-
+/* ---- NPC 人数设置 ---- */
 function getMatchNpcCount() {
   return matchNpcCount;
 }
 
 function syncNpcCountInput() {
   ui.npcCountInput.value = String(matchNpcCount);
-}
-
-function parseNpcCountRaw(raw) {
-  const text = String(raw).trim();
-  if (!text) return null;
-  const value = Number(text);
-  return Number.isFinite(value) ? value : null;
 }
 
 function getNpcCountPreview() {
@@ -473,7 +320,7 @@ function commitNpcCountInput() {
   }
   matchNpcCount = next;
   syncNpcCountInput();
-  saveMatchNpcCount();
+  saveMatchNpcCount(matchNpcCount);
   buildLevelCards();
 }
 
@@ -497,55 +344,97 @@ function bindNpcCountInput() {
   }, { passive: false });
 }
 
-/* ---- 关卡选择 ---- */
-function getDuelLevelIndex() {
-  return LEVELS.findIndex((level) => level.duelMode);
-}
-
-function isDuelLevel(level = levelState?.level) {
-  return Boolean(level?.duelMode);
-}
-
+/* ---- 决斗 / 联机 ---- */
 function isDuelActive() {
   if (!isDuelLevel()) return false;
   if (!isConnected()) return true;
   return ["briefing", "playing", "paused", "settling"].includes(gameStatus);
 }
 
-function formatHearts(hp, max = DUEL_PLAYER_HP) {
-  const safe = Math.max(0, Math.min(max, Number(hp) || 0));
-  let out = "";
-  for (let i = 0; i < max; i += 1) {
-    const rem = safe - i;
-    if (rem >= 1) out += "❤️";
-    else if (rem >= 0.5) out += "💗";
-    else out += "🖤";
-  }
-  return out;
-}
-
-function buildDuelPuncherSet(worldSeed) {
-  const rng = createSeededRng((worldSeed >>> 0) ^ 0x8f4e2c1b);
-  const order = Array.from({ length: DUEL_NPC_COUNT }, (_, i) => i);
-  for (let i = order.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]];
-  }
-  return new Set(order.slice(0, Math.floor(DUEL_NPC_COUNT / 2)));
-}
-
 function isDuelRematchContext() {
   return isDuelLevel(LEVELS[currentLevelIndex]) || (levelState && isDuelLevel(levelState.level));
 }
 
-function createSeededRng(seed) {
-  let t = (seed >>> 0) || 1;
-  return () => {
-    t += 0x6d2b79f5;
-    let r = Math.imul(t ^ (t >>> 15), 1 | t);
-    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+function getWorldContext() {
+  return {
+    getScene: () => scene,
+    getLevelState: () => levelState,
+    randomRange,
+    getMatchNpcCount,
+    collidesWithObstacle: (pos, radius) => collidesWithObstacleInLevel(levelState, pos, radius),
+    registerObstacle: (x, z, halfW, halfD) => registerObstacleInLevel(levelState, x, z, halfW, halfD),
+    createBloodmoonClawCue,
+    createSuShiShadowCue,
+    createLightningBolt: (x, z, width, height, tilt) => createLightningBolt(x, z, width, height, tilt, randomRange),
   };
+}
+
+function registerObstacle(x, z, halfW, halfD) {
+  registerObstacleInLevel(levelState, x, z, halfW, halfD);
+}
+
+function collidesWithObstacle(pos, radius) {
+  return collidesWithObstacleInLevel(levelState, pos, radius);
+}
+
+function resolveObstacleCollisions(position, radius, velocity) {
+  return resolveObstacleCollisionsInLevel(levelState, position, radius, velocity);
+}
+
+function clampActorPosition(position, velocity) {
+  clampActorPositionInLevel(levelState, position, velocity);
+}
+
+function buildWorld(level) {
+  if (!worldBuilder) worldBuilder = createWorldBuilder(getWorldContext());
+  worldBuilder.buildWorld(level);
+}
+
+function updateFlashlight(dt) {
+  worldBuilder?.updateFlashlight(dt);
+}
+
+function triggerHitstop(duration) {
+  fx.triggerHitstop(duration);
+}
+
+function triggerShake(intensity, duration) {
+  fx.triggerShake(intensity, duration);
+}
+
+function triggerDamageFx() {
+  fx.triggerDamageFx();
+}
+
+function updateShake(dt) {
+  fx.updateShake(dt, camera);
+}
+
+function collectDuelSnapshot() {
+  return collectDuelSnapshotFromState({
+    isDuelLevel,
+    levelState,
+    totalTime,
+    getIsHost,
+    player,
+    remotePlayer,
+    npcs,
+  });
+}
+
+function buildGameStatePayload(extra = {}) {
+  return buildGameStatePayloadFromState({
+    stateRevision,
+    gameMode,
+    gameStatus,
+    currentLevelIndex,
+    isDuelActive,
+    matchNpcCount,
+    duelRoundId,
+    levelState,
+    isDuelLevel,
+    collectSnapshot: collectDuelSnapshot,
+  }, extra);
 }
 
 function duelRandom() {
@@ -562,67 +451,6 @@ function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
   }, delayMs);
 }
 
-function validatePvpHit(punchData, targetActor) {
-  if (!targetActor?.group || targetActor.hp <= 0) return false;
-  const playerPos = targetActor.group.position;
-  const toTarget = new THREE.Vector2(
-    playerPos.x - punchData.x,
-    playerPos.z - punchData.z,
-  );
-  return toTarget.length() <= PVP_HIT_RANGE;
-}
-
-function collectDuelSnapshot() {
-  if (!isDuelLevel() || !levelState) return null;
-  return {
-    worldSeed: levelState.worldSeed,
-    elapsed: Math.max(0, totalTime - (levelState.startTime || 0)),
-    hostHp: getIsHost() ? player.hp : remotePlayer?.hp,
-    guestHp: getIsHost() ? remotePlayer?.hp : player.hp,
-    duelNpcs: npcs.map((n) => ({
-      x: n.group.position.x,
-      z: n.group.position.z,
-      hp: n.hp ?? DUEL_NPC_HP,
-      alive: n.alive,
-      punchDelay: n.punchDelay ?? NPC_PUNCH_INTERVAL,
-      punchTimer: n.punchTimer ?? 0,
-    })),
-  };
-}
-
-function buildGameStatePayload(extra = {}) {
-  const payload = {
-    revision: stateRevision,
-    mode: gameMode,
-    phase: gameStatus === "levelSelect"
-      ? "lobby"
-      : gameStatus === "paused"
-        ? "paused"
-        : gameStatus === "playing"
-          ? "playing"
-          : "briefing",
-    levelIndex: gameStatus === "levelSelect" ? null : currentLevelIndex,
-    npcCount: isDuelActive() ? DUEL_NPC_COUNT : matchNpcCount,
-    roundId: duelRoundId,
-    started: gameStatus === "playing",
-    ...extra,
-  };
-  if (levelState?.duelSpawns) {
-    payload.duelSpawns = levelState.duelSpawns;
-  }
-  if (extra.includeSnapshot) {
-    payload.syncSnapshot = extra.syncSnapshot === true;
-    const snap = collectDuelSnapshot();
-    if (snap) {
-      payload.worldSeed = snap.worldSeed;
-      payload.duelNpcs = snap.duelNpcs;
-      payload.elapsed = snap.elapsed;
-      payload.hostHp = snap.hostHp;
-      payload.guestHp = snap.guestHp;
-    }
-  }
-  return payload;
-}
 
 function nextDuelRoundId() {
   duelRoundId += 1;
@@ -928,7 +756,7 @@ function applyRemoteGameState(state) {
   if (state.npcCount != null && state.mode !== "duel") {
     matchNpcCount = clampNpcCount(state.npcCount);
     syncNpcCountInput();
-    saveMatchNpcCount();
+    saveMatchNpcCount(matchNpcCount);
   }
 
   const remoteRoundId = state.roundId ?? 0;
@@ -1183,156 +1011,10 @@ function clearPendingRoundEndTimers() {
   }
 }
 
-/* ---- 纹理缓存 ---- */
-const textureCache = { floor: {}, wall: {} };
 
-/* ---- 音效系统 (Web Audio API) ---- */
-let audioCtx = null;
+export function boot() {
+  fx = createFxSystem({ ui, getPlayer: () => player });
 
-function ensureAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === "suspended") audioCtx.resume();
-}
-
-function playTone(freq, duration, type, volume, detune) {
-  if (!audioCtx) return;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.type = type || "sine";
-  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-  if (detune) osc.detune.setValueAtTime(detune, audioCtx.currentTime);
-  gain.gain.setValueAtTime(volume || 0.3, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime + duration);
-}
-
-function playNoise(duration, volume) {
-  if (!audioCtx) return;
-  const bufferSize = audioCtx.sampleRate * duration;
-  const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
-  const src = audioCtx.createBufferSource();
-  src.buffer = buffer;
-  const gain = audioCtx.createGain();
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = "highpass";
-  filter.frequency.setValueAtTime(2000, audioCtx.currentTime);
-  gain.gain.setValueAtTime(volume || 0.15, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-  src.connect(filter);
-  filter.connect(gain);
-  gain.connect(audioCtx.destination);
-  src.start();
-  src.stop(audioCtx.currentTime + duration);
-}
-
-function sfxPunch() {
-  ensureAudio();
-  playNoise(0.07, 0.22);
-  playTone(150, 0.1, "sawtooth", 0.28);
-  playTone(80, 0.14, "sine", 0.16, -180);
-}
-
-function sfxPunchHeavy() {
-  ensureAudio();
-  playNoise(0.11, 0.38);
-  playTone(110, 0.16, "square", 0.34);
-  playTone(55, 0.22, "sawtooth", 0.22);
-  setTimeout(() => playTone(200, 0.08, "sine", 0.12), 40);
-}
-
-function sfxHurt() {
-  ensureAudio();
-  playTone(180, 0.18, "sawtooth", 0.28);
-  playNoise(0.14, 0.28);
-  setTimeout(() => playTone(90, 0.2, "sine", 0.2), 70);
-}
-
-function sfxHit() {
-  ensureAudio();
-  playTone(260, 0.15, "square", 0.25);
-  playTone(520, 0.12, "sine", 0.18);
-  playNoise(0.12, 0.2);
-  setTimeout(() => playTone(380, 0.1, "sine", 0.15), 60);
-}
-
-function sfxWolfPunch() {
-  ensureAudio();
-  playNoise(0.06, 0.2);
-  playTone(120, 0.08, "sawtooth", 0.18, -120);
-  playTone(420, 0.05, "square", 0.12);
-}
-
-function sfxWolfHowl() {
-  ensureAudio();
-  playTone(96, 0.5, "sawtooth", 0.14, -80);
-  setTimeout(() => playTone(144, 0.42, "sine", 0.12, -40), 120);
-}
-
-function sfxThunder() {
-  ensureAudio();
-  playTone(42, 0.55, "sawtooth", 0.22);
-  playNoise(0.52, 0.28);
-  setTimeout(() => playTone(58, 0.36, "triangle", 0.15), 90);
-}
-
-function sfxMiss() {
-  ensureAudio();
-  playTone(120, 0.22, "sawtooth", 0.15);
-  playTone(80, 0.3, "sine", 0.1);
-}
-
-function sfxWin() {
-  ensureAudio();
-  [0, 100, 200, 350].forEach((delay, i) => {
-    setTimeout(() => playTone([523, 659, 784, 1047][i], 0.25, "sine", 0.2), delay);
-  });
-}
-
-function sfxLose() {
-  ensureAudio();
-  [0, 150, 300].forEach((delay, i) => {
-    setTimeout(() => playTone([330, 262, 196][i], 0.35, "sine", 0.18), delay);
-  });
-}
-
-/* ---- 打击反馈：hitstop + 屏幕震动 ---- */
-let hitstopTimer = 0;
-let shakeTimer = 0;
-let shakeIntensity = 0;
-let damageFlashTimer = 0;
-const cameraBasePos = new THREE.Vector3(0, 19.5, 17.2);
-
-function triggerHitstop(duration) {
-  hitstopTimer = Math.max(hitstopTimer, duration);
-}
-
-function triggerShake(intensity, duration) {
-  shakeIntensity = intensity;
-  shakeTimer = duration;
-}
-
-function triggerDamageFx() {
-  damageFlashTimer = 0.38;
-  if (ui.damageFlash) {
-    ui.damageFlash.classList.remove("active");
-    void ui.damageFlash.offsetWidth;
-    ui.damageFlash.classList.add("active");
-  }
-  if (player?.group?.userData?.visual) {
-    player.group.userData.damageFlash = 0.32;
-  }
-}
-
-boot();
-
-function boot() {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -1488,6 +1170,10 @@ function setupUi() {
 }
 
 function setupInput() {
+  const primeAudio = () => resumeAudioOnInteraction();
+  ui.joystick.addEventListener("pointerdown", primeAudio, { once: true });
+  window.addEventListener("keydown", primeAudio, { once: true });
+
   ui.joystick.addEventListener("pointerdown", (event) => {
     input.pointerId = event.pointerId;
     ui.joystick.setPointerCapture(event.pointerId);
@@ -1607,17 +1293,6 @@ function disposeScene() {
   });
 }
 
-function isCachedTexture(tex) {
-  for (const key in textureCache.floor) if (textureCache.floor[key] === tex) return true;
-  for (const key in textureCache.wall) if (textureCache.wall[key] === tex) return true;
-  return false;
-}
-
-function getCachedTexture(cache, key, factory) {
-  if (cache[key]) return cache[key];
-  cache[key] = factory();
-  return cache[key];
-}
 
 function resetLevel(index, options = {}) {
   clearPendingRoundEndTimers();
@@ -1635,8 +1310,7 @@ function resetLevel(index, options = {}) {
   punchTier = 0;
   punchResetTimer = 0;
   totalTime = options.elapsed ?? 0;
-  hitstopTimer = 0;
-  shakeTimer = 0;
+  fx?.reset();
   playerInputVel.set(0, 0);
   resetActionIntervalLock();
   gameStatus = options.skipBriefing ? "playing" : "briefing";
@@ -1786,668 +1460,6 @@ function showTask() {
   updateHud();
 }
 
-function getNightLightLevels(level) {
-  if (level.id === "gaming") {
-    return { hemi: 0.3, ambient: 0.04, dir: 0.42 };
-  }
-  return { hemi: 1.2, ambient: 0.35, dir: 1.3 };
-}
-
-function buildWorld(level) {
-  const isBloodmoon = level.id === "bloodmoon";
-  const isNight = level.lighting === "night" || isBloodmoon;
-  const nightLights = getNightLightLevels(level);
-  scene.background = new THREE.Color(isBloodmoon ? 0x21060b : isNight ? 0x0c1320 : 0xb9d6e7);
-  if (isNight && level.id === "gaming") {
-    scene.fog = new THREE.Fog(0x0c1320, 42, 78);
-  } else {
-    scene.fog = new THREE.Fog(isBloodmoon ? 0x3b0710 : isNight ? 0x0c1320 : 0xc8e3f0, 16, isBloodmoon ? 30 : 35);
-  }
-
-  const hemi = new THREE.HemisphereLight(
-    isBloodmoon ? 0x6d1a25 : isNight ? 0x3a4d6b : 0xffffff,
-    isBloodmoon ? 0x120406 : isNight ? 0x0a0e16 : 0xa98f6b,
-    isBloodmoon ? 0.95 : isNight ? nightLights.hemi : 1.42,
-  );
-  scene.add(hemi);
-
-  if (isNight) {
-    const ambient = new THREE.AmbientLight(isBloodmoon ? 0x6f1720 : 0x4466aa, isBloodmoon ? 0.52 : nightLights.ambient);
-    scene.add(ambient);
-  }
-
-  const sun = new THREE.DirectionalLight(
-    isBloodmoon ? 0xff6b6b : isNight ? 0x9fc4ff : 0xfff7d6,
-    isBloodmoon ? 1.55 : isNight ? nightLights.dir : 1.65,
-  );
-  sun.position.set(-5, 12, 8);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  sun.shadow.camera.left = -16;
-  sun.shadow.camera.right = 16;
-  sun.shadow.camera.top = 16;
-  sun.shadow.camera.bottom = -16;
-  scene.add(sun);
-
-  const mapId = level.mapId || level.id;
-  const floorTex = getCachedTexture(textureCache.floor, mapId, () => makeFloorTexture(mapId));
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(28, 28),
-    new THREE.MeshStandardMaterial({
-      map: floorTex,
-      roughness: level.id === "gaming" ? 0.58 : 0.78,
-      metalness: 0.02,
-    }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  if (level.id === "gaming") {
-    buildGamingRoom();
-  } else if (level.id === "library" || level.mapId === "library") {
-    buildLibrary();
-  } else if (level.id === "bloodmoon") {
-    buildBloodmoonStreet(sun);
-  } else {
-    buildTempleCourtyard();
-  }
-}
-
-function makeFloorTexture(kind) {
-  const canvasTexture = document.createElement("canvas");
-  canvasTexture.width = 1024;
-  canvasTexture.height = 1024;
-  const ctx = canvasTexture.getContext("2d");
-
-  if (kind === "gaming") {
-    ctx.fillStyle = "#111827";
-    ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
-    for (let y = 0; y < 1024; y += 64) {
-      for (let x = 0; x < 1024; x += 64) {
-        ctx.fillStyle = (x + y) % 128 === 0 ? "#141f31" : "#0d1522";
-        ctx.fillRect(x, y, 64, 64);
-      }
-    }
-    ctx.fillStyle = "rgba(66, 153, 225, 0.12)";
-    for (let i = 0; i < 10; i += 1) {
-      ctx.fillRect(90 + i * 92, 128, 46, 150);
-      ctx.fillRect(90 + i * 92, 694, 46, 150);
-    }
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 4;
-    for (let i = 0; i < 1024; i += 128) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, 1024);
-      ctx.stroke();
-    }
-  } else if (kind === "bloodmoon") {
-    const gradient = ctx.createRadialGradient(512, 500, 80, 512, 500, 720);
-    gradient.addColorStop(0, "#3f0b12");
-    gradient.addColorStop(0.52, "#1f1218");
-    gradient.addColorStop(1, "#09080d");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
-    ctx.fillStyle = "rgba(248, 113, 113, 0.12)";
-    for (let y = 0; y < 1024; y += 92) {
-      ctx.fillRect(0, y + 34, 1024, 10);
-    }
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-    ctx.lineWidth = 5;
-    for (let x = -120; x < 1120; x += 180) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + 260, 1024);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgba(185, 28, 28, 0.24)";
-    for (let i = 0; i < 12; i += 1) {
-      const x = 70 + i * 82;
-      const y = 120 + Math.sin(i * 1.7) * 90 + (i % 3) * 190;
-      ctx.beginPath();
-      ctx.ellipse(x, y, 42 + (i % 4) * 16, 16 + (i % 3) * 10, Math.sin(i) * 0.7, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  } else if (kind === "library") {
-    ctx.fillStyle = "#d9caa5";
-    ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
-    for (let y = 0; y < 1024; y += 72) {
-      ctx.fillStyle = y % 144 === 0 ? "#cdbb90" : "#e2d5b8";
-      ctx.fillRect(0, y, 1024, 72);
-    }
-    ctx.strokeStyle = "rgba(92, 58, 35, 0.18)";
-    ctx.lineWidth = 3;
-    for (let x = 0; x < 1024; x += 96) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, 1024);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgba(60, 96, 120, 0.16)";
-    for (let i = 0; i < 7; i += 1) {
-      ctx.fillRect(90 + i * 128, 96, 70, 730);
-    }
-  } else {
-    const gradient = ctx.createRadialGradient(512, 500, 90, 512, 500, 690);
-    gradient.addColorStop(0, "#dbeafe");
-    gradient.addColorStop(0.32, "#9db8c8");
-    gradient.addColorStop(1, "#233447");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
-
-    ctx.fillStyle = "rgba(225, 238, 248, 0.24)";
-    for (let y = 0; y < 1024; y += 96) {
-      ctx.fillRect(0, y + 28, 1024, 18);
-    }
-
-    ctx.strokeStyle = "rgba(19, 41, 55, 0.34)";
-    ctx.lineWidth = 7;
-    for (let x = -120; x < 1120; x += 160) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + 320, 1024);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = "rgba(22, 101, 52, 0.22)";
-    ctx.lineWidth = 12;
-    for (let i = 0; i < 14; i += 1) {
-      const x = 70 + i * 74;
-      ctx.beginPath();
-      ctx.moveTo(x, 180 + Math.sin(i) * 50);
-      ctx.bezierCurveTo(x + 34, 360, x - 64, 560, x + 20, 830);
-      ctx.stroke();
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvasTexture);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(1, 1);
-  texture.anisotropy = 4;
-  return texture;
-}
-
-function buildGamingRoom() {
-  const wallTex = getCachedTexture(textureCache.wall, "gaming", () => makeWallTexture("gaming"));
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    map: wallTex,
-    color: 0x2d374f,
-    roughness: 0.72,
-  });
-  addWall(0, -11.8, 0, wallMaterial);
-  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
-  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
-
-  const deskMat = new THREE.MeshStandardMaterial({ color: 0x2f2b26, roughness: 0.7 });
-  const monitorMat = new THREE.MeshStandardMaterial({ color: 0x070b10, roughness: 0.46 });
-  const screenMat = new THREE.MeshStandardMaterial({
-    color: 0x8ee7ff,
-    emissive: 0x1d8cff,
-    emissiveIntensity: 2.2,
-    roughness: 0.25,
-  });
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0x283348, roughness: 0.82 });
-  const spots = [
-    [-7.2, -6.7],
-    [-3.6, -7.0],
-    [0, -6.8],
-    [3.7, -7.0],
-    [7.3, -6.7],
-    [-7.0, 7.0],
-    [-3.4, 7.2],
-    [0.4, 7.0],
-    [3.8, 7.2],
-    [7.1, 7.0],
-  ];
-
-  spots.forEach(([x, z], index) => {
-    const flip = z > 0 ? Math.PI : 0;
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.42, 0.88), deskMat);
-    desk.position.set(x, 0.32, z);
-    desk.rotation.y = flip;
-    desk.castShadow = true;
-    desk.receiveShadow = true;
-    scene.add(desk);
-
-    const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.5, 0.12), monitorMat);
-    monitor.position.set(x, 0.92, z + (z > 0 ? -0.25 : 0.25));
-    monitor.rotation.y = flip;
-    monitor.castShadow = true;
-    scene.add(monitor);
-
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.34), screenMat.clone());
-    screen.position.set(x, 0.93, z + (z > 0 ? -0.32 : 0.32));
-    screen.rotation.y = z > 0 ? 0 : Math.PI;
-    scene.add(screen);
-
-    const glow = new THREE.PointLight(0x33aaff, 0.65, 4.4);
-    glow.position.set(x, 1.2, z + (z > 0 ? -0.6 : 0.6));
-    scene.add(glow);
-
-    const chair = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.44, 0.64), chairMat);
-    chair.position.set(x + ((index % 2) * 0.28 - 0.14), 0.24, z + (z > 0 ? 0.95 : -0.95));
-    chair.castShadow = true;
-    chair.receiveShadow = true;
-    scene.add(chair);
-
-    levelState.computers.push(new THREE.Vector3(x, 0, z + (z > 0 ? 1.2 : -1.2)));
-  });
-
-  setupGamingFlashlight();
-
-  const bedMat = new THREE.MeshStandardMaterial({ color: 0x243448, roughness: 0.86 });
-  const quiltMat = new THREE.MeshStandardMaterial({ color: 0x445a78, roughness: 0.92 });
-  [-10.2, 10.2].forEach((x) => {
-    [-5.2, 0.6, 6.3].forEach((z) => {
-      const bed = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.38, 2.45), bedMat);
-      bed.position.set(x, 0.22, z);
-      bed.castShadow = true;
-      bed.receiveShadow = true;
-      scene.add(bed);
-
-      const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.18, 1.55), quiltMat);
-      quilt.position.set(x, 0.52, z + 0.18);
-      quilt.castShadow = true;
-      scene.add(quilt);
-    });
-  });
-}
-
-const FLASHLIGHT_COLOR = 0xfff0c8;
-const FLASHLIGHT_RADIUS = 22;
-const FLASHLIGHT_HEIGHT = 2.8;
-const FLASHLIGHT_SPEED = 1.45;
-const FLASHLIGHT_INTENSITY = 36;
-const FLASHLIGHT_DISTANCE = Math.hypot(FLASHLIGHT_RADIUS, FLASHLIGHT_HEIGHT) + 1.2;
-const FLASHLIGHT_PENUMBRA = 0;
-const FLASHLIGHT_DECAY = 0;
-const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
-
-function setupGamingFlashlight() {
-  const start = randomFlashlightPoint();
-  const spot = new THREE.SpotLight(
-    FLASHLIGHT_COLOR,
-    FLASHLIGHT_INTENSITY,
-    FLASHLIGHT_DISTANCE,
-    FLASHLIGHT_SPOT_ANGLE,
-    FLASHLIGHT_PENUMBRA,
-    FLASHLIGHT_DECAY,
-  );
-  spot.position.set(start.x, FLASHLIGHT_HEIGHT, start.z);
-  spot.target.position.set(start.x, 0, start.z);
-  spot.castShadow = false;
-  scene.add(spot);
-  scene.add(spot.target);
-  levelState.flashlight = {
-    spot,
-    position: new THREE.Vector3(start.x, 0, start.z),
-    target: new THREE.Vector3(start.x, 0, start.z),
-    state: "patrol",
-    pauseTimer: 0,
-  };
-}
-
-function randomFlashlightPoint() {
-  let pos;
-  let tries = 0;
-  do {
-    pos = new THREE.Vector3(randomRange(-8.6, 8.6), 0, randomRange(-7.6, 7.6));
-    tries += 1;
-  } while (tries < 30 && collidesWithObstacle(pos, FLASHLIGHT_RADIUS * 0.6));
-  return pos;
-}
-
-function updateFlashlight(dt) {
-  const fl = levelState.flashlight;
-  if (!fl) return;
-  if (fl.state === "pause") {
-    fl.pauseTimer -= dt;
-    if (fl.pauseTimer <= 0) {
-      fl.state = "patrol";
-      fl.target.copy(randomFlashlightPoint());
-    }
-  } else {
-    const dx = fl.target.x - fl.position.x;
-    const dz = fl.target.z - fl.position.z;
-    const dist = Math.hypot(dx, dz);
-    const step = FLASHLIGHT_SPEED * dt;
-    if (dist <= step || dist < 0.05) {
-      fl.position.copy(fl.target);
-      fl.state = "pause";
-      fl.pauseTimer = randomRange(2.5, 5.0);
-    } else {
-      fl.position.x += (dx / dist) * step;
-      fl.position.z += (dz / dist) * step;
-    }
-  }
-  fl.spot.intensity = FLASHLIGHT_INTENSITY;
-  fl.spot.position.set(fl.position.x, FLASHLIGHT_HEIGHT, fl.position.z);
-  fl.spot.target.position.set(fl.position.x, 0, fl.position.z);
-}
-
-function buildLibrary() {
-  const wallTex = getCachedTexture(textureCache.wall, "library", () => makeWallTexture("library"));
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    map: wallTex,
-    color: 0xf0dfbf,
-    roughness: 0.62,
-  });
-  addWall(0, -11.8, 0, wallMaterial);
-  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
-  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
-
-  const shelfMat = new THREE.MeshStandardMaterial({ color: 0x785a3a, roughness: 0.7 });
-  const tableMat = new THREE.MeshStandardMaterial({ color: 0x926c44, roughness: 0.68 });
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0x3f6f7d, roughness: 0.78 });
-  const bookColors = [0xb91c1c, 0x1d4ed8, 0x047857, 0xf59e0b, 0x7c3aed];
-
-  [-9.5, -6.2, -2.9, 2.9, 6.2, 9.5].forEach((x) => {
-    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.45, 0.65), shelfMat);
-    shelf.position.set(x, 0.74, -9.2);
-    shelf.castShadow = true;
-    shelf.receiveShadow = true;
-    scene.add(shelf);
-    for (let i = 0; i < 8; i += 1) {
-      const book = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.44 + Math.random() * 0.22, 0.08),
-        new THREE.MeshStandardMaterial({ color: bookColors[i % bookColors.length], roughness: 0.82 }),
-      );
-      book.position.set(x - 0.84 + i * 0.24, 1.02, -8.82);
-      scene.add(book);
-    }
-  });
-
-  [-10.2, 10.2].forEach((x) => {
-    [-5.8, -2.5, 0.8, 4.1, 7.4].forEach((z) => {
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.74, 1.35, 2.2), shelfMat);
-      shelf.position.set(x, 0.68, z);
-      shelf.castShadow = true;
-      shelf.receiveShadow = true;
-      scene.add(shelf);
-      registerObstacle(x, z, 0.37, 1.1);
-    });
-  });
-
-  [-9.5, -6.2, -2.9, 2.9, 6.2, 9.5].forEach((x) => {
-    registerObstacle(x, -9.2, 1.1, 0.33);
-  });
-
-  // 两侧与后侧墙体碰撞（内缘与可视墙对齐）
-  registerObstacle(-10.9, 0, 0.35, 10.6);
-  registerObstacle(10.9, 0, 0.35, 10.6);
-  registerObstacle(0, -10.9, 10.6, 0.35);
-
-  const libraryTables = [
-    [-3.4, -1.4],
-    [3.4, -1.4],
-    [-3.4, 2.4],
-    [3.4, 2.4],
-  ];
-  libraryTables.forEach(([x, z]) => {
-    const table = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.35, 1.35), tableMat);
-    table.position.set(x, 0.38, z);
-    table.castShadow = true;
-    table.receiveShadow = true;
-    scene.add(table);
-    registerObstacle(x, z, 1.35, 0.675);
-
-    const lamp = new THREE.PointLight(0xffe0a8, 0.48, 5.2);
-    lamp.position.set(x, 1.6, z);
-    scene.add(lamp);
-
-    [-1, 1].forEach((side) => {
-      const chair = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.42, 0.58), chairMat);
-      chair.position.set(x + side * 1.15, 0.26, z);
-      chair.castShadow = true;
-      chair.receiveShadow = true;
-      scene.add(chair);
-    });
-  });
-}
-
-function buildTempleCourtyard() {
-  levelState.temple = {
-    moonPoint: new THREE.Vector3(0, 0, 0.15),
-  };
-
-  const wallTex = getCachedTexture(textureCache.wall, "temple", () => makeWallTexture("temple"));
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    map: wallTex,
-    color: 0x92a3b4,
-    roughness: 0.68,
-  });
-  addWall(0, -11.8, 0, wallMaterial);
-  addWall(0, 11.8, Math.PI, wallMaterial);
-  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
-  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
-
-  const moonLight = new THREE.PointLight(0xdbeafe, 1.15, 12.5);
-  moonLight.position.set(0, 5.2, 0.1);
-  scene.add(moonLight);
-
-  const moonDisk = new THREE.Mesh(
-    new THREE.CircleGeometry(0.78, 36),
-    new THREE.MeshBasicMaterial({ color: 0xf6f0c7, transparent: true, opacity: 0.92 }),
-  );
-  moonDisk.position.set(7.1, 5.0, -11.76);
-  scene.add(moonDisk);
-
-  const moonPool = new THREE.Mesh(
-    new THREE.CircleGeometry(4.55, 64),
-    new THREE.MeshStandardMaterial({
-      color: 0xdcefff,
-      emissive: 0x8bbcff,
-      emissiveIntensity: 0.25,
-      roughness: 0.28,
-      transparent: true,
-      opacity: 0.42,
-      depthWrite: false,
-    }),
-  );
-  moonPool.rotation.x = -Math.PI / 2;
-  moonPool.position.set(0, 0.026, 0.15);
-  scene.add(moonPool);
-
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(4.45, 4.62, 64),
-    new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.18, depthWrite: false }),
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.set(0, 0.033, 0.15);
-  scene.add(ring);
-
-  const shadowMat = new THREE.MeshBasicMaterial({
-    color: 0x12352f,
-    transparent: true,
-    opacity: 0.26,
-    depthWrite: false,
-  });
-  for (let i = 0; i < 11; i += 1) {
-    const shadow = new THREE.Mesh(new THREE.PlaneGeometry(randomRange(0.18, 0.34), randomRange(5.8, 8.4)), shadowMat.clone());
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.rotation.z = -0.62 + i * 0.075;
-    shadow.position.set(-4.8 + i * 0.92, 0.041, -0.7 + Math.sin(i * 0.8) * 1.5);
-    scene.add(shadow);
-  }
-
-  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x6f8190, roughness: 0.84 });
-  [-8.8, -4.4, 4.4, 8.8].forEach((x) => {
-    [-8.6, 8.7].forEach((z) => {
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.92), stoneMat);
-      slab.position.set(x, 0.06, z);
-      slab.receiveShadow = true;
-      scene.add(slab);
-    });
-  });
-
-  const lanternMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.82 });
-  const lanternLightMat = new THREE.MeshStandardMaterial({
-    color: 0xfff4c0,
-    emissive: 0xffd580,
-    emissiveIntensity: 0.55,
-    roughness: 0.4,
-  });
-  [
-    [-6.2, -6.2],
-    [6.2, -6.2],
-    [-6.2, 6.3],
-    [6.2, 6.3],
-  ].forEach(([x, z]) => {
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.42), lanternMat);
-    base.position.set(x, 0.14, z);
-    base.castShadow = true;
-    scene.add(base);
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.38, 0.34), lanternLightMat);
-    lamp.position.set(x, 0.46, z);
-    lamp.castShadow = true;
-    scene.add(lamp);
-    registerObstacle(x, z, 0.24, 0.24);
-  });
-
-  addBambooCluster(-10.0, -4.8);
-  addBambooCluster(-10.4, 4.9);
-  addBambooCluster(10.1, -4.6);
-  addBambooCluster(10.4, 5.2);
-  addCypress(-8.7, 0.4, 1.05);
-  addCypress(8.6, 0.2, 1.0);
-
-  levelState.temple.shadowCue = createSuShiShadowCue(0);
-  scene.add(levelState.temple.shadowCue);
-}
-
-function addBambooCluster(x, z) {
-  const bambooMat = new THREE.MeshStandardMaterial({ color: 0x2f6b3f, roughness: 0.66 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f8b54, roughness: 0.74 });
-  for (let i = 0; i < 5; i += 1) {
-    const offsetX = (i - 2) * 0.16;
-    const offsetZ = Math.sin(i * 1.4) * 0.2;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.8 + i * 0.12, 6), bambooMat);
-    stem.position.set(x + offsetX, 1.4 + i * 0.04, z + offsetZ);
-    stem.rotation.z = randomRange(-0.08, 0.08);
-    stem.castShadow = true;
-    scene.add(stem);
-
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.055, 0.16), leafMat);
-    leaf.position.set(x + offsetX * 1.4, 2.75 + i * 0.05, z + offsetZ);
-    leaf.rotation.y = randomRange(-0.9, 0.9);
-    leaf.rotation.z = randomRange(-0.2, 0.2);
-    leaf.castShadow = true;
-    scene.add(leaf);
-  }
-  registerObstacle(x, z, 0.45, 0.48);
-}
-
-function addCypress(x, z, scale) {
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x513b2c, roughness: 0.78 });
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x1f4d40, roughness: 0.7 });
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.17 * scale, 2.0 * scale, 8), trunkMat);
-  trunk.position.set(x, 1.0 * scale, z);
-  trunk.castShadow = true;
-  scene.add(trunk);
-
-  const crown = new THREE.Mesh(new THREE.ConeGeometry(0.78 * scale, 2.15 * scale, 12), leafMat);
-  crown.position.set(x, 2.35 * scale, z);
-  crown.castShadow = true;
-  scene.add(crown);
-  registerObstacle(x, z, 0.55 * scale, 0.55 * scale);
-}
-
-function makeWallTexture(kind) {
-  const canvasTexture = document.createElement("canvas");
-  canvasTexture.width = 1024;
-  canvasTexture.height = 512;
-  const ctx = canvasTexture.getContext("2d");
-  ctx.fillStyle = kind === "gaming" ? "#121b2d" : kind === "library" ? "#ead7b5" : kind === "bloodmoon" ? "#17070b" : "#7f90a2";
-  ctx.fillRect(0, 0, 1024, 512);
-
-  if (kind === "gaming") {
-    ctx.fillStyle = "#1f2a44";
-    for (let x = 60; x < 960; x += 180) {
-      ctx.fillRect(x, 72, 110, 170);
-      ctx.fillStyle = "rgba(80, 200, 255, 0.16)";
-      ctx.fillRect(x + 8, 84, 94, 68);
-      ctx.fillStyle = "#1f2a44";
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    ctx.fillRect(0, 318, 1024, 8);
-  } else if (kind === "library") {
-    ctx.fillStyle = "#b58a54";
-    for (let x = 36; x < 980; x += 150) {
-      ctx.fillRect(x, 60, 110, 300);
-      for (let y = 88; y < 330; y += 54) {
-        ctx.fillStyle = y % 108 === 0 ? "#7f5132" : "#315b69";
-        ctx.fillRect(x + 12, y, 86, 24);
-      }
-      ctx.fillStyle = "#b58a54";
-    }
-    ctx.fillStyle = "rgba(120, 90, 58, 0.22)";
-    ctx.fillRect(0, 382, 1024, 10);
-  } else if (kind === "bloodmoon") {
-    ctx.fillStyle = "#241018";
-    ctx.fillRect(0, 340, 1024, 28);
-    ctx.fillStyle = "#12080d";
-    for (let x = 30; x < 1024; x += 116) {
-      const h = 190 + (x % 5) * 22;
-      ctx.fillRect(x, 122 - (x % 3) * 14, 74, h);
-      ctx.fillStyle = "rgba(248, 113, 113, 0.18)";
-      for (let y = 152; y < 286; y += 48) {
-        ctx.fillRect(x + 12, y, 18, 24);
-        ctx.fillRect(x + 44, y + (x % 2) * 8, 18, 24);
-      }
-      ctx.fillStyle = "#12080d";
-    }
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.lineWidth = 4;
-    for (let i = 0; i < 8; i += 1) {
-      ctx.beginPath();
-      ctx.moveTo(80 + i * 130, 30);
-      ctx.lineTo(20 + i * 120, 330);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgba(127, 29, 29, 0.36)";
-    for (let x = 0; x < 1024; x += 72) {
-      ctx.fillRect(x, 376 + Math.sin(x) * 7, 36, 104);
-    }
-  } else {
-    ctx.fillStyle = "#5d7184";
-    ctx.fillRect(0, 340, 1024, 24);
-    ctx.fillStyle = "#273548";
-    for (let x = 48; x < 1024; x += 124) {
-      ctx.fillRect(x, 86, 72, 224);
-      ctx.fillStyle = "rgba(219, 234, 254, 0.2)";
-      ctx.fillRect(x + 10, 106, 52, 56);
-      ctx.fillStyle = "#273548";
-    }
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
-    ctx.lineWidth = 5;
-    for (let y = 58; y < 330; y += 76) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(1024, y + 16);
-      ctx.stroke();
-    }
-    ctx.fillStyle = "rgba(18, 53, 47, 0.24)";
-    for (let x = 0; x < 1024; x += 88) {
-      ctx.fillRect(x, 372 + Math.sin(x) * 8, 42, 118);
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvasTexture);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
-}
-
-function addWall(x, z, rotationY, material) {
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(24, 6.8), material);
-  wall.position.set(x, 3.4, z);
-  wall.rotation.y = rotationY;
-  wall.receiveShadow = true;
-  scene.add(wall);
-}
 
 function spawnNpcs(level) {
   if (level.duelMode) {
@@ -3233,53 +2245,6 @@ function updateDecoy(npc, dt) {
   }
 }
 
-function registerObstacle(x, z, halfW, halfD) {
-  levelState.obstacles.push({ x, z, halfW, halfD });
-}
-
-function collidesWithObstacle(pos, radius = ACTOR_COLLISION_RADIUS) {
-  if (!levelState?.obstacles?.length) return false;
-  for (const obs of levelState.obstacles) {
-    if (
-      Math.abs(pos.x - obs.x) < obs.halfW + radius &&
-      Math.abs(pos.z - obs.z) < obs.halfD + radius
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function resolveObstacleCollisions(position, radius = ACTOR_COLLISION_RADIUS, velocity = null) {
-  if (!levelState?.obstacles?.length) return false;
-  let hit = false;
-  for (let pass = 0; pass < 4; pass += 1) {
-    let resolved = false;
-    for (const obs of levelState.obstacles) {
-      const dx = position.x - obs.x;
-      const dz = position.z - obs.z;
-      const overlapX = obs.halfW + radius - Math.abs(dx);
-      const overlapZ = obs.halfD + radius - Math.abs(dz);
-      if (overlapX <= 0 || overlapZ <= 0) continue;
-      if (overlapX < overlapZ) {
-        position.x += dx >= 0 ? overlapX : -overlapX;
-        if (velocity) velocity.x *= -0.25;
-      } else {
-        position.z += dz >= 0 ? overlapZ : -overlapZ;
-        if (velocity) velocity.y *= -0.25;
-      }
-      resolved = true;
-      hit = true;
-    }
-    if (!resolved) break;
-  }
-  return hit;
-}
-
-function clampActorPosition(position, velocity = null) {
-  clampToWorld(position);
-  resolveObstacleCollisions(position, ACTOR_COLLISION_RADIUS, velocity);
-}
 
 function pickWanderDirection(npc) {
   const rng = isDuelLevel() && duelRng ? duelRng : Math.random;
@@ -3798,254 +2763,6 @@ function createNpc(id, flags) {
 
 
 /* ---- bloodmoon mode (from zjy) ---- */
-function buildBloodmoonStreet(baseLight) {
-  levelState.bloodmoon = {
-    lightningTimer: randomRange(BLOODMOON_LIGHTNING_INTERVAL[0], BLOODMOON_LIGHTNING_INTERVAL[1]),
-    lightningFlash: 0,
-    clueTimer: 0,
-    revealCount: 0,
-    targetCue: createBloodmoonClawCue(0),
-    decoyCues: [],
-    mode: "phase1",
-    huntTimer: 0,
-    safeZones: [],
-    safeZoneVisuals: [],
-    safeZoneRadius: 2.35,
-    cutsceneTimer: 0,
-    huntBriefingShown: false,
-    bossHp: BLOODMOON_PHASE2_HP_MAX,
-    summonWave: 0,
-    nextNpcId: getMatchNpcCount(),
-    baseLight,
-    lightningLight: null,
-    lightningBolts: [],
-    moonMaterial: null,
-  };
-
-  const wallTex = getCachedTexture(textureCache.wall, "bloodmoon", () => makeWallTexture("bloodmoon"));
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    map: wallTex,
-    color: 0x5f111b,
-    roughness: 0.76,
-  });
-  addWall(0, -11.8, 0, wallMaterial);
-  addWall(0, 11.8, Math.PI, wallMaterial);
-  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
-  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
-
-  const lightningLight = new THREE.PointLight(0xdbeafe, 0, 28);
-  lightningLight.position.set(-3, 9.4, -2);
-  scene.add(lightningLight);
-  levelState.bloodmoon.lightningLight = lightningLight;
-
-  levelState.bloodmoon.lightningBolts = [
-    createLightningBolt(-5.4, -11.72, 1.25, 4.9, 0.22),
-    createLightningBolt(1.4, -11.73, 1.6, 5.5, -0.12),
-    createLightningBolt(5.4, -11.74, 1.1, 4.2, 0.34),
-  ];
-  levelState.bloodmoon.lightningBolts.forEach((bolt) => {
-    bolt.visible = false;
-    scene.add(bolt);
-  });
-
-  for (let i = 0; i < BLOODMOON_DECOY_CUES; i += 1) {
-    const cue = createBloodmoonClawCue(0);
-    cue.userData.isDecoyCue = true;
-    cue.userData.decoyNpc = null;
-    cue.userData.decoyCompleteness = 0.45;
-    levelState.bloodmoon.decoyCues.push(cue);
-    scene.add(cue);
-  }
-
-  const moonMaterial = new THREE.MeshBasicMaterial({ color: 0xd41f2f, transparent: true, opacity: 0.88 });
-  const moonDisk = new THREE.Mesh(new THREE.CircleGeometry(1.35, 48), moonMaterial);
-  moonDisk.position.set(7.2, 5.25, -11.75);
-  scene.add(moonDisk);
-  levelState.bloodmoon.moonMaterial = moonMaterial;
-
-  const moonHalo = new THREE.Mesh(
-    new THREE.CircleGeometry(2.15, 48),
-    new THREE.MeshBasicMaterial({ color: 0x7f1018, transparent: true, opacity: 0.26, depthWrite: false }),
-  );
-  moonHalo.position.set(7.2, 5.25, -11.77);
-  scene.add(moonHalo);
-
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x111116, roughness: 0.34, metalness: 0.1 });
-  const road = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.045, 24), roadMat);
-  road.position.set(0, 0.025, 0);
-  road.receiveShadow = true;
-  scene.add(road);
-
-  const lineMat = new THREE.MeshBasicMaterial({ color: 0xffc9c9, transparent: true, opacity: 0.18 });
-  for (let z = -8.8; z <= 8.8; z += 3.2) {
-    const line = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 1.45), lineMat);
-    line.position.set(0, 0.066, z);
-    scene.add(line);
-  }
-
-  const buildingMat = new THREE.MeshStandardMaterial({ color: 0x171018, roughness: 0.86 });
-  const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x4f0b14,
-    emissive: 0x7f1018,
-    emissiveIntensity: 0.42,
-    roughness: 0.42,
-  });
-  [
-    [-8.5, -6.8, 2.3, 3.7, 3.2],
-    [-8.8, -1.2, 2.0, 3.1, 2.8],
-    [-8.1, 4.7, 2.7, 4.0, 3.6],
-    [8.4, -5.8, 2.6, 3.4, 3.4],
-    [8.8, 0.0, 2.1, 3.9, 3.0],
-    [8.0, 6.0, 2.8, 3.2, 3.8],
-  ].forEach(([x, z, w, d, h], index) => {
-    const block = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), buildingMat);
-    block.position.set(x, h / 2, z);
-    block.castShadow = true;
-    block.receiveShadow = true;
-    scene.add(block);
-    registerObstacle(x, z, w / 2, d / 2);
-
-    for (let i = 0; i < 3; i += 1) {
-      const window = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.42, 0.035), windowMat.clone());
-      window.position.set(x + (x < 0 ? w / 2 + 0.02 : -w / 2 - 0.02), 0.85 + i * 0.72, z - d * 0.24 + (index % 2) * 0.42);
-      window.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2;
-      scene.add(window);
-    }
-  });
-
-  const puddleMat = new THREE.MeshStandardMaterial({
-    color: 0x5e1018,
-    emissive: 0x33040a,
-    emissiveIntensity: 0.24,
-    roughness: 0.16,
-    metalness: 0.28,
-    transparent: true,
-    opacity: 0.56,
-    depthWrite: false,
-  });
-  [
-    [-3.9, -6.4, 1.2, 0.44, 0.24],
-    [3.6, -2.6, 1.4, 0.52, -0.38],
-    [-3.4, 2.8, 1.0, 0.38, 0.7],
-    [3.9, 6.3, 1.45, 0.5, -0.2],
-  ].forEach(([x, z, sx, sz, rz]) => {
-    const puddle = new THREE.Mesh(new THREE.CircleGeometry(1, 32), puddleMat.clone());
-    puddle.rotation.x = -Math.PI / 2;
-    puddle.rotation.z = rz;
-    puddle.scale.set(sx, sz, 1);
-    puddle.position.set(x, 0.071, z);
-    scene.add(puddle);
-  });
-
-  const lampMat = new THREE.MeshStandardMaterial({ color: 0x23212a, roughness: 0.7 });
-  const lampGlowMat = new THREE.MeshStandardMaterial({
-    color: 0xffd3d3,
-    emissive: 0xff2a3d,
-    emissiveIntensity: 1.1,
-    roughness: 0.35,
-  });
-  [
-    [-5.1, -8.0],
-    [5.1, -4.1],
-    [-5.1, 1.2],
-    [5.1, 5.9],
-  ].forEach(([x, z]) => {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 2.1, 8), lampMat);
-    pole.position.set(x, 1.05, z);
-    pole.castShadow = true;
-    scene.add(pole);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.28, 0.34), lampGlowMat.clone());
-    head.position.set(x, 2.18, z);
-    scene.add(head);
-    const glow = new THREE.PointLight(0xff3347, 0.65, 5);
-    glow.position.set(x, 2.2, z);
-    scene.add(glow);
-    registerObstacle(x, z, 0.18, 0.18);
-  });
-
-  scene.add(levelState.bloodmoon.targetCue);
-
-  for (let i = 0; i < BLOODMOON_SAFE_ZONE_COUNT; i += 1) {
-    const safeZoneMat = new THREE.MeshBasicMaterial({
-      color: 0x22c55e,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    });
-    const safeZoneMesh = new THREE.Mesh(new THREE.CircleGeometry(2.35, 48), safeZoneMat);
-    safeZoneMesh.rotation.x = -Math.PI / 2;
-    safeZoneMesh.position.y = 0.105;
-    safeZoneMesh.renderOrder = 14;
-    safeZoneMesh.visible = false;
-    scene.add(safeZoneMesh);
-
-    const safeZoneRing = new THREE.Mesh(
-      new THREE.RingGeometry(2.25, 2.45, 48),
-      new THREE.MeshBasicMaterial({ color: 0xbbf7d0, transparent: true, opacity: 0, depthWrite: false }),
-    );
-    safeZoneRing.rotation.x = -Math.PI / 2;
-    safeZoneRing.position.y = 0.112;
-    safeZoneRing.renderOrder = 15;
-    safeZoneRing.visible = false;
-    scene.add(safeZoneRing);
-    levelState.bloodmoon.safeZoneVisuals.push({ mesh: safeZoneMesh, ring: safeZoneRing });
-  }
-}
-
-function createLightningBolt(x, z, width, height, tilt) {
-  const group = new THREE.Group();
-  group.position.set(x, 0, z);
-  group.rotation.y = tilt;
-  group.userData.segments = [];
-
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xeef6ff,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-  });
-  const glowMaterial = new THREE.MeshBasicMaterial({
-    color: 0x93c5fd,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-  });
-
-  let px = 0;
-  let py = height;
-  const points = [[px, py]];
-  for (let i = 1; i <= 7; i += 1) {
-    px += randomRange(-width, width) * 0.42;
-    py = height - (height / 7) * i;
-    points.push([px, py]);
-  }
-
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const [x1, y1] = points[i];
-    const [x2, y2] = points[i + 1];
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const length = Math.hypot(dx, dy);
-    const angle = Math.atan2(dx, dy);
-    const seg = new THREE.Mesh(new THREE.PlaneGeometry(0.08, length), material.clone());
-    seg.position.set((x1 + x2) / 2, (y1 + y2) / 2, 0);
-    seg.rotation.z = -angle;
-    seg.renderOrder = 20;
-    group.add(seg);
-    group.userData.segments.push(seg);
-
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.22, length), glowMaterial.clone());
-    glow.position.copy(seg.position);
-    glow.rotation.copy(seg.rotation);
-    glow.renderOrder = 19;
-    group.add(glow);
-    group.userData.segments.push(glow);
-  }
-
-  return group;
-}
 
 
 function createSuShiShadowCue(intensity = 0) {
@@ -4914,8 +3631,7 @@ function tick() {
   }
 
   // hitstop：命中时冻结游戏几帧
-  if (hitstopTimer > 0) {
-    hitstopTimer -= clampedDt;
+  if (fx.consumeHitstop(clampedDt)) {
     updateShake(clampedDt);
     renderer.render(scene, camera);
     return;
@@ -4949,7 +3665,7 @@ function tick() {
     if (player.group?.userData?.damageFlash > 0) {
       player.group.userData.damageFlash = Math.max(0, player.group.userData.damageFlash - dt);
     }
-    if (damageFlashTimer > 0) damageFlashTimer = Math.max(0, damageFlashTimer - dt);
+    if (fx.damageFlashTimer > 0) fx.damageFlashTimer = Math.max(0, fx.damageFlashTimer - dt);
     updatePlayer(dt);
     updateNpcs(dt);
     updateProximityHint();
@@ -4972,18 +3688,6 @@ function tick() {
   updateParticles(dt);
   updateShake(dt);
   renderer.render(scene, camera);
-}
-
-function updateShake(dt) {
-  if (shakeTimer > 0) {
-    shakeTimer -= dt;
-    const decay = Math.max(0, shakeTimer / 0.2);
-    const offsetX = (Math.random() - 0.5) * 2 * shakeIntensity * decay;
-    const offsetY = (Math.random() - 0.5) * 2 * shakeIntensity * decay * 0.5;
-    camera.position.set(cameraBasePos.x + offsetX, cameraBasePos.y + offsetY, cameraBasePos.z);
-  } else {
-    camera.position.copy(cameraBasePos);
-  }
 }
 
 function applyReverseInputLock(nextInput) {
@@ -5517,13 +4221,8 @@ function animateActor(actor, dt, moving) {
 }
 
 /* ---- 空间网格（优化碰撞检测） ---- */
-const GRID_CELL = 2.0;
 const GRID_COLS = Math.ceil((WORLD_LIMIT * 2) / GRID_CELL) + 1;
 let spatialGrid = new Map();
-
-function gridKey(cx, cz) {
-  return cx * 1000 + cz;
-}
 
 function buildSpatialGrid() {
   spatialGrid.clear();
@@ -5978,16 +4677,6 @@ function updateHud() {
     ui.cooldownOverlay.classList.remove("active");
     ui.attackButton.classList.remove("cooling");
   }
-}
-
-function clampToWorld(position) {
-  position.x = THREE.MathUtils.clamp(position.x, -WORLD_LIMIT, WORLD_LIMIT);
-  position.z = THREE.MathUtils.clamp(position.z, PLAY_Z_MIN, WORLD_LIMIT);
-}
-
-function lerpAngle(a, b, t) {
-  const delta = ((((b - a) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-  return a + delta * t;
 }
 
 function randomRange(min, max) {

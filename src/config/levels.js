@@ -1,0 +1,83 @@
+export const LEVELS = [
+  {
+    id: "gaming",
+    sceneName: "凌晨三点",
+    emoji: "🌙",
+    cardDesc: "在人群中找到凌晨三点还在打游戏的人",
+    mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
+    clue: "目标特征：有明显黑眼圈",
+    targetDesc: "打游戏的人",
+    difficulty: 2,
+    success: "精准命中，宿舍终于安静了。",
+    failure: "这个人游戏打爽了，大家都被吵醒了",
+    lighting: "night",
+  },
+  {
+    id: "library",
+    sceneName: "图书馆",
+    emoji: "📚",
+    cardDesc: "在人群中找到图书馆里亲嘴的情侣",
+    mission: "图书馆里有一对情侣在亲嘴，太辣眼睛了！",
+    clue: "目标特征：两个人贴在一起，嘴上有口红印",
+    targetDesc: "亲嘴的情侣",
+    difficulty: 3,
+    success: "精准命中，图书馆恢复了该有的安静。",
+    failure: "这对情侣亲爽了",
+    lighting: "library",
+  },
+  {
+    id: "library_duel",
+    mapId: "library",
+    sceneName: "图书馆决斗",
+    emoji: "⚔️",
+    cardDesc: "在出拳人群中击败对手",
+    mission: "图书馆里挤满了出拳的读者，击败你的对手！",
+    hudMission: "击败对手，同时躲避 NPC 的拳头",
+    clue: "NPC 每 10 秒挥拳一次；每 1.5 分钟需到集合圈报到，否则扣 1 滴血",
+    hudClue: "NPC 每 10 秒挥拳 · 1.5 分钟集合 · 双方各 5 滴血",
+    targetDesc: "对手",
+    difficulty: 3,
+    success: "你击败了对手，图书馆归于“平静”。",
+    failure: "你被击败了",
+    lighting: "library",
+    duelMode: true,
+  },
+  {
+    id: "temple",
+    sceneName: "承天寺夜游",
+    emoji: "🌕",
+    cardDesc: "在苏轼影分身里找出真正吵醒怀民的苏轼",
+    mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
+    hudMission: "观察月下显形线索，找出真正的苏轼。",
+    clue: "目标特征：会在月色最亮的中庭停留，脚下竹柏影会像藻荇一样交横聚拢",
+    hudClue: "目标特征：月光中庭停留时，脚下会聚起交横竹柏影",
+    targetDesc: "真正的苏轼",
+    difficulty: 3,
+    success: "精准命中，怀民终于能回去睡觉了。",
+    failure: "苏轼月下散步爽了，怀民彻底睡不着了",
+    lighting: "night",
+  },
+  {
+    id: "bloodmoon",
+    sceneName: "血月街区",
+    emoji: "🌕",
+    cardDesc: "为了你变成狼人，在雷暴里找出血月引路人",
+    mission: "血月升起，你收到一句求救：“别让我在血月里认不出你。”为了赶到对方身边，你主动踏进血月，变成狼人模样。找出伪装在人群里的血月引路人，击倒他，解除狼化。",
+    hudMission: "为了你，我变成狼人模样。找出血月引路人。",
+    clue: "电光照亮时，真正的血月引路人脚下会露出狼爪影",
+    hudClue: "电光照亮时，真正的血月引路人脚下会露出狼爪影。",
+    targetDesc: "血月引路人",
+    difficulty: 3,
+    success: "血月退潮，你终于把自己的影子从狼形里拽了回来。",
+    failure: "雷声盖过了那句求救，整条街都开始长出狼影。",
+    lighting: "bloodmoon",
+  },
+];
+
+export function getDuelLevelIndex() {
+  return LEVELS.findIndex((level) => level.duelMode);
+}
+
+export function isDuelLevel(level) {
+  return Boolean(level?.duelMode);
+}
