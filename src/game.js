@@ -762,6 +762,7 @@ function buildLevelCards() {
 }
 
 function showLevelSelect() {
+  clearPendingRoundEndTimers();
   disposeScene();
   scene = null;
   gameStatus = "levelSelect";
@@ -1150,6 +1151,10 @@ let lastActionAt = -Infinity;
 
 const scratchVec2 = new THREE.Vector2();
 const scratchVec3 = new THREE.Vector3();
+const scratchFacing = new THREE.Vector2();
+const scratchToPlayer = new THREE.Vector2();
+const scratchWaypoint = new THREE.Vector3();
+const nearbyScratch = [];
 const pixelGeo = new THREE.BoxGeometry(0.13, 0.13, 0.13);
 
 /* ---- 粒子材质缓存（按颜色共享） ---- */
@@ -1162,6 +1167,20 @@ function getPixelMaterial(color) {
     pixelMaterialCache.set(color, mat);
   }
   return mat;
+}
+
+function isCachedPixelMaterial(mat) {
+  for (const cached of pixelMaterialCache.values()) {
+    if (cached === mat) return true;
+  }
+  return false;
+}
+
+function clearPendingRoundEndTimers() {
+  if (settleTimer) {
+    window.clearTimeout(settleTimer);
+    settleTimer = null;
+  }
 }
 
 /* ---- 纹理缓存 ---- */
@@ -1582,7 +1601,7 @@ function disposeScene() {
       mats.forEach((mat) => {
         // 不 dispose 缓存中的纹理（floor/wall texture cache 管理）
         if (mat.map && !isCachedTexture(mat.map)) mat.map.dispose();
-        mat.dispose();
+        if (!isCachedPixelMaterial(mat)) mat.dispose();
       });
     }
   });
@@ -1601,6 +1620,7 @@ function getCachedTexture(cache, key, factory) {
 }
 
 function resetLevel(index, options = {}) {
+  clearPendingRoundEndTimers();
   // 先清理旧场景资源
   disposeScene();
 
@@ -1627,7 +1647,7 @@ function resetLevel(index, options = {}) {
 
   levelState = {
     level,
-    remaining: duel ? 9999 : ROUND_SECONDS,
+    remaining: duel || level.id === "bloodmoon" ? 9999 : ROUND_SECONDS,
     attempts: duel ? DUEL_PLAYER_HP : ATTEMPTS,
     computers: [],
     pair: null,
@@ -1751,7 +1771,7 @@ function showTask() {
   ui.taskCopy.textContent = level.mission;
   ui.taskClue.textContent = "🔍 " + level.clue;
   ui.taskNpcCount.textContent = duel ? DUEL_NPC_COUNT : getMatchNpcCount();
-  ui.taskTime.textContent = duel ? "∞" : ROUND_SECONDS;
+  ui.taskTime.textContent = duel || level.id === "bloodmoon" ? "∞" : ROUND_SECONDS;
   updateTaskAttemptsChip(duel);
   ui.targetLabel.textContent = duel ? "对手" : level.targetDesc;
   ui.levelSelectModal.classList.remove("visible");
@@ -4482,8 +4502,7 @@ function handleBloodmoonBossHit(boss) {
   state.bossHp = Math.max(0, state.bossHp - 1);
   if (state.bossHp <= 0) {
     dissolveNpc(boss);
-    gameStatus = "settling";
-    window.setTimeout(() => finishRound(true), 760);
+    settleRound(true, null, 760);
     return;
   }
   startBloodmoonHunt(boss);
@@ -4637,7 +4656,7 @@ function updateBloodmoonHunt(dt) {
 
 function resolveBloodmoonHunt() {
   const state = levelState.bloodmoon;
-  if (!state || state.mode !== "hunt") return;
+  if (!state || state.mode !== "hunt" || gameStatus !== "playing") return;
   const radius = state.safeZoneRadius;
   const playerSafe = isInsideAnyBloodmoonSafeZone(player.group.position, radius);
 
@@ -4647,8 +4666,7 @@ function resolveBloodmoonHunt() {
     setPlayerWolfIdentity(true);
     triggerShake(0.55, 0.35);
     sfxLose();
-    gameStatus = "settling";
-    window.setTimeout(() => finishRound(false), 700);
+    settleRound(false, null, 700);
     return;
   }
 
@@ -4660,6 +4678,7 @@ function resolveBloodmoonHunt() {
 
   hideBloodmoonSafeZones();
   setPlayerWolfIdentity(true);
+  compactDeadNpcs();
   respawnBloodmoonBoss();
   summonBloodmoonWave();
   restoreBloodmoonNpcAttacks();
@@ -4802,17 +4821,19 @@ function updateBloodmoonNpcThreat(npc, dt) {
   npc.attackResolveTimer = Math.max(0, (npc.attackResolveTimer ?? 0) - dt);
   npc.alertTimer = Math.max(0, (npc.alertTimer ?? 0) - dt);
 
-  const toPlayer = new THREE.Vector2(player.group.position.x - npc.group.position.x, player.group.position.z - npc.group.position.z);
-  const distance = toPlayer.length();
+  scratchToPlayer.set(
+    player.group.position.x - npc.group.position.x,
+    player.group.position.z - npc.group.position.z,
+  );
+  const distance = scratchToPlayer.length();
   if (prevResolveTimer > 0 && npc.attackResolveTimer <= 0) {
     resolveBloodmoonNpcHit(npc);
   }
   if (distance > BLOODMOON_NPC_HIT_RANGE || npc.attackCooldown > 0) return;
 
-  const facing = getFacingVector(npc.group.rotation.y);
-  const playerInFront = isFacingTarget(facing, toPlayer.clone());
+  getFacingVector(npc.group.rotation.y, scratchFacing);
   const pressure = levelState.hostility * npc.hostility;
-  if (playerInFront && npc.alertTimer <= 0 && Math.random() < dt * 1.8 * pressure) {
+  if (isFacingTarget(scratchFacing, scratchToPlayer) && npc.alertTimer <= 0 && Math.random() < dt * 1.8 * pressure) {
     npc.attackTimer = 0.26;
     npc.attackResolveTimer = 0.12;
     npc.attackCooldown = randomRange(1.0, 1.7) / pressure;
@@ -4823,8 +4844,8 @@ function updateBloodmoonNpcThreat(npc, dt) {
 
 function updateWolfGuard(npc, dt) {
   if (!player || !npc.alive) return;
-  const waypoint = player.group.position.clone();
-  const reached = moveNpcToward(npc, waypoint, npc.speed ?? BLOODMOON_GUARD_SPEED, dt);
+  scratchWaypoint.copy(player.group.position);
+  const reached = moveNpcToward(npc, scratchWaypoint, npc.speed ?? BLOODMOON_GUARD_SPEED, dt);
   npc.walking = !reached;
   if (npc.group.position.distanceTo(player.group.position) < BLOODMOON_NPC_HIT_RANGE + 0.18) {
     npc.alertTimer = 0;
@@ -4836,9 +4857,13 @@ function updateWolfGuard(npc, dt) {
 
 function resolveBloodmoonNpcHit(npc) {
   if (levelState.level.id !== "bloodmoon" || levelState.playerInvuln > 0 || gameStatus !== "playing") return;
-  const toPlayer = new THREE.Vector2(player.group.position.x - npc.group.position.x, player.group.position.z - npc.group.position.z);
-  if (toPlayer.length() > BLOODMOON_NPC_HIT_RANGE) return;
-  if (!isFacingTarget(getFacingVector(npc.group.rotation.y), toPlayer)) return;
+  scratchToPlayer.set(
+    player.group.position.x - npc.group.position.x,
+    player.group.position.z - npc.group.position.z,
+  );
+  if (scratchToPlayer.length() > BLOODMOON_NPC_HIT_RANGE) return;
+  getFacingVector(npc.group.rotation.y, scratchFacing);
+  if (!isFacingTarget(scratchFacing, scratchToPlayer)) return;
 
   levelState.sanity = Math.max(0, levelState.sanity - (npc.isWolfGuard ? BLOODMOON_GUARD_DAMAGE : BLOODMOON_NPC_HIT_DAMAGE));
   levelState.playerInvuln = 0.72;
@@ -4848,8 +4873,7 @@ function resolveBloodmoonNpcHit(npc) {
   window.setTimeout(() => ui.hud.classList.remove("bloodmoon-hit"), 180);
   updateHud();
   if (levelState.sanity <= 0) {
-    gameStatus = "settling";
-    window.setTimeout(() => finishRound(false), 620);
+    settleRound(false, null, 620);
   }
 }
 
@@ -5123,6 +5147,7 @@ function updateNpcs(dt) {
     });
     separateActors();
     updateBloodmoonTargetCue();
+    compactDeadNpcs();
     return;
   }
 
@@ -5515,14 +5540,15 @@ function buildSpatialGrid() {
 function getNearbyNpcs(pos) {
   const cx = Math.floor((pos.x + WORLD_LIMIT) / GRID_CELL);
   const cz = Math.floor((pos.z + WORLD_LIMIT) / GRID_CELL);
-  const result = [];
+  nearbyScratch.length = 0;
   for (let dx = -1; dx <= 1; dx += 1) {
     for (let dz = -1; dz <= 1; dz += 1) {
       const cell = spatialGrid.get(gridKey(cx + dx, cz + dz));
-      if (cell) result.push(...cell);
+      if (!cell) continue;
+      for (let i = 0; i < cell.length; i += 1) nearbyScratch.push(cell[i]);
     }
   }
-  return result;
+  return nearbyScratch;
 }
 
 function separateActors() {
@@ -5734,8 +5760,18 @@ function isFacingTarget(facing, toTarget) {
   return facing.dot(toTarget) >= HIT_FACING_DOT;
 }
 
-function getFacingVector(rotationY) {
-  return new THREE.Vector2(Math.sin(rotationY), Math.cos(rotationY));
+function getFacingVector(rotationY, out = scratchFacing) {
+  return out.set(Math.sin(rotationY), Math.cos(rotationY));
+}
+
+function compactDeadNpcs() {
+  const huntBoss = levelState.bloodmoon?.huntBoss;
+  for (let i = npcs.length - 1; i >= 0; i -= 1) {
+    const npc = npcs[i];
+    if (npc.alive || npc === huntBoss) continue;
+    if (npc.group) scene.remove(npc.group);
+    npcs.splice(i, 1);
+  }
 }
 
 function dissolveNpc(npc) {
@@ -5801,11 +5837,9 @@ function updateParticles(dt) {
 }
 
 function finishRound(won, failMessage) {
-  if (gameStatus === "won" || gameStatus === "lost") return;
-  if (settleTimer) {
-    window.clearTimeout(settleTimer);
-    settleTimer = null;
-  }
+  if (gameStatus === "won" || gameStatus === "lost" || gameStatus === "levelSelect") return;
+  if (!levelState?.level || !scene) return;
+  clearPendingRoundEndTimers();
   gameStatus = won ? "won" : "lost";
   player.cheer = won;
   if (won) sfxWin(); else sfxLose();
@@ -5880,7 +5914,7 @@ function updateHud() {
     ui.missionText.textContent = levelState.level.hudMission || levelState.level.mission;
   }
 
-  ui.timerText.textContent = duel ? "∞" : Math.ceil(levelState.remaining).toString();
+  ui.timerText.textContent = duel || isBloodmoon ? "∞" : Math.ceil(levelState.remaining).toString();
   ui.attemptLabel.textContent = duel ? "生命" : isBloodmoon ? "理智" : "出拳";
   if (duel) {
     ui.attemptText.textContent = formatHearts(player.hp ?? levelState.playerHp);
