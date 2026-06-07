@@ -367,6 +367,31 @@ function bindNpcCountInput() {
   input.addEventListener("wheel", (event) => {
     if (document.activeElement === input) event.preventDefault();
   }, { passive: false });
+
+  // 箭头按钮事件
+  if (ui.npcCountUp) {
+    ui.npcCountUp.addEventListener("click", () => {
+      const next = clampNpcCount(matchNpcCount + 1);
+      if (next !== matchNpcCount) {
+        matchNpcCount = next;
+        syncNpcCountInput();
+        saveMatchNpcCount(matchNpcCount);
+        buildLevelCards();
+      }
+    });
+  }
+
+  if (ui.npcCountDown) {
+    ui.npcCountDown.addEventListener("click", () => {
+      const next = clampNpcCount(matchNpcCount - 1);
+      if (next !== matchNpcCount) {
+        matchNpcCount = next;
+        syncNpcCountInput();
+        saveMatchNpcCount(matchNpcCount);
+        buildLevelCards();
+      }
+    });
+  }
 }
 
 /* ---- 决斗 / 联机 ---- */
@@ -591,6 +616,23 @@ function buildLevelCards() {
     const bestText = best ? `${best.grade} · ${best.time}s` : "--";
     const disabled = mpGuest || mpHostWaiting;
 
+    // 难度标签
+    let difficultyLabel = "";
+    let difficultyClass = "";
+    if (level.difficulty === 1) {
+      difficultyLabel = "简单";
+      difficultyClass = "easy";
+    } else if (level.difficulty === 2) {
+      difficultyLabel = "经典";
+      difficultyClass = "classic";
+    } else if (level.difficulty === 3) {
+      difficultyLabel = "推荐";
+      difficultyClass = "recommended";
+    } else if (level.difficulty >= 4) {
+      difficultyLabel = "困难";
+      difficultyClass = "hard";
+    }
+
     const card = document.createElement("button");
     card.className = `level-card level-card--${level.id}${disabled ? " disabled" : ""}`;
     card.type = "button";
@@ -600,14 +642,13 @@ function buildLevelCards() {
       <div class="level-card-accent" aria-hidden="true"></div>
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-body">
-        <div class="level-card-name">${level.sceneName}</div>
+        <div class="level-card-name">${level.sceneName} <span class="level-card-difficulty ${difficultyClass}">${difficultyLabel}</span></div>
         <div class="level-card-desc">${formatLevelCardDesc(level)}</div>
         <div class="level-card-meta">
           <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${starsHtml}</span>
-          <span class="level-card-best">最佳 <strong>${bestText}</strong></span>
         </div>
       </div>
-      <div class="level-card-go" aria-hidden="true"><span>👊</span></div>
+      <div class="level-card-go" aria-hidden="true"><span>›</span></div>
     `;
     if (!disabled) {
       card.addEventListener("click", () => selectLevel(i));
