@@ -1410,6 +1410,33 @@ button {
   min-width: 0;
 }
 
+.mechanic-hint .shadow-mark {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 42px;
+  margin: -6px 1px -7px 0;
+  vertical-align: -15px;
+}
+
+.mechanic-hint .shadow-line {
+  position: absolute;
+  border-radius: 999px;
+  background: #12352f;
+  box-shadow: 0 0 8px rgba(18, 53, 47, 0.5);
+  transform-origin: center center;
+}
+
+.mechanic-hint .shadow-line.accent {
+  background: #5eead4;
+  box-shadow: 0 0 10px rgba(94, 234, 212, 0.55);
+}
+
+.clue-bar.hidden {
+  display: none;
+}
+
 .hud.bloodmoon-hit::after {
   content: "";
   position: fixed;

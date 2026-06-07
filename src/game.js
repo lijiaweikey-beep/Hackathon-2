@@ -42,6 +42,23 @@ const PLAYER_LERP = 0.88; // 玩家移动响应插值（1=即时，越小越延�
 const ACTION_INTERVAL_MS = 500; // 任意动作切换最小间隔，防止摇头找自己
 const REVERSE_INPUT_LOCK_MS = 500; // 反向输入锁窗口（毫秒）
 const REVERSE_INPUT_DOT_THRESHOLD = -0.35; // 小于该值视为“反向输入”
+const TEMPLE_MOON_RADIUS = 4.55;
+const TEMPLE_SHADOW_FADE = 0.55;
+const TEMPLE_DECOY_SHADOW_STYLES = ["fan", "moon", "window", "stone", "leaf", "willow"];
+const TEMPLE_TRUE_SHADOW_MAX = 0.68;
+const TEMPLE_TRUE_REVEAL_AT = 0.75;
+const TEMPLE_TRUE_INITIAL_MOON_DELAY = [12, 16];
+const SU_SHI_SHADOW_PATTERN = [
+  { x: -0.58, z: -0.08, length: 1.9, width: 0.12, rz: -0.72, opacity: 0.38, accent: false },
+  { x: -0.34, z: 0.22, length: 1.55, width: 0.1, rz: -0.28, opacity: 0.33, accent: false },
+  { x: 0.18, z: -0.16, length: 1.7, width: 0.1, rz: 0.42, opacity: 0.36, accent: false },
+  { x: 0.48, z: 0.18, length: 1.35, width: 0.09, rz: 0.88, opacity: 0.31, accent: false },
+  { x: -0.1, z: 0.0, length: 1.25, width: 0.08, rz: 1.36, opacity: 0.28, accent: false },
+  { x: 0.05, z: 0.32, length: 0.92, width: 0.075, rz: -1.25, opacity: 0.27, accent: false },
+  { x: -0.44, z: -0.32, length: 0.98, width: 0.075, rz: 1.08, opacity: 0.27, accent: false },
+  { x: -0.02, z: 0.02, length: 1.05, width: 0.055, rz: -0.72, opacity: 0.28, accent: true },
+  { x: 0.04, z: 0.0, length: 0.92, width: 0.055, rz: 0.74, opacity: 0.24, accent: true },
+];
 const REMOTE_POS_LERP = 14; // 对手位置插值速度（越大越跟手）
 const REMOTE_SNAP_DIST = 2.2; // 偏差过大时直接瞬移，避免长时间拉扯
 const REMOTE_STALE_MS = 900; // 网络延迟容忍；过大才瞬移对齐
@@ -126,8 +143,8 @@ const LEVELS = [
     cardDesc: "在苏轼影分身里找出真正吵醒怀民的苏轼",
     mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
     hudMission: "观察月下显形线索，找出真正的苏轼。",
-    clue: "目标特征：会在月色最亮的中庭停留，随后衣襟泛月白光，身上有竹柏影纹，手里拿着诗卷",
-    hudClue: "目标特征：会在月光中庭停留，随后显现月白衣襟、竹柏影纹和诗卷",
+    clue: "目标特征：会在月色最亮的中庭停留，脚下竹柏影会像藻荇一样交横聚拢",
+    hudClue: "目标特征：月光中庭停留时，脚下会聚起交横竹柏影",
     targetDesc: "真正的苏轼",
     difficulty: 3,
     success: "精准命中，怀民终于能回去睡觉了。",
@@ -337,10 +354,17 @@ function renderTargetPreview(level) {
     const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[2]);
     npc.group.rotation.y = -0.35;
     previewScene.add(npc.group);
-  } else {
-    const npc = createLowPolyPerson(LOW_POLY_TEMPLE_PALETTE, { temple: true });
+  } else if (level.id === "temple") {
+    const cue = createSuShiShadowCue(1);
+    cue.position.set(0, 0.045, 0.08);
+    previewScene.add(cue);
+
+    const npc = createTemplePerson("bamboo", 0);
     npc.group.rotation.y = -0.35;
-    setSuShiClues(npc, 1);
+    previewScene.add(npc.group);
+  } else {
+    const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
+    npc.group.rotation.y = -0.35;
     previewScene.add(npc.group);
   }
 
@@ -2269,6 +2293,9 @@ function buildTempleCourtyard() {
   addBambooCluster(10.4, 5.2);
   addCypress(-8.7, 0.4, 1.05);
   addCypress(8.6, 0.2, 1.0);
+
+  levelState.temple.shadowCue = createSuShiShadowCue(0);
+  scene.add(levelState.temple.shadowCue);
 }
 
 function addBambooCluster(x, z) {
@@ -2467,15 +2494,17 @@ function spawnNpcs(level) {
     }
   } else {
     const target = createNpc(0, { suShiTarget: true, templeClone: true });
-    const start = randomOpenPosition();
+    const start = randomOpenPositionAwayFromTempleCenter();
     target.group.position.set(start.x, 0, start.z);
     target.script = {
-      state: "seekMoon",
-      timer: 0,
-      waypoint: levelState.temple.moonPoint.clone(),
+      state: "wander",
+      timer: randomRange(2.4, 4.2),
+      waypoint: randomOpenPositionOutsideTempleMoon(start),
       moonPoint: levelState.temple.moonPoint.clone(),
       revealProgress: 0,
       exposed: false,
+      wanderRouteLeft: 2,
+      nextMoonDelay: randomRange(TEMPLE_TRUE_INITIAL_MOON_DELAY[0], TEMPLE_TRUE_INITIAL_MOON_DELAY[1]),
     };
     npcs.push(target);
     scene.add(target.group);
@@ -2489,7 +2518,7 @@ function spawnNpcs(level) {
   const wanderNpcs = npcs.filter((n) => !n.isGamingTarget && !n.isLover && !n.isSuShiTarget && !n.isBloodmoonTarget && n.alive);
   shuffleArray(wanderNpcs);
   for (let i = 0; i < Math.min(decoyCount, wanderNpcs.length); i += 1) {
-    initDecoy(wanderNpcs[i]);
+    initDecoy(wanderNpcs[i], level.id === "temple" && i < 3);
   }
 
   if (level.id === "bloodmoon") {
@@ -3067,11 +3096,14 @@ function shuffleArray(arr) {
   }
 }
 
-function initDecoy(npc) {
+function initDecoy(npc, moonDisturber = false) {
   npc.isDecoy = true;
-  npc.deoyState = "wander"; // "wander" | "confuse"
+  npc.deoyState = "wander"; // "wander" | "confuse" | "moonApproach" | "moonPause"
   npc.decoyTimer = randomRange(1.5, 3.5); // 当前状态剩余时间
   npc.decoyDir = new THREE.Vector2(); // 替身移动方向
+  npc.isMoonDisturber = moonDisturber;
+  npc.moonDisturbTimer = moonDisturber ? randomRange(12, 18) : 0;
+  npc.moonDisturbWaypoint = null;
   pickDecoyDir(npc);
 }
 
@@ -3081,6 +3113,47 @@ function pickDecoyDir(npc) {
 }
 
 function updateDecoy(npc, dt) {
+  if (npc.isMoonDisturber && levelState?.level?.id === "temple") {
+    if (npc.deoyState !== "moonApproach" && npc.deoyState !== "moonPause") {
+      npc.moonDisturbTimer -= dt;
+      if (npc.moonDisturbTimer <= 0) {
+        if (Math.random() < 0.65) {
+          npc.deoyState = "moonApproach";
+          npc.decoyTimer = randomRange(4.0, 6.0);
+          npc.moonDisturbWaypoint = randomTempleDisturbPoint();
+        } else {
+          npc.moonDisturbTimer = randomRange(12, 18);
+        }
+      }
+    }
+
+    if (npc.deoyState === "moonApproach") {
+      npc.walking = true;
+      const reached = moveNpcToward(npc, npc.moonDisturbWaypoint, NPC_SPEED * 0.92, dt);
+      npc.decoyTimer -= dt;
+      if (reached || npc.decoyTimer <= 0) {
+        npc.deoyState = "moonPause";
+        npc.decoyTimer = randomRange(0.8, 1.4);
+      }
+      return;
+    }
+
+    if (npc.deoyState === "moonPause") {
+      npc.walking = false;
+      npc.decoyTimer -= dt;
+      faceNpcToward(npc, new THREE.Vector3(7.1, 0, -10.4));
+      if (npc.decoyTimer <= 0) {
+        npc.deoyState = "wander";
+        npc.decoyTimer = randomRange(1.0, 2.5);
+        npc.moonDisturbTimer = randomRange(12, 18);
+        npc.moonDisturbWaypoint = null;
+        npc.wanderTimer = randomRange(0.5, 1.5);
+        npc.pauseTimer = randomRange(0.2, 0.8);
+      }
+      return;
+    }
+  }
+
   npc.decoyTimer -= dt;
 
   if (npc.deoyState === "wander") {
@@ -3217,6 +3290,74 @@ function randomOpenPosition() {
     tries += 1;
   } while (tries < 40 && (pos.distanceTo(playerPos) < 2.2 || collidesWithObstacle(pos)));
   return pos;
+}
+
+function randomOpenPositionAwayFromTempleCenter() {
+  const moonPoint = levelState?.temple?.moonPoint ?? new THREE.Vector3();
+  const minDistance = TEMPLE_MOON_RADIUS + 1.2;
+  let fallback = null;
+
+  for (let tries = 0; tries < 60; tries += 1) {
+    const pos = randomOpenPosition();
+    const distance = Math.hypot(pos.x - moonPoint.x, pos.z - moonPoint.z);
+    if (!fallback || distance > Math.hypot(fallback.x - moonPoint.x, fallback.z - moonPoint.z)) {
+      fallback = pos;
+    }
+    if (distance >= minDistance) return pos;
+  }
+
+  return fallback ?? randomOpenPosition();
+}
+
+function randomOpenPositionOutsideTempleMoon(fromPosition = null) {
+  const moonPoint = levelState?.temple?.moonPoint ?? new THREE.Vector3();
+  const minDistance = TEMPLE_MOON_RADIUS + 0.8;
+  let fallback = null;
+
+  for (let tries = 0; tries < 60; tries += 1) {
+    const pos = randomOpenPosition();
+    const distance = Math.hypot(pos.x - moonPoint.x, pos.z - moonPoint.z);
+    if (!fallback || distance > Math.hypot(fallback.x - moonPoint.x, fallback.z - moonPoint.z)) {
+      fallback = pos;
+    }
+    if (distance < minDistance) continue;
+    if (fromPosition && segmentPassesTempleMoon(fromPosition, pos, TEMPLE_MOON_RADIUS * 0.82)) continue;
+    return pos;
+  }
+
+  return fallback ?? randomOpenPositionAwayFromTempleCenter();
+}
+
+function segmentPassesTempleMoon(fromPosition, toPosition, radius) {
+  const moonPoint = levelState?.temple?.moonPoint;
+  if (!moonPoint) return false;
+  const ax = fromPosition.x;
+  const az = fromPosition.z;
+  const bx = toPosition.x;
+  const bz = toPosition.z;
+  const dx = bx - ax;
+  const dz = bz - az;
+  const lengthSq = dx * dx + dz * dz;
+  if (lengthSq <= 0.0001) return Math.hypot(ax - moonPoint.x, az - moonPoint.z) < radius;
+  const t = THREE.MathUtils.clamp(((moonPoint.x - ax) * dx + (moonPoint.z - az) * dz) / lengthSq, 0, 1);
+  const closestX = ax + dx * t;
+  const closestZ = az + dz * t;
+  return Math.hypot(closestX - moonPoint.x, closestZ - moonPoint.z) < radius;
+}
+
+function randomTempleDisturbPoint() {
+  const moonPoint = levelState?.temple?.moonPoint ?? new THREE.Vector3();
+  for (let tries = 0; tries < 24; tries += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = randomRange(TEMPLE_MOON_RADIUS * 0.48, TEMPLE_MOON_RADIUS * 0.86);
+    const pos = new THREE.Vector3(
+      moonPoint.x + Math.sin(angle) * radius,
+      0,
+      moonPoint.z + Math.cos(angle) * radius,
+    );
+    if (!collidesWithObstacle(pos)) return pos;
+  }
+  return moonPoint.clone().add(new THREE.Vector3(randomRange(-2.8, 2.8), 0, randomRange(-2.8, 2.8)));
 }
 
 const LOW_POLY_PLAYER_PALETTE = {
@@ -3440,13 +3581,163 @@ function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE, options = {}) {
   return { group };
 }
 
+function createTemplePerson(shadowStyle = "fan", shadowSeed = 0) {
+  const group = new THREE.Group();
+  const visual = new THREE.Group();
+  group.add(visual);
+
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xf0b88c, roughness: 0.72 });
+  const robeMat = new THREE.MeshStandardMaterial({ color: 0xc8d4dc, roughness: 0.76 });
+  const robeDarkMat = new THREE.MeshStandardMaterial({ color: 0x8796a4, roughness: 0.82 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x57666f, roughness: 0.82 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.92 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.7 });
+  const paperMat = new THREE.MeshStandardMaterial({ color: 0xf7e9bc, roughness: 0.68 });
+  const inkMat = new THREE.MeshBasicMaterial({ color: 0x3b2f2f, transparent: true, opacity: 0.62 });
+
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.62, 4, 12), robeMat);
+  body.position.y = 0.86;
+  body.castShadow = true;
+  visual.add(body);
+
+  const robeFront = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.035), robeDarkMat);
+  robeFront.position.set(0, 0.74, 0.31);
+  robeFront.castShadow = true;
+  visual.add(robeFront);
+
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.38), robeDarkMat);
+  belt.position.set(0, 0.72, 0.03);
+  belt.castShadow = true;
+  visual.add(belt);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 16), skinMat);
+  head.position.y = 1.54;
+  head.castShadow = true;
+  visual.add(head);
+
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 8), hairMat);
+  hair.scale.set(1, 0.6, 1);
+  hair.position.set(0, 1.68, -0.02);
+  hair.castShadow = true;
+  visual.add(hair);
+
+  const topknot = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), hairMat);
+  topknot.scale.set(0.85, 0.72, 0.85);
+  topknot.position.set(0, 1.94, -0.02);
+  topknot.castShadow = true;
+  visual.add(topknot);
+
+  const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.055, 0.04), hairMat);
+  ribbon.position.set(0, 1.82, 0.1);
+  ribbon.castShadow = true;
+  visual.add(ribbon);
+
+  const leftEye = new THREE.Mesh(new THREE.CircleGeometry(0.036, 16), eyeMat);
+  leftEye.position.set(-0.115, 1.56, 0.314);
+  const rightEye = new THREE.Mesh(new THREE.CircleGeometry(0.036, 16), eyeMat);
+  rightEye.position.set(0.115, 1.56, 0.314);
+  visual.add(leftEye, rightEye);
+
+  const beardMat = new THREE.MeshBasicMaterial({ color: 0x221815, transparent: true, opacity: 0.92 });
+  const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.026, 0.014), beardMat);
+  mustache.position.set(0, 1.45, 0.337);
+  visual.add(mustache);
+
+  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 8), beardMat.clone());
+  beard.position.set(0, 1.33, 0.335);
+  beard.rotation.x = Math.PI;
+  visual.add(beard);
+
+  const leftArm = new THREE.Group();
+  const rightArm = new THREE.Group();
+  const armGeo = new THREE.CapsuleGeometry(0.07, 0.46, 3, 8);
+  const armL = new THREE.Mesh(armGeo, skinMat);
+  const armR = new THREE.Mesh(armGeo, skinMat);
+  armL.position.y = -0.24;
+  armR.position.y = -0.24;
+  leftArm.add(armL);
+  rightArm.add(armR);
+
+  const sleeveGeo = new THREE.BoxGeometry(0.2, 0.34, 0.17);
+  const sleeveL = new THREE.Mesh(sleeveGeo, robeDarkMat);
+  const sleeveR = new THREE.Mesh(sleeveGeo, robeDarkMat);
+  sleeveL.position.y = -0.22;
+  sleeveR.position.y = -0.22;
+  sleeveL.castShadow = true;
+  sleeveR.castShadow = true;
+  leftArm.add(sleeveL);
+  rightArm.add(sleeveR);
+
+  leftArm.position.set(-0.39, 1.06, 0.02);
+  rightArm.position.set(0.39, 1.06, 0.02);
+  leftArm.rotation.z = 0.38;
+  rightArm.rotation.z = -0.38;
+  visual.add(leftArm, rightArm);
+
+  const scroll = new THREE.Group();
+  const scrollRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.46, 12), paperMat);
+  scrollRoll.rotation.z = Math.PI / 2;
+  scrollRoll.castShadow = true;
+  scroll.add(scrollRoll);
+  const inkLine = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.01, 0.012), inkMat);
+  inkLine.position.set(0, 0.052, 0);
+  scroll.add(inkLine);
+  scroll.position.set(0.5, 0.95, 0.26);
+  scroll.rotation.set(0.18, 0.18, -0.38);
+  visual.add(scroll);
+
+  const legGeo = new THREE.CapsuleGeometry(0.08, 0.42, 3, 8);
+  const leftLeg = new THREE.Mesh(legGeo, pantsMat);
+  const rightLeg = new THREE.Mesh(legGeo, pantsMat);
+  leftLeg.position.set(-0.14, 0.27, 0);
+  rightLeg.position.set(0.14, 0.27, 0);
+  leftLeg.castShadow = true;
+  rightLeg.castShadow = true;
+  visual.add(leftLeg, rightLeg);
+
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.48, 24),
+    new THREE.MeshBasicMaterial({ color: 0x061814, transparent: true, opacity: 0, depthWrite: false }),
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.02;
+  shadow.userData.baseOpacity = 0.16;
+  group.add(shadow);
+
+  const localBambooShadow = createTempleLocalShadow(shadowStyle, shadowSeed);
+  group.add(localBambooShadow);
+
+  visual.traverse((child) => {
+    if (child.isMesh) child.castShadow = false;
+  });
+
+  group.userData = {
+    visual,
+    body,
+    leftArm,
+    rightArm,
+    leftLeg,
+    rightLeg,
+    blackMarks: [],
+    lipMarks: [],
+    groundShadow: shadow,
+    localBambooShadow,
+    baseArmRotations: {
+      leftZ: leftArm.rotation.z,
+      rightZ: rightArm.rotation.z,
+    },
+    colors: [0xc8d4dc, 0x57666f, 0xf0b88c, 0x111827, 0xf7e9bc],
+  };
+
+  return { group };
+}
+
 function createPlayer() {
   const isTemple = levelState?.level?.id === "temple";
   const isBloodmoon = levelState?.level?.id === "bloodmoon";
-  const actor = createLowPolyPerson(
-    isTemple ? LOW_POLY_TEMPLE_PALETTE : isBloodmoon ? LOW_POLY_WOLF_PALETTE : LOW_POLY_PLAYER_PALETTE,
-    { temple: isTemple },
-  );
+  const actor = isTemple
+    ? createTemplePerson("window", -1)
+    : createLowPolyPerson(isBloodmoon ? LOW_POLY_WOLF_PALETTE : LOW_POLY_PLAYER_PALETTE);
   actor.speed = PLAYER_SPEED;
   actor.punchTimer = 0;
   actor.cheer = false;
@@ -3463,10 +3754,10 @@ function createRemotePlayer() {
 
 function createNpc(id, flags) {
   const isTemple = flags.templeClone || flags.suShiTarget || levelState?.level?.id === "temple";
-  let actor = createLowPolyPerson(
-    isTemple ? LOW_POLY_TEMPLE_PALETTE : LOW_POLY_NPC_PALETTES[id % LOW_POLY_NPC_PALETTES.length],
-    { temple: isTemple },
-  );
+  const shadowStyle = flags.suShiTarget ? "bamboo" : TEMPLE_DECOY_SHADOW_STYLES[id % TEMPLE_DECOY_SHADOW_STYLES.length];
+  let actor = isTemple
+    ? createTemplePerson(shadowStyle, id)
+    : createLowPolyPerson(flags.wolfGuard ? LOW_POLY_WOLF_PALETTE : LOW_POLY_NPC_PALETTES[id % LOW_POLY_NPC_PALETTES.length]);
   if (flags.wolfGuard) actor = decorateAsWolfGuard(actor);
   actor.id = id;
   actor.isGamingTarget = Boolean(flags.gamingTarget);
@@ -3734,6 +4025,194 @@ function createLightningBolt(x, z, width, height, tilt) {
   }
 
   return group;
+}
+
+
+function createSuShiShadowCue(intensity = 0) {
+  const group = new THREE.Group();
+  group.visible = intensity > 0;
+  group.userData.shadowMeshes = [];
+
+  SU_SHI_SHADOW_PATTERN.forEach(({ x, z, length, width, rz, opacity, accent }) => {
+    const material = new THREE.MeshBasicMaterial({
+      color: accent ? 0x5eead4 : 0x12352f,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, length), material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.rotation.z = rz;
+    mesh.position.set(x, accent ? 0.006 : 0, z);
+    mesh.renderOrder = accent ? 7 : 4;
+    mesh.userData.baseOpacity = opacity;
+    group.add(mesh);
+    group.userData.shadowMeshes.push(mesh);
+  });
+
+  const poolMaterial = new THREE.MeshBasicMaterial({
+    color: 0x0f2f2a,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    depthTest: false,
+  });
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(0.64, 24), poolMaterial);
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = -0.002;
+  pool.scale.set(1.35, 0.58, 1);
+  pool.renderOrder = 3;
+  pool.userData.baseOpacity = 0.15;
+  group.add(pool);
+  group.userData.shadowMeshes.push(pool);
+
+  setShadowCueIntensity(group, intensity);
+  return group;
+}
+
+function setShadowCueIntensity(group, intensity, pulse = 1) {
+  const level = THREE.MathUtils.clamp(intensity, 0, 1);
+  group.visible = level > 0.02;
+  group.scale.setScalar(0.9 + level * 0.22);
+  group.userData.shadowMeshes?.forEach((mesh) => {
+    mesh.material.opacity = mesh.userData.baseOpacity * level * pulse;
+  });
+}
+
+function renderSuShiShadowMarkHtml() {
+  const scale = 22;
+  return `<span class="shadow-mark" aria-hidden="true">${SU_SHI_SHADOW_PATTERN.map((line) => {
+    const left = 34 + line.x * scale - (line.width * scale) / 2;
+    const top = 26 + line.z * scale - (line.length * scale) / 2;
+    const width = Math.max(3, line.width * scale);
+    const height = line.length * scale;
+    const className = line.accent ? "shadow-line accent" : "shadow-line";
+    return `<i class="${className}" style="left:${left.toFixed(1)}px;top:${top.toFixed(1)}px;width:${width.toFixed(1)}px;height:${height.toFixed(1)}px;transform:rotate(${line.rz.toFixed(3)}rad);opacity:${line.opacity.toFixed(2)}"></i>`;
+  }).join("")}</span>`;
+}
+
+function positionShadowCue(group, npc) {
+  if (!group || !npc) return;
+  const facing = getFacingVector(npc.group.rotation.y);
+  group.position.set(
+    npc.group.position.x - facing.x * 0.18,
+    0.062,
+    npc.group.position.z - facing.y * 0.18,
+  );
+  group.rotation.y = npc.group.rotation.y * 0.08;
+}
+
+function getTempleMoonInfluence(position) {
+  const moonPoint = levelState?.temple?.moonPoint;
+  if (!moonPoint) return 0;
+  const distance = Math.hypot(position.x - moonPoint.x, position.z - moonPoint.z);
+  return THREE.MathUtils.clamp((TEMPLE_MOON_RADIUS - distance) / TEMPLE_SHADOW_FADE, 0, 1);
+}
+
+function makeShadowMaterial(opacity = 0) {
+  return new THREE.MeshBasicMaterial({
+    color: 0x12352f,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    depthTest: false,
+  });
+}
+
+function addShadowMesh(group, geometry, x, z, rz, baseOpacity, scaleX = 1, scaleZ = 1) {
+  const mesh = new THREE.Mesh(geometry, makeShadowMaterial());
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.rotation.z = rz;
+  mesh.position.set(x, 0.026, z);
+  mesh.scale.set(scaleX, scaleZ, 1);
+  mesh.renderOrder = 3;
+  mesh.userData.baseOpacity = baseOpacity;
+  group.add(mesh);
+  group.userData.shadowMeshes.push(mesh);
+}
+
+function createTempleLocalShadow(style = "bamboo", seed = 0) {
+  const group = new THREE.Group();
+  group.visible = false;
+  group.userData.shadowMeshes = [];
+
+  const sway = Math.sin(seed * 1.73) * 0.12;
+
+  if (style === "bamboo") {
+    SU_SHI_SHADOW_PATTERN.forEach(({ x, z, length, width, rz, opacity }) => {
+      addShadowMesh(group, new THREE.PlaneGeometry(width, length), x, z, rz, opacity);
+    });
+  } else if (style === "fan") {
+    addShadowMesh(group, new THREE.CircleGeometry(0.74, 24, 0.1, Math.PI * 0.86), -0.1, -0.12, -0.72 + sway, 0.3, 1.35, 0.72);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.38), -0.18, 0.02, -0.96, 0.18);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.05, 1.18), 0.04, 0.03, -0.55, 0.16);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.92), 0.25, 0.04, -0.18, 0.14);
+  } else if (style === "moon") {
+    addShadowMesh(group, new THREE.RingGeometry(0.48, 0.68, 28, 2, -0.35, Math.PI * 1.35), 0, 0.02, 0.34 + sway, 0.32, 1.25, 0.72);
+    addShadowMesh(group, new THREE.RingGeometry(0.3, 0.38, 20, 2, 0.2, Math.PI * 1.05), 0.26, -0.08, -0.45, 0.18, 1.2, 0.7);
+  } else if (style === "window") {
+    addShadowMesh(group, new THREE.RingGeometry(0.56, 0.64, 4), 0, 0.02, Math.PI / 4 + sway, 0.26, 1.25, 0.82);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.28), 0, 0.02, 0.05 + sway, 0.18);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.28), 0, 0.02, Math.PI / 2 + sway, 0.18);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.98), -0.24, 0.0, 0.05 + sway, 0.14);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.98), 0.24, 0.0, 0.05 + sway, 0.14);
+  } else if (style === "stone") {
+    addShadowMesh(group, new THREE.CircleGeometry(0.62, 18), -0.06, 0.02, 0.1 + sway, 0.24, 1.45, 0.72);
+    addShadowMesh(group, new THREE.CircleGeometry(0.32, 12), 0.42, -0.12, -0.2, 0.18, 1.25, 0.7);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.82), -0.22, 0.08, 0.86, 0.13);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.04, 0.72), 0.16, -0.04, -0.62, 0.12);
+  } else if (style === "leaf") {
+    addShadowMesh(group, new THREE.CircleGeometry(0.56, 28), -0.08, 0.02, -0.28 + sway, 0.26, 0.82, 1.48);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.055, 1.28), -0.08, 0.02, -0.28 + sway, 0.18);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.04, 0.62), 0.08, 0.2, 0.58, 0.12);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.04, 0.58), -0.26, -0.08, -1.04, 0.12);
+  } else {
+    addShadowMesh(group, new THREE.PlaneGeometry(0.08, 1.55), -0.34, 0.02, -0.12 + sway, 0.24);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.28), -0.08, 0.1, 0.08 + sway, 0.2);
+    addShadowMesh(group, new THREE.PlaneGeometry(0.05, 1.06), 0.18, -0.02, 0.28 + sway, 0.17);
+    addShadowMesh(group, new THREE.CircleGeometry(0.22, 12), 0.44, 0.18, 0.2, 0.12, 1.45, 0.52);
+  }
+
+  return group;
+}
+
+function setTempleLocalShadow(actor, influence, strength = 1, pulse = 1) {
+  const data = actor?.group?.userData;
+  if (!data?.groundShadow) return;
+  const level = THREE.MathUtils.clamp(influence, 0, 1);
+  const visible = level > 0.02;
+
+  data.groundShadow.visible = visible;
+  data.groundShadow.material.opacity = data.groundShadow.userData.baseOpacity * level * strength;
+
+  if (data.localBambooShadow) {
+    data.localBambooShadow.visible = visible;
+    data.localBambooShadow.scale.setScalar(0.9 + level * 0.12);
+  }
+
+  data.localBambooShadow?.userData.shadowMeshes?.forEach((mesh) => {
+    mesh.material.opacity = mesh.userData.baseOpacity * level * strength * pulse;
+  });
+}
+
+function updateTempleShadows() {
+  if (levelState?.level?.id !== "temple") return;
+  const actors = [player, ...npcs].filter(Boolean);
+
+  actors.forEach((actor) => {
+    const influence = getTempleMoonInfluence(actor.group.position);
+    const pulse = 0.9 + Math.sin(totalTime * 2.4 + (actor.id ?? 0)) * 0.08;
+    const strength = actor.isSuShiTarget ? 0.86 : actor.isDecoy ? 0.84 : 0.8;
+    setTempleLocalShadow(actor, influence, strength, pulse);
+  });
+
+  const target = npcs.find((npc) => npc.isSuShiTarget);
+  if (target?.marked) {
+    pulseSuShiClues(target);
+  } else if (levelState?.temple?.shadowCue) {
+    setShadowCueIntensity(levelState.temple.shadowCue, 0);
+  }
 }
 
 
@@ -4686,6 +5165,7 @@ function updateNpcs(dt) {
   });
 
   separateActors();
+  updateTempleShadows();
 }
 
 function updateGamingTarget(dt) {
@@ -4806,7 +5286,9 @@ function updateTempleTarget(dt) {
     const reached = moveNpcToward(target, script.moonPoint, NPC_SPEED * 0.96, dt);
     if (reached) {
       script.state = "moonPause";
-      script.timer = randomRange(2.2, 3.0);
+      script.timer = randomRange(1.6, 2.1);
+      script.revealProgress = 0;
+      script.exposed = false;
     }
     animateActor(target, dt, target.walking);
     return;
@@ -4817,17 +5299,25 @@ function updateTempleTarget(dt) {
     script.timer -= dt;
     faceNpcToward(target, new THREE.Vector3(7.1, 0, -10.4));
 
-    if (script.timer <= 1.45 || script.exposed) {
+    if (script.timer <= TEMPLE_TRUE_REVEAL_AT || script.exposed) {
       script.exposed = true;
-      script.revealProgress = Math.min(1, script.revealProgress + dt * 0.9);
+      script.revealProgress = Math.min(1, script.revealProgress + dt * 0.65);
       setSuShiClues(target, script.revealProgress);
     }
 
     if (script.timer <= 0) {
-      setSuShiClues(target, 1);
       script.state = "wander";
-      script.timer = randomRange(4.2, 6.4);
-      script.waypoint = randomOpenPosition();
+      script.timer = randomRange(2.4, 4.2);
+      script.waypoint = randomOpenPositionOutsideTempleMoon(target.group.position);
+      script.wanderRouteLeft = Math.random() < 0.5 ? 1 : 2;
+      script.nextMoonDelay = randomRange(10, 15);
+      script.revealProgress = 0;
+      script.exposed = false;
+      target.marked = false;
+      target.markIntensity = 0;
+      if (levelState?.temple?.shadowCue) {
+        setShadowCueIntensity(levelState.temple.shadowCue, 0);
+      }
     }
     animateActor(target, dt, false);
     return;
@@ -4837,9 +5327,18 @@ function updateTempleTarget(dt) {
     target.walking = true;
     const reached = moveNpcToward(target, script.waypoint, NPC_SPEED * 1.02, dt);
     script.timer -= dt;
+    script.nextMoonDelay = Math.max(0, script.nextMoonDelay - dt);
     if (reached || script.timer <= 0) {
-      script.state = "seekMoon";
-      script.waypoint = script.moonPoint.clone();
+      if (script.wanderRouteLeft > 0 || script.nextMoonDelay > 0) {
+        if (reached) script.wanderRouteLeft = Math.max(0, script.wanderRouteLeft - 1);
+        script.timer = randomRange(2.4, 4.2);
+        script.waypoint = script.nextMoonDelay > 0
+          ? randomOpenPositionOutsideTempleMoon(target.group.position)
+          : randomOpenPosition();
+      } else {
+        script.state = "seekMoon";
+        script.waypoint = script.moonPoint.clone();
+      }
     }
     animateActor(target, dt, true);
   }
@@ -4876,43 +5375,23 @@ function setLipstick(npc, intensity) {
 }
 
 function setSuShiClues(npc, intensity) {
+  const clueIntensity = npc.isSuShiTarget ? Math.min(intensity, TEMPLE_TRUE_SHADOW_MAX) : intensity;
   npc.marked = true;
-  npc.markIntensity = Math.max(npc.markIntensity, intensity);
-  const level = THREE.MathUtils.clamp(npc.markIntensity, 0, 1);
-  const data = npc.group.userData;
-
-  data.moonMarks?.forEach((mesh, index) => {
-    mesh.material.opacity = level * (0.42 + index * 0.12);
-    mesh.scale.set(1 + level * 0.18, 1 + level * 0.28, 1);
-  });
-
-  if (data.moonGlow) {
-    data.moonGlow.material.opacity = 0.12 + level * 0.28;
-    data.moonGlow.scale.setScalar(0.82 + level * 0.26);
-  }
-
-  if (data.scroll) {
-    data.scroll.visible = level > 0.22;
-    data.scroll.scale.setScalar(0.82 + level * 0.18);
-  }
-
-  data.robeMaterials?.forEach((material) => {
-    material.emissiveIntensity = level * 0.22;
-  });
+  npc.markIntensity = npc.isSuShiTarget ? clueIntensity : Math.max(npc.markIntensity, clueIntensity);
+  const cue = levelState?.temple?.shadowCue;
+  if (!cue) return;
+  positionShadowCue(cue, npc);
+  setShadowCueIntensity(cue, npc.markIntensity * getTempleMoonInfluence(npc.group.position));
 }
 
 function pulseSuShiClues(npc) {
   if (!npc.marked) return;
-  const data = npc.group.userData;
+  const cue = levelState?.temple?.shadowCue;
+  if (!cue) return;
   const pulse = 0.5 + Math.sin(totalTime * 3.2) * 0.5;
-
-  if (data.moonGlow) {
-    data.moonGlow.material.opacity = 0.22 + pulse * 0.15;
-  }
-
-  data.robeMaterials?.forEach((material) => {
-    material.emissiveIntensity = 0.14 + pulse * 0.12;
-  });
+  positionShadowCue(cue, npc);
+  const courtyardInfluence = getTempleMoonInfluence(npc.group.position);
+  setShadowCueIntensity(cue, npc.markIntensity * courtyardInfluence, 0.78 + pulse * 0.12);
 }
 
 function updateWander(npc, dt) {
@@ -5268,6 +5747,9 @@ function dissolveActor(actor) {
   if (!actor?.group || actor.group.visible === false) return;
   actor.alive = false;
   actor.group.visible = false;
+  if (actor.isSuShiTarget && levelState?.temple?.shadowCue) {
+    setShadowCueIntensity(levelState.temple.shadowCue, 0);
+  }
   if (actor.isBloodmoonTarget && levelState?.bloodmoon?.targetCue) {
     setBloodmoonClawIntensity(levelState.bloodmoon.targetCue, 0);
   }
@@ -5378,6 +5860,7 @@ function finishRound(won, failMessage) {
 function updateHud() {
   const duel = isDuelLevel();
   const isBloodmoon = !duel && levelState.level.id === "bloodmoon";
+  const isTemple = !duel && levelState.level.id === "temple";
   const bloodmoonState = levelState.bloodmoon;
   const duelPlaying = duel && (gameStatus === "playing" || gameStatus === "paused");
   if (ui.hud) ui.hud.classList.toggle("is-duel-play", duelPlaying);
@@ -5421,6 +5904,7 @@ function updateHud() {
   } else {
     ui.clueBar.textContent = "🔍 " + (levelState.level.hudClue || levelState.level.clue);
   }
+  ui.clueBar?.classList.toggle("hidden", isTemple);
 
   if (ui.attackIcon) ui.attackIcon.textContent = isBloodmoon ? "爪" : "拳";
   ui.hud?.classList.toggle("bloodmoon-mode", isBloodmoon);
@@ -5429,17 +5913,23 @@ function updateHud() {
   ui.clueBar?.classList.toggle("bloodmoon", isBloodmoon);
   ui.attemptChip?.classList.toggle("bloodmoon", isBloodmoon);
   if (ui.mechanicHint) {
-    ui.mechanicHint.classList.toggle("visible", isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing"));
-    if (isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing")) {
-      ui.mechanicHint.innerHTML = `
+    ui.mechanicHint.classList.toggle(
+      "visible",
+      isTemple || (isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing")),
+    );
+    ui.mechanicHint.innerHTML = isTemple
+      ? `
+      <div class="mechanic-hint-row"><span class="mechanic-hint-label">任务</span><span class="mechanic-hint-text">找出真正吵醒怀民的苏轼。</span></div>
+      <div class="mechanic-hint-row"><span class="mechanic-hint-label">机制</span><span class="mechanic-hint-text">苏轼只在月光中庭显影，假影也会短暂干扰。</span></div>
+      <div class="mechanic-hint-row"><span class="mechanic-hint-label">特征</span>${renderSuShiShadowMarkHtml()}<span class="mechanic-hint-text">真苏轼脚下是这组交错竹柏影。</span></div>
+    `
+      : isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing")
+        ? `
         <div class="mechanic-hint-row"><span class="mechanic-hint-label">台词</span><span class="mechanic-hint-text">认不出自己的人，都会留在月光外。</span></div>
         <div class="mechanic-hint-row"><span class="mechanic-hint-label">机制</span><span class="mechanic-hint-text">找到自己，进入任意绿色区域。</span></div>
         <div class="mechanic-hint-row"><span class="mechanic-hint-label">处决</span><span class="mechanic-hint-text">倒计时结束时，绿区外全部秒杀。</span></div>
-      `;
-    } else if (!isBloodmoon) {
-      ui.mechanicHint.classList.remove("visible");
-      ui.mechanicHint.innerHTML = "";
-    }
+      `
+        : "";
   }
 
   updateGatherBanner();
