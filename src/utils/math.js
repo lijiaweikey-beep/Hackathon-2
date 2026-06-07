@@ -14,3 +14,9 @@ export function lerpAngle(a, b, t) {
 export function gridKey(cx, cz) {
   return cx * 1000 + cz;
 }
+
+const scratchFacing = new THREE.Vector2();
+
+export function getFacingVector(rotationY, out = scratchFacing) {
+  return out.set(Math.sin(rotationY), Math.cos(rotationY));
+}

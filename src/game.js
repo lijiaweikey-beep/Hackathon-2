@@ -72,7 +72,32 @@ import {
   isDuelLevel as checkDuelLevel,
 } from "./config/levels.js";
 import { canvas, ui } from "./ui/dom.js";
-import { clampToWorld, lerpAngle, gridKey } from "./utils/math.js";
+import { clampToWorld, lerpAngle, gridKey, getFacingVector } from "./utils/math.js";
+import {
+  LOW_POLY_PLAYER_PALETTE,
+  LOW_POLY_NPC_PALETTES,
+  LOW_POLY_REMOTE_PALETTE,
+} from "./entities/palettes.js";
+import { createLowPolyPerson } from "./entities/lowPolyPerson.js";
+import { createTemplePerson } from "./entities/templePerson.js";
+import {
+  createSuShiShadowCue,
+  setShadowCueIntensity,
+  positionShadowCue,
+  setTempleLocalShadow,
+  renderSuShiShadowMarkHtml,
+} from "./entities/templeShadows.js";
+import {
+  createBloodmoonClawCue,
+  setBloodmoonClawIntensity,
+  positionBloodmoonCue,
+} from "./entities/bloodmoonCues.js";
+import {
+  createPlayer as createPlayerEntity,
+  createRemotePlayer,
+  createNpc as createNpcEntity,
+} from "./entities/actors.js";
+import { setBlackEye, setLipstick } from "./entities/marks.js";
 import { createSeededRng } from "./utils/rng.js";
 import {
   clampNpcCount,
@@ -367,6 +392,14 @@ function getWorldContext() {
     createSuShiShadowCue,
     createLightningBolt: (x, z, width, height, tilt) => createLightningBolt(x, z, width, height, tilt, randomRange),
   };
+}
+
+function createPlayer() {
+  return createPlayerEntity(levelState?.level?.id);
+}
+
+function createNpc(id, flags) {
+  return createNpcEntity(id, flags, levelState?.level?.id, randomRange);
 }
 
 function registerObstacle(x, z, halfW, halfD) {
@@ -2054,37 +2087,22 @@ function isRemoteInPunchRange(range = HIT_RANGE) {
   return getActorDistance2D(player, remotePlayer) <= range;
 }
 
-function findDuelNpcTarget() {
-  const playerPos = player.group.position;
-  let best = null;
-  let bestDistance = Infinity;
-
-  npcs.forEach((npc) => {
-    if (!npc.alive || !npc.group) return;
-    const dx = npc.group.position.x - playerPos.x;
-    const dz = npc.group.position.z - playerPos.z;
-    const distance = Math.hypot(dx, dz);
-    if (distance > HIT_RANGE || distance >= bestDistance) return;
-    bestDistance = distance;
-    best = npc;
-  });
-
-  return best;
-}
-
 function findDuelPunchTarget() {
   const playerPos = player.group.position;
+  getFacingVector(player.group.rotation.y, scratchFacing);
   let best = null;
   let bestDistance = Infinity;
 
   function testTarget(type, actor) {
-    if (!actor?.group || actor.group.visible === false || actor.hp <= 0) return;
-    const toTarget = new THREE.Vector2(
+    if (!actor?.group || actor.group.visible === false) return;
+    if (type === "remote" && (actor.hp ?? 0) <= 0) return;
+    if (type === "npc" && !actor.alive) return;
+    scratchToPlayer.set(
       actor.group.position.x - playerPos.x,
       actor.group.position.z - playerPos.z,
     );
-    const distance = toTarget.length();
-    if (distance > HIT_RANGE) return;
+    const distance = scratchToPlayer.length();
+    if (distance > HIT_RANGE || !isFacingTarget(scratchFacing, scratchToPlayer)) return;
     if (distance < bestDistance) {
       bestDistance = distance;
       best = { type, actor };
@@ -2092,9 +2110,7 @@ function findDuelPunchTarget() {
   }
 
   testTarget("remote", remotePlayer);
-  npcs.forEach((npc) => {
-    if (npc.alive) testTarget("npc", npc);
-  });
+  npcs.forEach((npc) => testTarget("npc", npc));
 
   return best;
 }
@@ -2112,11 +2128,9 @@ function damageRemotePlayer() {
 }
 
 function damageDuelNpc(npc) {
-  if (!npc?.alive || npc.hp <= 0) return false;
-  npc.hp = Math.max(0, (npc.hp ?? DUEL_NPC_HP) - 1);
-  if (npc.hp <= 0) {
-    dissolveNpc(npc);
-  }
+  if (!npc?.alive) return false;
+  dissolveNpc(npc);
+  compactDeadNpcs();
   return true;
 }
 
@@ -2345,500 +2359,10 @@ function randomTempleDisturbPoint() {
   return moonPoint.clone().add(new THREE.Vector3(randomRange(-2.8, 2.8), 0, randomRange(-2.8, 2.8)));
 }
 
-const LOW_POLY_PLAYER_PALETTE = {
-  jacket: 0x3ddc68,
-  jacketDark: 0x2ab84f,
-  shorts: 0xa16207,
-  shortsDark: 0x854d0e,
-  cap: 0x3b82f6,
-  capAccent: 0xf97316,
-  sock: 0x7dd3fc,
-};
-
-const LOW_POLY_NPC_PALETTES = [
-  { jacket: 0x60a5fa, jacketDark: 0x2563eb, shorts: 0x57534e, shortsDark: 0x44403c, cap: 0xef4444, capAccent: 0xfbbf24, sock: 0xf9a8d4 },
-  { jacket: 0xf472b6, jacketDark: 0xdb2777, shorts: 0x78350f, shortsDark: 0x57230a, cap: 0x8b5cf6, capAccent: 0x22d3ee, sock: 0xa5f3fc },
-  { jacket: 0xfbbf24, jacketDark: 0xf59e0b, shorts: 0x1e40af, shortsDark: 0x1e3a8a, cap: 0x10b981, capAccent: 0xf43f5e, sock: 0xe2e8f0 },
-  { jacket: 0xa78bfa, jacketDark: 0x7c3aed, shorts: 0x166534, shortsDark: 0x14532d, cap: 0x0ea5e9, capAccent: 0xfcd34d, sock: 0xbae6fd },
-];
-
-const LOW_POLY_WOLF_PALETTE = {
-  jacket: 0x4b1418,
-  jacketDark: 0x1f0a0d,
-  shorts: 0x20202a,
-  shortsDark: 0x111116,
-  cap: 0x2b1014,
-  capAccent: 0xef4444,
-  sock: 0xfca5a5,
-};
-
-const LOW_POLY_REMOTE_PALETTE = {
-  jacket: 0xef4444,
-  jacketDark: 0xdc2626,
-  shorts: 0x1e3a5f,
-  shortsDark: 0x172e4a,
-  cap: 0xfbbf24,
-  capAccent: 0xef4444,
-  sock: 0xfca5a5,
-};
-
-const LOW_POLY_TEMPLE_PALETTE = {
-  jacket: 0xc8d4dc,
-  jacketDark: 0x8796a4,
-  shorts: 0x57666f,
-  shortsDark: 0x3f4b54,
-  cap: 0x111827,
-  capAccent: 0xf7e9bc,
-  sock: 0xdbeafe,
-};
-
-function makeLowPolyMat(color, roughness = 0.62) {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness,
-    metalness: 0.04,
-    flatShading: true,
-  });
-}
-
-function addFacetedBox(parent, w, h, d, material, x, y, z, rx = 0, ry = 0, rz = 0) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
-  mesh.position.set(x, y, z);
-  mesh.rotation.set(rx, ry, rz);
-  mesh.castShadow = true;
-  parent.add(mesh);
-  return mesh;
-}
-
-function createLowPolyPerson(palette = LOW_POLY_PLAYER_PALETTE, options = {}) {
-  const group = new THREE.Group();
-  const visual = new THREE.Group();
-  group.add(visual);
-
-  const isTempleStyle = options.temple === true;
-  const skin = makeLowPolyMat(0xf0b88c);
-  const jacket = makeLowPolyMat(palette.jacket);
-  const jacketDark = makeLowPolyMat(palette.jacketDark);
-  const shirt = makeLowPolyMat(0xf8fafc, 0.55);
-  const shorts = makeLowPolyMat(palette.shorts);
-  const shortsDark = makeLowPolyMat(palette.shortsDark);
-  const boot = makeLowPolyMat(0x7c4a1e);
-  const sock = makeLowPolyMat(palette.sock);
-  const cap = makeLowPolyMat(palette.cap);
-  const capAccent = makeLowPolyMat(palette.capAccent);
-  const eye = makeLowPolyMat(0x111111, 0.4);
-  const mouth = makeLowPolyMat(0x1a1a1a, 0.5);
-  const blackEyeMat = new THREE.MeshBasicMaterial({
-    color: 0x2a1450,
-    transparent: true,
-    opacity: 0,
-    depthTest: false,
-  });
-  const lipMat = new THREE.MeshBasicMaterial({ color: 0xe11d48, transparent: true, opacity: 0 });
-  const moonShadowMat = new THREE.MeshBasicMaterial({ color: 0x12352f, transparent: true, opacity: 0, depthWrite: false });
-
-  if (isTempleStyle) {
-    jacket.emissive = new THREE.Color(0xb8dcff);
-    jacket.emissiveIntensity = 0;
-    jacketDark.emissive = new THREE.Color(0xb8dcff);
-    jacketDark.emissiveIntensity = 0;
-  }
-
-  addFacetedBox(visual, 0.54, 0.5, 0.48, skin, 0, 1.44, 0);
-  addFacetedBox(visual, 0.58, 0.07, 0.34, cap, 0, 1.7, 0.1);
-  addFacetedBox(visual, 0.5, 0.16, 0.46, cap, 0, 1.78, -0.03);
-  addFacetedBox(visual, 0.5, 0.16, 0.1, capAccent, 0, 1.78, 0.24);
-  if (isTempleStyle) {
-    addFacetedBox(visual, 0.2, 0.18, 0.2, cap, 0, 1.96, -0.02);
-    addFacetedBox(visual, 0.38, 0.05, 0.04, cap, 0, 1.86, 0.15);
-  }
-  addFacetedBox(visual, 0.11, 0.13, 0.05, eye, -0.13, 1.46, 0.26);
-  addFacetedBox(visual, 0.11, 0.13, 0.05, eye, 0.13, 1.46, 0.26);
-  addFacetedBox(visual, 0.2, 0.06, 0.04, mouth, 0, 1.3, 0.26);
-  if (isTempleStyle) {
-    addFacetedBox(visual, 0.25, 0.03, 0.04, cap, 0, 1.36, 0.285);
-    addFacetedBox(visual, 0.1, 0.18, 0.04, cap, 0, 1.23, 0.285);
-  }
-  const blackLeft = addFacetedBox(visual, 0.17, 0.14, 0.04, blackEyeMat, -0.13, 1.4, 0.27);
-  const blackRight = addFacetedBox(visual, 0.17, 0.14, 0.04, blackEyeMat.clone(), 0.13, 1.4, 0.27);
-  const blackTopLeft = addFacetedBox(visual, 0.16, 0.05, 0.16, blackEyeMat.clone(), -0.13, 1.67, -0.02);
-  const blackTopRight = addFacetedBox(visual, 0.16, 0.05, 0.16, blackEyeMat.clone(), 0.13, 1.67, -0.02);
-  blackTopLeft.userData.isTopView = true;
-  blackTopRight.userData.isTopView = true;
-  const lipMark = addFacetedBox(visual, 0.16, 0.08, 0.03, lipMat, 0, 1.28, 0.27);
-  addFacetedBox(visual, 0.56, 0.4, 0.22, jacketDark, 0, 1.52, -0.3, 0.18, 0, 0);
-
-  const torso = addFacetedBox(visual, 0.46, 0.44, 0.34, jacket, 0, 1.04, 0);
-  addFacetedBox(visual, 0.2, 0.3, 0.05, shirt, 0, 1.06, 0.18);
-  addFacetedBox(visual, 0.13, 0.34, 0.12, jacketDark, -0.15, 1.06, 0.1, 0, 0.22, 0);
-  addFacetedBox(visual, 0.13, 0.34, 0.12, jacketDark, 0.15, 1.06, 0.1, 0, -0.22, 0);
-  const moonMarks = [];
-  let moonGlow = null;
-  let scroll = null;
-  if (isTempleStyle) {
-    [-0.14, 0.02, 0.16].forEach((x, i) => {
-      const mark = addFacetedBox(visual, 0.055, 0.46, 0.025, moonShadowMat.clone(), x, 1.0 + i * 0.03, 0.205, 0, 0, -0.22 + i * 0.2);
-      moonMarks.push(mark);
-    });
-    moonGlow = new THREE.Mesh(
-      new THREE.TorusGeometry(0.5, 0.018, 8, 36),
-      new THREE.MeshBasicMaterial({ color: 0xdbeafe, transparent: true, opacity: 0, depthWrite: false }),
-    );
-    moonGlow.rotation.x = Math.PI / 2;
-    moonGlow.position.set(0, 0.96, 0);
-    visual.add(moonGlow);
-  }
-  addFacetedBox(visual, 0.44, 0.24, 0.36, shorts, 0, 0.74, 0);
-  addFacetedBox(visual, 0.46, 0.08, 0.38, shortsDark, 0, 0.62, 0);
-
-  const leftArm = new THREE.Group();
-  const rightArm = new THREE.Group();
-  leftArm.position.set(-0.3, 1.1, 0);
-  rightArm.position.set(0.3, 1.1, 0);
-  addFacetedBox(leftArm, 0.13, 0.38, 0.13, jacket, 0, -0.2, 0);
-  addFacetedBox(rightArm, 0.13, 0.38, 0.13, jacket, 0, -0.2, 0);
-  addFacetedBox(leftArm, 0.11, 0.11, 0.11, skin, 0, -0.42, 0);
-  addFacetedBox(rightArm, 0.11, 0.11, 0.11, skin, 0, -0.42, 0);
-  if (isTempleStyle) {
-    addFacetedBox(leftArm, 0.21, 0.28, 0.18, jacketDark, 0, -0.22, 0);
-    addFacetedBox(rightArm, 0.21, 0.28, 0.18, jacketDark, 0, -0.22, 0);
-    scroll = new THREE.Group();
-    const paperMat = makeLowPolyMat(0xf7e9bc, 0.68);
-    const inkMat = new THREE.MeshBasicMaterial({ color: 0x3b2f2f, transparent: true, opacity: 0.62 });
-    const scrollRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.46, 12), paperMat);
-    scrollRoll.rotation.z = Math.PI / 2;
-    scrollRoll.castShadow = true;
-    scroll.add(scrollRoll);
-    addFacetedBox(scroll, 0.3, 0.01, 0.012, inkMat, 0, 0.052, 0);
-    scroll.position.set(0.5, 0.95, 0.26);
-    scroll.rotation.set(0.18, 0.18, -0.38);
-    scroll.visible = false;
-    visual.add(scroll);
-  }
-  leftArm.rotation.z = 0.35;
-  rightArm.rotation.z = -0.35;
-  visual.add(leftArm, rightArm);
-
-  const leftLeg = new THREE.Group();
-  const rightLeg = new THREE.Group();
-  leftLeg.position.set(-0.12, 0.6, 0);
-  rightLeg.position.set(0.12, 0.6, 0);
-  addFacetedBox(leftLeg, 0.15, 0.18, 0.15, shorts, 0, -0.09, 0);
-  addFacetedBox(rightLeg, 0.15, 0.18, 0.15, shorts, 0, -0.09, 0);
-  addFacetedBox(leftLeg, 0.14, 0.26, 0.14, skin, 0, -0.31, 0);
-  addFacetedBox(rightLeg, 0.14, 0.26, 0.14, skin, 0, -0.31, 0);
-  addFacetedBox(leftLeg, 0.15, 0.1, 0.15, sock, 0, -0.48, 0);
-  addFacetedBox(rightLeg, 0.15, 0.1, 0.15, sock, 0, -0.48, 0);
-  addFacetedBox(leftLeg, 0.17, 0.13, 0.22, boot, 0, -0.58, 0.04);
-  addFacetedBox(rightLeg, 0.17, 0.13, 0.22, boot, 0, -0.58, 0.04);
-  visual.add(leftLeg, rightLeg);
-
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.48, 8),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false }),
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.02;
-  group.add(shadow);
-
-  group.userData = {
-    visual,
-    body: torso,
-    leftArm,
-    rightArm,
-    leftLeg,
-    rightLeg,
-    blackMarks: [blackLeft, blackRight, blackTopLeft, blackTopRight],
-    lipMarks: [lipMark],
-    moonMarks,
-    moonGlow,
-    scroll,
-    robeMaterials: isTempleStyle ? [jacket, jacketDark] : [],
-    baseArmRotations: {
-      leftZ: leftArm.rotation.z,
-      rightZ: rightArm.rotation.z,
-    },
-    colors: isTempleStyle
-      ? [palette.jacket, palette.shorts, 0xf0b88c, palette.cap, palette.capAccent, 0xf7e9bc, 0x12352f]
-      : [palette.jacket, palette.shorts, 0xf0b88c, palette.cap, palette.capAccent, 0xf8fafc],
-  };
-
-  return { group };
-}
-
-function createTemplePerson(shadowStyle = "fan", shadowSeed = 0) {
-  const group = new THREE.Group();
-  const visual = new THREE.Group();
-  group.add(visual);
-
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xf0b88c, roughness: 0.72 });
-  const robeMat = new THREE.MeshStandardMaterial({ color: 0xc8d4dc, roughness: 0.76 });
-  const robeDarkMat = new THREE.MeshStandardMaterial({ color: 0x8796a4, roughness: 0.82 });
-  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x57666f, roughness: 0.82 });
-  const hairMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.92 });
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.7 });
-  const paperMat = new THREE.MeshStandardMaterial({ color: 0xf7e9bc, roughness: 0.68 });
-  const inkMat = new THREE.MeshBasicMaterial({ color: 0x3b2f2f, transparent: true, opacity: 0.62 });
-
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.62, 4, 12), robeMat);
-  body.position.y = 0.86;
-  body.castShadow = true;
-  visual.add(body);
-
-  const robeFront = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.035), robeDarkMat);
-  robeFront.position.set(0, 0.74, 0.31);
-  robeFront.castShadow = true;
-  visual.add(robeFront);
-
-  const belt = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.38), robeDarkMat);
-  belt.position.set(0, 0.72, 0.03);
-  belt.castShadow = true;
-  visual.add(belt);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 18, 16), skinMat);
-  head.position.y = 1.54;
-  head.castShadow = true;
-  visual.add(head);
-
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 8), hairMat);
-  hair.scale.set(1, 0.6, 1);
-  hair.position.set(0, 1.68, -0.02);
-  hair.castShadow = true;
-  visual.add(hair);
-
-  const topknot = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), hairMat);
-  topknot.scale.set(0.85, 0.72, 0.85);
-  topknot.position.set(0, 1.94, -0.02);
-  topknot.castShadow = true;
-  visual.add(topknot);
-
-  const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.055, 0.04), hairMat);
-  ribbon.position.set(0, 1.82, 0.1);
-  ribbon.castShadow = true;
-  visual.add(ribbon);
-
-  const leftEye = new THREE.Mesh(new THREE.CircleGeometry(0.036, 16), eyeMat);
-  leftEye.position.set(-0.115, 1.56, 0.314);
-  const rightEye = new THREE.Mesh(new THREE.CircleGeometry(0.036, 16), eyeMat);
-  rightEye.position.set(0.115, 1.56, 0.314);
-  visual.add(leftEye, rightEye);
-
-  const beardMat = new THREE.MeshBasicMaterial({ color: 0x221815, transparent: true, opacity: 0.92 });
-  const mustache = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.026, 0.014), beardMat);
-  mustache.position.set(0, 1.45, 0.337);
-  visual.add(mustache);
-
-  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 8), beardMat.clone());
-  beard.position.set(0, 1.33, 0.335);
-  beard.rotation.x = Math.PI;
-  visual.add(beard);
-
-  const leftArm = new THREE.Group();
-  const rightArm = new THREE.Group();
-  const armGeo = new THREE.CapsuleGeometry(0.07, 0.46, 3, 8);
-  const armL = new THREE.Mesh(armGeo, skinMat);
-  const armR = new THREE.Mesh(armGeo, skinMat);
-  armL.position.y = -0.24;
-  armR.position.y = -0.24;
-  leftArm.add(armL);
-  rightArm.add(armR);
-
-  const sleeveGeo = new THREE.BoxGeometry(0.2, 0.34, 0.17);
-  const sleeveL = new THREE.Mesh(sleeveGeo, robeDarkMat);
-  const sleeveR = new THREE.Mesh(sleeveGeo, robeDarkMat);
-  sleeveL.position.y = -0.22;
-  sleeveR.position.y = -0.22;
-  sleeveL.castShadow = true;
-  sleeveR.castShadow = true;
-  leftArm.add(sleeveL);
-  rightArm.add(sleeveR);
-
-  leftArm.position.set(-0.39, 1.06, 0.02);
-  rightArm.position.set(0.39, 1.06, 0.02);
-  leftArm.rotation.z = 0.38;
-  rightArm.rotation.z = -0.38;
-  visual.add(leftArm, rightArm);
-
-  const scroll = new THREE.Group();
-  const scrollRoll = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.46, 12), paperMat);
-  scrollRoll.rotation.z = Math.PI / 2;
-  scrollRoll.castShadow = true;
-  scroll.add(scrollRoll);
-  const inkLine = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.01, 0.012), inkMat);
-  inkLine.position.set(0, 0.052, 0);
-  scroll.add(inkLine);
-  scroll.position.set(0.5, 0.95, 0.26);
-  scroll.rotation.set(0.18, 0.18, -0.38);
-  visual.add(scroll);
-
-  const legGeo = new THREE.CapsuleGeometry(0.08, 0.42, 3, 8);
-  const leftLeg = new THREE.Mesh(legGeo, pantsMat);
-  const rightLeg = new THREE.Mesh(legGeo, pantsMat);
-  leftLeg.position.set(-0.14, 0.27, 0);
-  rightLeg.position.set(0.14, 0.27, 0);
-  leftLeg.castShadow = true;
-  rightLeg.castShadow = true;
-  visual.add(leftLeg, rightLeg);
-
-  const shadow = new THREE.Mesh(
-    new THREE.CircleGeometry(0.48, 24),
-    new THREE.MeshBasicMaterial({ color: 0x061814, transparent: true, opacity: 0, depthWrite: false }),
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.02;
-  shadow.userData.baseOpacity = 0.16;
-  group.add(shadow);
-
-  const localBambooShadow = createTempleLocalShadow(shadowStyle, shadowSeed);
-  group.add(localBambooShadow);
-
-  visual.traverse((child) => {
-    if (child.isMesh) child.castShadow = false;
-  });
-
-  group.userData = {
-    visual,
-    body,
-    leftArm,
-    rightArm,
-    leftLeg,
-    rightLeg,
-    blackMarks: [],
-    lipMarks: [],
-    groundShadow: shadow,
-    localBambooShadow,
-    baseArmRotations: {
-      leftZ: leftArm.rotation.z,
-      rightZ: rightArm.rotation.z,
-    },
-    colors: [0xc8d4dc, 0x57666f, 0xf0b88c, 0x111827, 0xf7e9bc],
-  };
-
-  return { group };
-}
-
-function createPlayer() {
-  const isTemple = levelState?.level?.id === "temple";
-  const isBloodmoon = levelState?.level?.id === "bloodmoon";
-  const actor = isTemple
-    ? createTemplePerson("window", -1)
-    : createLowPolyPerson(isBloodmoon ? LOW_POLY_WOLF_PALETTE : LOW_POLY_PLAYER_PALETTE);
-  actor.speed = PLAYER_SPEED;
-  actor.punchTimer = 0;
-  actor.cheer = false;
-  return isBloodmoon ? decorateAsWerewolf(actor) : actor;
-}
-
-function createRemotePlayer() {
-  const actor = createLowPolyPerson(LOW_POLY_REMOTE_PALETTE);
-  actor.speed = PLAYER_SPEED;
-  actor.punchTimer = 0;
-  actor.cheer = false;
-  return actor;
-}
-
-function createNpc(id, flags) {
-  const isTemple = flags.templeClone || flags.suShiTarget || levelState?.level?.id === "temple";
-  const shadowStyle = flags.suShiTarget ? "bamboo" : TEMPLE_DECOY_SHADOW_STYLES[id % TEMPLE_DECOY_SHADOW_STYLES.length];
-  let actor = isTemple
-    ? createTemplePerson(shadowStyle, id)
-    : createLowPolyPerson(flags.wolfGuard ? LOW_POLY_WOLF_PALETTE : LOW_POLY_NPC_PALETTES[id % LOW_POLY_NPC_PALETTES.length]);
-  if (flags.wolfGuard) actor = decorateAsWolfGuard(actor);
-  actor.id = id;
-  actor.isGamingTarget = Boolean(flags.gamingTarget);
-  actor.isLover = Boolean(flags.lover);
-  actor.isSuShiTarget = Boolean(flags.suShiTarget);
-  actor.isBloodmoonTarget = Boolean(flags.bloodmoonTarget);
-  actor.isWolfGuard = Boolean(flags.wolfGuard);
-  actor.alive = true;
-  actor.marked = false;
-  actor.markIntensity = 0;
-  actor.velocity = new THREE.Vector2();
-  actor.wanderTimer = randomRange(0.8, 2.8);
-  actor.pauseTimer = randomRange(0.4, 1.8);
-  actor.walking = false;
-  actor.walkCycle = Math.random() * 10;
-  return actor;
-}
 
 
 /* ---- bloodmoon mode (from zjy) ---- */
 
-
-function createSuShiShadowCue(intensity = 0) {
-  const group = new THREE.Group();
-  group.visible = intensity > 0;
-  group.userData.shadowMeshes = [];
-
-  SU_SHI_SHADOW_PATTERN.forEach(({ x, z, length, width, rz, opacity, accent }) => {
-    const material = new THREE.MeshBasicMaterial({
-      color: accent ? 0x5eead4 : 0x12352f,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      depthTest: false,
-    });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, length), material);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.rotation.z = rz;
-    mesh.position.set(x, accent ? 0.006 : 0, z);
-    mesh.renderOrder = accent ? 7 : 4;
-    mesh.userData.baseOpacity = opacity;
-    group.add(mesh);
-    group.userData.shadowMeshes.push(mesh);
-  });
-
-  const poolMaterial = new THREE.MeshBasicMaterial({
-    color: 0x0f2f2a,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-  });
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(0.64, 24), poolMaterial);
-  pool.rotation.x = -Math.PI / 2;
-  pool.position.y = -0.002;
-  pool.scale.set(1.35, 0.58, 1);
-  pool.renderOrder = 3;
-  pool.userData.baseOpacity = 0.15;
-  group.add(pool);
-  group.userData.shadowMeshes.push(pool);
-
-  setShadowCueIntensity(group, intensity);
-  return group;
-}
-
-function setShadowCueIntensity(group, intensity, pulse = 1) {
-  const level = THREE.MathUtils.clamp(intensity, 0, 1);
-  group.visible = level > 0.02;
-  group.scale.setScalar(0.9 + level * 0.22);
-  group.userData.shadowMeshes?.forEach((mesh) => {
-    mesh.material.opacity = mesh.userData.baseOpacity * level * pulse;
-  });
-}
-
-function renderSuShiShadowMarkHtml() {
-  const scale = 22;
-  return `<span class="shadow-mark" aria-hidden="true">${SU_SHI_SHADOW_PATTERN.map((line) => {
-    const left = 34 + line.x * scale - (line.width * scale) / 2;
-    const top = 26 + line.z * scale - (line.length * scale) / 2;
-    const width = Math.max(3, line.width * scale);
-    const height = line.length * scale;
-    const className = line.accent ? "shadow-line accent" : "shadow-line";
-    return `<i class="${className}" style="left:${left.toFixed(1)}px;top:${top.toFixed(1)}px;width:${width.toFixed(1)}px;height:${height.toFixed(1)}px;transform:rotate(${line.rz.toFixed(3)}rad);opacity:${line.opacity.toFixed(2)}"></i>`;
-  }).join("")}</span>`;
-}
-
-function positionShadowCue(group, npc) {
-  if (!group || !npc) return;
-  const facing = getFacingVector(npc.group.rotation.y);
-  group.position.set(
-    npc.group.position.x - facing.x * 0.18,
-    0.062,
-    npc.group.position.z - facing.y * 0.18,
-  );
-  group.rotation.y = npc.group.rotation.y * 0.08;
-}
 
 function getTempleMoonInfluence(position) {
   const moonPoint = levelState?.temple?.moonPoint;
@@ -2847,91 +2371,6 @@ function getTempleMoonInfluence(position) {
   return THREE.MathUtils.clamp((TEMPLE_MOON_RADIUS - distance) / TEMPLE_SHADOW_FADE, 0, 1);
 }
 
-function makeShadowMaterial(opacity = 0) {
-  return new THREE.MeshBasicMaterial({
-    color: 0x12352f,
-    transparent: true,
-    opacity,
-    depthWrite: false,
-    depthTest: false,
-  });
-}
-
-function addShadowMesh(group, geometry, x, z, rz, baseOpacity, scaleX = 1, scaleZ = 1) {
-  const mesh = new THREE.Mesh(geometry, makeShadowMaterial());
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.rotation.z = rz;
-  mesh.position.set(x, 0.026, z);
-  mesh.scale.set(scaleX, scaleZ, 1);
-  mesh.renderOrder = 3;
-  mesh.userData.baseOpacity = baseOpacity;
-  group.add(mesh);
-  group.userData.shadowMeshes.push(mesh);
-}
-
-function createTempleLocalShadow(style = "bamboo", seed = 0) {
-  const group = new THREE.Group();
-  group.visible = false;
-  group.userData.shadowMeshes = [];
-
-  const sway = Math.sin(seed * 1.73) * 0.12;
-
-  if (style === "bamboo") {
-    SU_SHI_SHADOW_PATTERN.forEach(({ x, z, length, width, rz, opacity }) => {
-      addShadowMesh(group, new THREE.PlaneGeometry(width, length), x, z, rz, opacity);
-    });
-  } else if (style === "fan") {
-    addShadowMesh(group, new THREE.CircleGeometry(0.74, 24, 0.1, Math.PI * 0.86), -0.1, -0.12, -0.72 + sway, 0.3, 1.35, 0.72);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.38), -0.18, 0.02, -0.96, 0.18);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.05, 1.18), 0.04, 0.03, -0.55, 0.16);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.92), 0.25, 0.04, -0.18, 0.14);
-  } else if (style === "moon") {
-    addShadowMesh(group, new THREE.RingGeometry(0.48, 0.68, 28, 2, -0.35, Math.PI * 1.35), 0, 0.02, 0.34 + sway, 0.32, 1.25, 0.72);
-    addShadowMesh(group, new THREE.RingGeometry(0.3, 0.38, 20, 2, 0.2, Math.PI * 1.05), 0.26, -0.08, -0.45, 0.18, 1.2, 0.7);
-  } else if (style === "window") {
-    addShadowMesh(group, new THREE.RingGeometry(0.56, 0.64, 4), 0, 0.02, Math.PI / 4 + sway, 0.26, 1.25, 0.82);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.28), 0, 0.02, 0.05 + sway, 0.18);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.28), 0, 0.02, Math.PI / 2 + sway, 0.18);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.98), -0.24, 0.0, 0.05 + sway, 0.14);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.98), 0.24, 0.0, 0.05 + sway, 0.14);
-  } else if (style === "stone") {
-    addShadowMesh(group, new THREE.CircleGeometry(0.62, 18), -0.06, 0.02, 0.1 + sway, 0.24, 1.45, 0.72);
-    addShadowMesh(group, new THREE.CircleGeometry(0.32, 12), 0.42, -0.12, -0.2, 0.18, 1.25, 0.7);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.045, 0.82), -0.22, 0.08, 0.86, 0.13);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.04, 0.72), 0.16, -0.04, -0.62, 0.12);
-  } else if (style === "leaf") {
-    addShadowMesh(group, new THREE.CircleGeometry(0.56, 28), -0.08, 0.02, -0.28 + sway, 0.26, 0.82, 1.48);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.055, 1.28), -0.08, 0.02, -0.28 + sway, 0.18);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.04, 0.62), 0.08, 0.2, 0.58, 0.12);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.04, 0.58), -0.26, -0.08, -1.04, 0.12);
-  } else {
-    addShadowMesh(group, new THREE.PlaneGeometry(0.08, 1.55), -0.34, 0.02, -0.12 + sway, 0.24);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.06, 1.28), -0.08, 0.1, 0.08 + sway, 0.2);
-    addShadowMesh(group, new THREE.PlaneGeometry(0.05, 1.06), 0.18, -0.02, 0.28 + sway, 0.17);
-    addShadowMesh(group, new THREE.CircleGeometry(0.22, 12), 0.44, 0.18, 0.2, 0.12, 1.45, 0.52);
-  }
-
-  return group;
-}
-
-function setTempleLocalShadow(actor, influence, strength = 1, pulse = 1) {
-  const data = actor?.group?.userData;
-  if (!data?.groundShadow) return;
-  const level = THREE.MathUtils.clamp(influence, 0, 1);
-  const visible = level > 0.02;
-
-  data.groundShadow.visible = visible;
-  data.groundShadow.material.opacity = data.groundShadow.userData.baseOpacity * level * strength;
-
-  if (data.localBambooShadow) {
-    data.localBambooShadow.visible = visible;
-    data.localBambooShadow.scale.setScalar(0.9 + level * 0.12);
-  }
-
-  data.localBambooShadow?.userData.shadowMeshes?.forEach((mesh) => {
-    mesh.material.opacity = mesh.userData.baseOpacity * level * strength * pulse;
-  });
-}
 
 function updateTempleShadows() {
   if (levelState?.level?.id !== "temple") return;
@@ -2953,106 +2392,6 @@ function updateTempleShadows() {
 }
 
 
-function createBloodmoonClawCue(intensity = 0) {
-  const group = new THREE.Group();
-  group.visible = intensity > 0;
-  group.userData.shadowMeshes = [];
-
-  const material = new THREE.MeshBasicMaterial({
-    color: 0x040204,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-  });
-  const bloodGlowMat = new THREE.MeshBasicMaterial({
-    color: 0xff3145,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-  });
-
-  const halo = new THREE.Mesh(new THREE.CircleGeometry(0.82, 32), bloodGlowMat.clone());
-  halo.rotation.x = -Math.PI / 2;
-  halo.position.set(0, 0.008, 0.06);
-  halo.scale.set(1.12, 0.78, 1);
-  halo.renderOrder = 9;
-  halo.userData.baseOpacity = 0.34;
-  halo.userData.part = "halo";
-  group.add(halo);
-  group.userData.shadowMeshes.push(halo);
-
-  const palm = new THREE.Mesh(new THREE.CircleGeometry(0.52, 24), material.clone());
-  palm.rotation.x = -Math.PI / 2;
-  palm.scale.set(1.0, 0.74, 1);
-  palm.position.set(0, 0.01, 0.08);
-  palm.renderOrder = 10;
-  palm.userData.baseOpacity = 0.68;
-  palm.userData.part = "palm";
-  group.add(palm);
-  group.userData.shadowMeshes.push(palm);
-
-  [-0.3, -0.1, 0.1, 0.3].forEach((x, i) => {
-    const toe = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.58 + i * 0.03, 3), material.clone());
-    toe.rotation.x = -Math.PI / 2;
-    toe.rotation.z = (x * -0.8);
-    toe.position.set(x, 0.012, -0.46 - Math.abs(x) * 0.1);
-    toe.scale.set(0.72, 1, 0.8);
-    toe.renderOrder = 11;
-    toe.userData.baseOpacity = 0.78;
-    toe.userData.part = "toe";
-    toe.userData.partIndex = i;
-    group.add(toe);
-    group.userData.shadowMeshes.push(toe);
-  });
-
-  const slashMat = new THREE.MeshBasicMaterial({
-    color: 0xffedf0,
-    transparent: true,
-    opacity: 0,
-    depthWrite: false,
-    depthTest: false,
-  });
-  [-0.26, 0, 0.26].forEach((x, i) => {
-    const slash = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 1.04), slashMat.clone());
-    slash.rotation.x = -Math.PI / 2;
-    slash.rotation.z = -0.36 + i * 0.36;
-    slash.position.set(x, 0.018, -0.02);
-    slash.renderOrder = 12;
-    slash.userData.baseOpacity = 0.56;
-    slash.userData.part = "slash";
-    slash.userData.partIndex = i;
-    group.add(slash);
-    group.userData.shadowMeshes.push(slash);
-  });
-
-  setBloodmoonClawIntensity(group, intensity);
-  return group;
-}
-
-function setBloodmoonClawIntensity(group, intensity, pulse = 1, completeness = 1) {
-  const level = THREE.MathUtils.clamp(intensity, 0, 1);
-  const complete = THREE.MathUtils.clamp(completeness, 0, 1);
-  group.visible = level > 0.02;
-  const jitter = group.userData.isDecoyCue ? Math.sin(totalTime * 18 + (group.userData.seed ?? 0)) * 0.07 : 0;
-  group.scale.setScalar(1.18 + level * (0.3 + complete * 0.28) + jitter);
-  group.userData.shadowMeshes?.forEach((mesh) => {
-    let partFactor = 1;
-    if (mesh.userData.part === "palm") partFactor = complete >= 0.34 ? 1 : 0.18;
-    if (mesh.userData.part === "toe") partFactor = complete >= (0.42 + mesh.userData.partIndex * 0.12) ? 1 : 0;
-    if (mesh.userData.part === "slash") partFactor = complete >= (0.74 + mesh.userData.partIndex * 0.08) ? 1 : 0;
-    if (group.userData.isDecoyCue && mesh.userData.part === "toe" && mesh.userData.partIndex === group.userData.missingToe) partFactor = 0;
-    mesh.material.opacity = mesh.userData.baseOpacity * level * pulse * partFactor;
-  });
-}
-
-function positionBloodmoonCue(group, npc) {
-  if (!group || !npc) return;
-  const facing = getFacingVector(npc.group.rotation.y);
-  group.position.set(npc.group.position.x - facing.x * 0.26, 0.092, npc.group.position.z - facing.y * 0.26);
-  group.rotation.y = npc.group.rotation.y * 0.08;
-}
 
 
 function initBloodmoonNpc(npc) {
@@ -3064,92 +2403,6 @@ function initBloodmoonNpc(npc) {
 }
 
 
-function decorateAsWerewolf(actor) {
-  const data = actor.group.userData;
-  const visual = data.visual;
-  const furMat = makeLowPolyMat(0x1b0b0f, 0.78);
-  const earInnerMat = makeLowPolyMat(0xef4444, 0.58);
-  const clawMat = makeLowPolyMat(0xf8fafc, 0.42);
-  const glowMat = new THREE.MeshBasicMaterial({ color: 0xff3b4f, transparent: true, opacity: 0.32, depthWrite: false });
-
-  const leftEar = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.34, 4), furMat);
-  leftEar.position.set(-0.2, 2.02, -0.02);
-  leftEar.rotation.set(0.12, 0.26, -0.24);
-  leftEar.castShadow = true;
-  const rightEar = leftEar.clone();
-  rightEar.material = furMat;
-  rightEar.position.x = 0.2;
-  rightEar.rotation.z = 0.24;
-  visual.add(leftEar, rightEar);
-
-  const wolfParts = [leftEar, rightEar];
-  wolfParts.push(addFacetedBox(visual, 0.09, 0.16, 0.035, earInnerMat, -0.2, 1.99, 0.04, 0.1, 0.16, -0.2));
-  wolfParts.push(addFacetedBox(visual, 0.09, 0.16, 0.035, earInnerMat, 0.2, 1.99, 0.04, 0.1, -0.16, 0.2));
-  wolfParts.push(addFacetedBox(visual, 0.36, 0.12, 0.24, furMat, 0, 1.7, -0.14, 0.08, 0, 0));
-
-  [-0.055, 0, 0.055].forEach((x, i) => {
-    wolfParts.push(addFacetedBox(data.leftArm, 0.025, 0.18, 0.045, clawMat, x, -0.52, 0.09, -0.32, 0, -0.12 + i * 0.12));
-    wolfParts.push(addFacetedBox(data.rightArm, 0.025, 0.18, 0.045, clawMat, x, -0.52, 0.09, -0.32, 0, -0.12 + i * 0.12));
-  });
-
-  const cape = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.35, 4, 1, true), glowMat);
-  cape.position.set(0, 0.88, -0.52);
-  cape.rotation.set(Math.PI * 0.5, Math.PI / 4, 0);
-  cape.scale.set(0.72, 1.0, 0.28);
-  visual.add(cape);
-  wolfParts.push(cape);
-
-  data.wolfCape = cape;
-  data.wolfParts = wolfParts;
-  data.colors = [0x4b1418, 0x20202a, 0xf0b88c, 0x1b0b0f, 0xef4444, 0xf8fafc];
-  actor.isWerewolf = true;
-  return actor;
-}
-
-function decorateAsWolfGuard(actor) {
-  const data = actor.group.userData;
-  const visual = data.visual;
-  const armorMat = makeLowPolyMat(0x171717, 0.68);
-  const furMat = makeLowPolyMat(0x2a0c12, 0.78);
-  const redMat = makeLowPolyMat(0xdc2626, 0.5);
-  const bladeMat = makeLowPolyMat(0xdbeafe, 0.34);
-  const hiltMat = makeLowPolyMat(0x78350f, 0.64);
-
-  const guardParts = [];
-  const leftEar = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.38, 4), furMat);
-  leftEar.position.set(-0.22, 2.05, -0.02);
-  leftEar.rotation.set(0.14, 0.26, -0.3);
-  const rightEar = leftEar.clone();
-  rightEar.material = furMat;
-  rightEar.position.x = 0.22;
-  rightEar.rotation.z = 0.3;
-  visual.add(leftEar, rightEar);
-  guardParts.push(leftEar, rightEar);
-
-  guardParts.push(addFacetedBox(visual, 0.62, 0.18, 0.26, armorMat, 0, 1.22, 0.02));
-  guardParts.push(addFacetedBox(visual, 0.28, 0.14, 0.1, redMat, 0, 1.28, 0.22));
-  guardParts.push(addFacetedBox(visual, 0.44, 0.18, 0.26, furMat, 0, 1.72, -0.14, 0.08, 0, 0));
-
-  const sword = new THREE.Group();
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.92, 0.06), bladeMat);
-  blade.position.y = 0.46;
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 4), bladeMat);
-  tip.position.y = 0.98;
-  tip.rotation.z = Math.PI / 4;
-  const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.08, 0.08), hiltMat);
-  hilt.position.y = 0.02;
-  sword.add(blade, tip, hilt);
-  sword.position.set(0.52, 0.86, 0.18);
-  sword.rotation.set(-0.18, 0.18, -0.62);
-  visual.add(sword);
-  guardParts.push(sword);
-
-  data.wolfParts = guardParts;
-  data.wolfCape = null;
-  data.colors = [0x171717, 0x2a0c12, 0xdc2626, 0xdbeafe, 0x78350f];
-  actor.isWerewolf = false;
-  return actor;
-}
 
 function updateBloodmoonStorm(dt) {
   const state = levelState.bloodmoon;
@@ -3613,7 +2866,7 @@ function updateBloodmoonTargetCue() {
     }
     positionBloodmoonCue(cue, npc);
     const flicker = 0.56 + Math.abs(Math.sin(totalTime * 20 + cue.userData.seed)) * 0.34;
-    setBloodmoonClawIntensity(cue, intensity * 0.82, flicker, cue.userData.decoyCompleteness);
+    setBloodmoonClawIntensity(cue, intensity * 0.82, flicker, cue.userData.decoyCompleteness, totalTime);
   });
 }
 
@@ -4083,25 +3336,6 @@ function randomMeetingPoint() {
   return point;
 }
 
-function setBlackEye(npc, intensity) {
-  npc.marked = true;
-  npc.markIntensity = Math.max(npc.markIntensity, intensity);
-  const i = npc.markIntensity;
-  npc.group.userData.blackMarks.forEach((mesh) => {
-    mesh.material.opacity = 0.58 + i * 0.42;
-    const base = mesh.userData.isTopView ? 1.05 : 0.9;
-    mesh.scale.setScalar(base + i * 0.7);
-  });
-}
-
-function setLipstick(npc, intensity) {
-  npc.marked = true;
-  npc.markIntensity = Math.max(npc.markIntensity, intensity);
-  npc.group.userData.lipMarks.forEach((mesh) => {
-    mesh.material.opacity = 0.25 + npc.markIntensity * 0.75;
-    mesh.scale.set(1 + npc.markIntensity * 2.8, 1 + npc.markIntensity * 1.8, 1);
-  });
-}
 
 function setSuShiClues(npc, intensity) {
   const clueIntensity = npc.isSuShiTarget ? Math.min(intensity, TEMPLE_TRUE_SHADOW_MAX) : intensity;
@@ -4332,10 +3566,16 @@ function triggerAttack() {
   }
 
   if (isDuelActive()) {
-    const remoteInRange = isRemoteInPunchRange();
-    const remoteHit = remoteInRange && !isConnected() ? damageRemotePlayer() : false;
-    const npcTarget = remoteInRange ? null : findDuelNpcTarget();
-    const npcHit = npcTarget ? damageDuelNpc(npcTarget) : false;
+    const punchTarget = findDuelPunchTarget();
+    let remoteHit = false;
+    let npcHit = false;
+
+    if (punchTarget?.type === "remote") {
+      remoteHit = !isConnected() ? damageRemotePlayer() : true;
+    } else if (punchTarget?.type === "npc") {
+      npcHit = damageDuelNpc(punchTarget.actor);
+    }
+
     if (isConnected()) {
       syncPunch(
         player.group.position.x,
@@ -4347,10 +3587,11 @@ function triggerAttack() {
         },
       );
     }
-    if (remoteHit || npcHit || (remoteInRange && isConnected())) {
-      triggerHitstop(0.06);
-      triggerShake(0.22, 0.14);
-      if (remoteHit || npcHit) sfxHit();
+
+    if (remoteHit || npcHit) {
+      triggerHitstop(npcHit ? 0.08 : 0.06);
+      triggerShake(npcHit ? 0.28 : 0.22, npcHit ? 0.16 : 0.14);
+      sfxHit();
     }
     return;
   }
@@ -4388,18 +3629,15 @@ function triggerAttack() {
   }
 
   if (isBloodmoon) {
+    dissolveNpc(hit.npc);
+    compactDeadNpcs();
+    triggerHitstop(0.06);
     triggerShake(0.14, 0.1);
     sfxMiss();
     if (levelState.bloodmoon) {
       levelState.bloodmoon.revealCount = Math.max(0, (levelState.bloodmoon.revealCount ?? 0) - 1);
     }
-    if (hit.npc) {
-      hit.npc.hostility = Math.min(2.6, (hit.npc.hostility ?? 1) + 0.55);
-      hit.npc.alertTimer = 0;
-      hit.npc.attackCooldown = Math.min(hit.npc.attackCooldown ?? 0.8, 0.24);
-      faceNpcToward(hit.npc, player.group.position);
-    }
-    levelState.hostility = Math.min(2.35, levelState.hostility + 0.18);
+    levelState.hostility = Math.min(2.35, levelState.hostility + 0.12);
     return;
   }
 
@@ -4415,7 +3653,8 @@ function triggerAttack() {
 
 function findHitTarget() {
   const playerPos = player.group.position;
-  const facing = getFacingVector(player.group.rotation.y);
+  getFacingVector(player.group.rotation.y, scratchFacing);
+  const facing = scratchFacing;
 
   if (levelState.level.id === "library" && levelState.pair) {
     const [a, b] = levelState.pair.members;
@@ -4459,9 +3698,6 @@ function isFacingTarget(facing, toTarget) {
   return facing.dot(toTarget) >= HIT_FACING_DOT;
 }
 
-function getFacingVector(rotationY, out = scratchFacing) {
-  return out.set(Math.sin(rotationY), Math.cos(rotationY));
-}
 
 function compactDeadNpcs() {
   const huntBoss = levelState.bloodmoon?.huntBoss;
@@ -4492,7 +3728,7 @@ function dissolveActor(actor) {
 }
 
 function createPixelBurst(npc) {
-  const colors = npc.group.userData.colors;
+  const colors = npc.group.userData.colors ?? [0x4b5563, 0x9ca3af, 0xf0b88c, 0x1f2937, 0xe5e7eb];
   for (let i = 0; i < 58; i += 1) {
     const color = colors[i % colors.length];
     const material = getPixelMaterial(color);
