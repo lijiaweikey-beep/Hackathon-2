@@ -73,7 +73,11 @@
       <div id="levelSelectPanel" class="level-select-panel">
         <header class="level-select-header">
           <div id="gameLogo" class="game-logo">🔥 别让我逮到你 🔥</div>
-          <p class="level-select-tagline">俯视角 · 人群中找人 · 一拳击倒</p>
+          <div class="level-select-tags">
+            <span class="level-tag">适合8人</span>
+            <span class="level-tag">4种玩法</span>
+            <span class="level-tag">一多点用</span>
+          </div>
         </header>
 
         <div id="duelLobbyPanel" class="duel-lobby-panel" hidden>
@@ -111,16 +115,22 @@
                     aria-describedby="npcCountHint"
                   />
                 </div>
-                <span id="npcCountHint" class="match-settings-hint">10–100 人（含目标）</span>
+                <span id="npcCountHint" class="match-settings-hint">10–100 人（多点用）</span>
+                <div class="match-settings-arrows">
+                  <button class="match-settings-arrow up" type="button" aria-label="增加人数">↑</button>
+                  <button class="match-settings-arrow down" type="button" aria-label="减少人数">↓</button>
+                </div>
               </div>
             </div>
           </div>
           <p class="level-section-label">选择关卡</p>
-          <div id="levelCards" class="level-cards"></div>
+          <div id="levelCards" class="level-cards">
+            <!-- 关卡卡片将通过JavaScript动态生成 -->
+          </div>
           <div class="level-section-divider" aria-hidden="true"><span>或</span></div>
           <button id="mpCreateBtn" class="mp-create-btn" type="button">
-            <span class="mp-create-btn-icon" aria-hidden="true">⚔️</span>
-            <span class="mp-create-btn-text">创建联机房间 · 双人决斗</span>
+            <span class="mp-create-btn-icon" aria-hidden="true">🎮</span>
+            <span class="mp-create-btn-text">创建私房间网 · 找人游玩</span>
           </button>
         </div>
       </div>

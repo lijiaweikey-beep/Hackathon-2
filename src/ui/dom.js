@@ -26,6 +26,8 @@ export const ui = {
   taskAttemptsChip: document.querySelector("#taskAttempts")?.parentElement,
   taskNpcCount: document.querySelector("#taskNpcCount"),
   npcCountInput: document.querySelector("#npcCountInput"),
+  npcCountUp: document.querySelector(".match-settings-arrow.up"),
+  npcCountDown: document.querySelector(".match-settings-arrow.down"),
   targetPreviewCanvas: document.querySelector("#targetPreviewCanvas"),
   targetLabel: document.querySelector("#targetLabel"),
   attackIcon: document.querySelector("#attackButton span"),
