@@ -9,6 +9,21 @@ async function readSource(relativePath) {
   return readFile(new URL(relativePath, sourceRoot), "utf8");
 }
 
+async function readDirectorySources(relativePath) {
+  const root = new URL(relativePath, sourceRoot);
+  const sources = [];
+  async function visit(directory) {
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const url = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directory);
+      if (entry.isDirectory()) await visit(url);
+      else if (entry.name.endsWith(".js")) sources.push(await readFile(url, "utf8"));
+    }
+  }
+  await visit(root);
+  return sources;
+}
+
 test("活动应用不导入休眠双人模式", async () => {
   const source = await readSource("game.js");
   assert.doesNotMatch(source, /modes\/duel|multiplayer/);
@@ -90,8 +105,18 @@ test("共享运行时不按具体关卡标识或资源变体分派", async () =>
 });
 
 test("共享运行时不包含关卡专属界面标识", async () => {
-  const source = await readSource("game.js");
-  assert.doesNotMatch(source, /bloodmoon|huntIntro|huntCard/);
+  const sources = [
+    await readSource("game.js"),
+    ...await readDirectorySources("runtime/"),
+    ...await readDirectorySources("systems/"),
+    ...await readDirectorySources("ui/"),
+  ];
+  for (const source of sources) {
+    assert.doesNotMatch(
+      source,
+      /gaming|library|temple|bloodmoon|isWerewolf|wolfCape|huntIntro|huntCard/i,
+    );
+  }
 });
 
 test("共享运行时不读取关卡专属角色特征", async () => {
@@ -115,4 +140,9 @@ test("共享配置和场景构建器不包含血月专属实现", async () => {
   ]);
   assert.doesNotMatch(constants, /BLOODMOON_/);
   assert.doesNotMatch(worldBuilder, /buildBloodmoonStreet|bloodmoon/i);
+});
+
+test("全局样式不包含具体关卡选择器", async () => {
+  const styles = await readSource("styles.css");
+  assert.doesNotMatch(styles, /gaming|library|temple|bloodmoon|hunt-/i);
 });

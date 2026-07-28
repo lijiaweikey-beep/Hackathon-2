@@ -749,21 +749,6 @@ button {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
-.level-card--gaming {
-  --card-accent: #818cf8;
-  --card-glow: rgba(129, 140, 248, 0.28);
-}
-
-.level-card--library {
-  --card-accent: #2dd4bf;
-  --card-glow: rgba(45, 212, 191, 0.28);
-}
-
-.level-card--temple {
-  --card-accent: #fbbf24;
-  --card-glow: rgba(251, 191, 36, 0.28);
-}
-
 .level-card-accent {
   position: absolute;
   left: 0;
