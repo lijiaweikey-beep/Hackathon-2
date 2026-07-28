@@ -72,25 +72,20 @@ import {
   isDuelLevel as checkDuelLevel,
 } from "./config/levels.js";
 import { canvas, ui } from "./ui/dom.js";
+import { renderTargetPreview } from "./ui/targetPreview.js";
+import { renderTaskModal } from "./ui/taskModal.js";
 import { clampToWorld, lerpAngle, gridKey, getFacingVector } from "./utils/math.js";
 import {
-  LOW_POLY_PLAYER_PALETTE,
-  LOW_POLY_NPC_PALETTES,
-  LOW_POLY_REMOTE_PALETTE,
-} from "./entities/palettes.js";
-import { createLowPolyPerson } from "./entities/lowPolyPerson.js";
-import { createTemplePerson } from "./entities/templePerson.js";
-import {
-  createSuShiShadowCue,
   setShadowCueIntensity,
   positionShadowCue,
   setTempleLocalShadow,
   renderSuShiShadowMarkHtml,
+  createSuShiShadowCue,
 } from "./entities/templeShadows.js";
 import {
-  createBloodmoonClawCue,
   setBloodmoonClawIntensity,
   positionBloodmoonCue,
+  createBloodmoonClawCue,
 } from "./entities/bloodmoonCues.js";
 import {
   createPlayer as createPlayerEntity,
@@ -153,6 +148,12 @@ import {
   collectDuelSnapshot as collectDuelSnapshotFromState,
   buildGameStatePayload as buildGameStatePayloadFromState,
 } from "./multiplayer/duelSync.js";
+import {
+  formatDuelGatherCountdown,
+  generateDuelHerdDirection,
+  getDuelGatherHudHint as getDuelGatherHudHintFromState,
+  getDuelGatherUiState as buildDuelGatherUiState,
+} from "./modes/duel/rules.js";
 
 let renderer;
 let scene;
@@ -200,100 +201,6 @@ let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
 let punchTier = 0; // 0=第1拳(1s), 1+=后续(2s)
 let punchResetTimer = 0; // 停止出拳后重置计时
 let totalTime = 0;
-
-/* ---- 3D 目标预览渲染器 ---- */
-let previewRenderer = null;
-let previewScene = null;
-let previewCamera = null;
-
-function initPreviewRenderer() {
-  if (previewRenderer) return;
-  previewRenderer = new THREE.WebGLRenderer({
-    canvas: ui.targetPreviewCanvas,
-    antialias: true,
-    alpha: true,
-  });
-  previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  previewRenderer.outputColorSpace = THREE.SRGBColorSpace;
-
-  previewScene = new THREE.Scene();
-  previewCamera = new THREE.PerspectiveCamera(28, 200 / 220, 0.1, 50);
-  previewCamera.position.set(0, 2.2, 3.6);
-  previewCamera.lookAt(0, 0.9, 0);
-
-  const ambient = new THREE.AmbientLight(0xffffff, 0.7);
-  previewScene.add(ambient);
-  const key = new THREE.DirectionalLight(0xffffff, 1.2);
-  key.position.set(2, 4, 3);
-  previewScene.add(key);
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.4);
-  fill.position.set(-2, 2, -1);
-  previewScene.add(fill);
-}
-
-function renderTargetPreview(level) {
-  initPreviewRenderer();
-  // 清除旧模型
-  while (previewScene.children.length > 3) {
-    previewScene.remove(previewScene.children[3]);
-  }
-
-  const bg = level.id === "bloodmoon" ? 0x21060b : level.lighting === "night" ? 0x0c1424 : 0xd0dce8;
-  previewScene.background = new THREE.Color(bg);
-
-  if (level.id === "gaming") {
-    const npc = createNpc(0, { gamingTarget: true });
-    setBlackEye(npc, 1);
-    previewScene.add(npc.group);
-  } else if (level.duelMode) {
-    const local = createLowPolyPerson(LOW_POLY_PLAYER_PALETTE);
-    const remote = createLowPolyPerson(LOW_POLY_REMOTE_PALETTE);
-    local.group.position.set(-0.5, 0, 0);
-    remote.group.position.set(0.5, 0, 0);
-    local.group.rotation.y = 0.4;
-    remote.group.rotation.y = -0.4;
-    previewScene.add(local.group, remote.group);
-  } else if (level.id === "library") {
-    // 情侣：两个人面对面
-    const a = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
-    const b = createLowPolyPerson(LOW_POLY_NPC_PALETTES[1]);
-    a.group.position.set(-0.32, 0, 0);
-    b.group.position.set(0.32, 0, 0);
-    a.group.rotation.y = 0.5;
-    b.group.rotation.y = -0.5;
-    // 渲染口红印效果
-    [a, b].forEach((npc) => {
-      npc.group.userData.lipMarks.forEach((m) => {
-        m.material = m.material.clone();
-        m.material.opacity = 0.9;
-        m.scale.set(3.8, 2.8, 1);
-      });
-    });
-    previewScene.add(a.group, b.group);
-  } else if (level.id === "bloodmoon") {
-    const cue = createBloodmoonClawCue(1);
-    cue.position.set(0, 0.045, 0.16);
-    previewScene.add(cue);
-
-    const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[2]);
-    npc.group.rotation.y = -0.35;
-    previewScene.add(npc.group);
-  } else if (level.id === "temple") {
-    const cue = createSuShiShadowCue(1);
-    cue.position.set(0, 0.045, 0.08);
-    previewScene.add(cue);
-
-    const npc = createTemplePerson("bamboo", 0);
-    npc.group.rotation.y = -0.35;
-    previewScene.add(npc.group);
-  } else {
-    const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
-    npc.group.rotation.y = -0.35;
-    previewScene.add(npc.group);
-  }
-
-  previewRenderer.render(previewScene, previewCamera);
-}
 
 /* ---- NPC 人数设置 ---- */
 function getMatchNpcCount() {
@@ -1472,20 +1379,6 @@ function resetLevel(index, options = {}) {
   updateHud();
 }
 
-function updateTaskAttemptsChip(duel) {
-  const chip = document.querySelector("#taskAttemptsChip");
-  if (!chip) return;
-  const level = levelState?.level;
-  if (duel) {
-    chip.innerHTML = `生命 <span id="taskAttempts" class="hearts-display">${formatHearts(DUEL_PLAYER_HP)}</span>`;
-  } else if (level?.id === "bloodmoon") {
-    chip.innerHTML = `理智 <span id="taskAttempts">${BLOODMOON_SANITY_MAX}</span>`;
-  } else {
-    chip.innerHTML = `🥊 <span id="taskAttempts">${ATTEMPTS}</span> 次机会`;
-  }
-  ui.taskAttempts = document.querySelector("#taskAttempts");
-}
-
 function spawnPunchSwish(actor) {
   if (!scene || !actor?.group) return;
   const pos = actor.group.position;
@@ -1518,22 +1411,13 @@ function spawnPunchSwish(actor) {
 function showTask() {
   const level = levelState.level;
   const duel = isDuelLevel(level);
-  ui.taskEmoji.textContent = level.emoji;
-  ui.taskTitle.textContent = level.sceneName;
-  ui.taskCopy.textContent = level.mission;
-  ui.taskClue.textContent = "🔍 " + level.clue;
-  ui.taskNpcCount.textContent = duel ? DUEL_NPC_COUNT : getMatchNpcCount();
-  ui.taskTime.textContent = duel || level.id === "bloodmoon" ? "∞" : ROUND_SECONDS;
-  updateTaskAttemptsChip(duel);
-  ui.targetLabel.textContent = duel ? "对手" : level.targetDesc;
-  ui.levelSelectModal.classList.remove("visible");
-  ui.taskModal.classList.add("visible");
-  ui.resultModal.classList.remove("visible");
-  ui.retryButton.disabled = false;
-  ui.retryButton.textContent = "再来一局";
+  renderTaskModal(ui, {
+    level,
+    duel,
+    npcCount: getMatchNpcCount(),
+  });
 
-  // 渲染 3D 目标预览
-  renderTargetPreview(level);
+  renderTargetPreview(ui.targetPreviewCanvas, level);
   updateTaskMpUI();
   updateHud();
 }
@@ -1758,81 +1642,18 @@ function removeGatherMarker() {
   duelGatherMarker = null;
 }
 
-function formatGatherCountdown(seconds) {
-  const total = Math.max(0, Math.ceil(seconds));
-  const minutes = Math.floor(total / 60);
-  const remainder = total % 60;
-  if (minutes > 0) return `${minutes}:${String(remainder).padStart(2, "0")}`;
-  return `${total}s`;
-}
-
 function getDuelGatherUiState() {
   if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) return null;
 
   const elapsed = Math.max(0, totalTime - levelState.startTime);
-  const gatherIndex = Math.floor(elapsed / DUEL_GATHER_INTERVAL);
-  const phaseInCycle = elapsed - gatherIndex * DUEL_GATHER_INTERVAL;
-  const timeToDeadline = DUEL_GATHER_INTERVAL - phaseInCycle;
-  const timeToPreview = Math.max(0, timeToDeadline - DUEL_GATHER_PREVIEW);
-  const inCircle = isPlayerInGatherCircle();
-
-  if (timeToDeadline > DUEL_GATHER_PREVIEW) {
-    if (timeToPreview <= 12) {
-      return {
-        bannerVisible: true,
-        phase: "upcoming",
-        seconds: timeToPreview,
-        title: "即将集合报到",
-        hint: "绿圈马上出现 · 站进去报到 · 最后 5 秒必须在圈内 · 否则扣 1 ❤️",
-      };
-    }
-    return {
-      bannerVisible: false,
-      clueHint: `⏳ ${formatGatherCountdown(timeToPreview)} 后出现集合圈 · 未报到扣 1 ❤️`,
-    };
-  }
-
-  if (timeToDeadline <= 0) return null;
-
-  const seconds = timeToDeadline;
-  if (timeToDeadline <= DUEL_GATHER_WINDOW) {
-    if (inCircle) {
-      return {
-        bannerVisible: true,
-        phase: "success",
-        seconds,
-        title: "已在集合圈内",
-        hint: `保持站立 · 剩余 ${formatGatherCountdown(seconds)} · 离开会扣 1 ❤️`,
-      };
-    }
-    return {
-      bannerVisible: true,
-      phase: "urgent",
-      seconds,
-      title: "立刻进入集合圈！",
-      hint: `地面红圈内站好 · 剩余 ${formatGatherCountdown(seconds)} · 未进圈扣 1 ❤️`,
-    };
-  }
-
-  return {
-    bannerVisible: true,
-    phase: "preview",
-    seconds,
-    title: "集合报到",
-    hint: `走到地面绿圈内 · 截止 ${formatGatherCountdown(seconds)} · 最后 5 秒必须在圈里 · 否则扣 1 ❤️`,
-  };
+  return buildDuelGatherUiState({
+    elapsed,
+    inCircle: isPlayerInGatherCircle(),
+  });
 }
 
 function getDuelGatherHudHint() {
-  const state = getDuelGatherUiState();
-  if (!state) return "";
-  if (state.bannerVisible) {
-    if (state.phase === "urgent") return `🔴 ${state.title} ${formatGatherCountdown(state.seconds)}`;
-    if (state.phase === "success") return `✅ ${state.title} ${formatGatherCountdown(state.seconds)}`;
-    if (state.phase === "upcoming") return `⏳ ${formatGatherCountdown(state.seconds)} 后出圈`;
-    return `📍 ${state.title} · ${formatGatherCountdown(state.seconds)}`;
-  }
-  return state.clueHint || "";
+  return getDuelGatherHudHintFromState(getDuelGatherUiState());
 }
 
 function updateGatherBanner() {
@@ -1848,7 +1669,7 @@ function updateGatherBanner() {
   ui.gatherBanner.classList.remove("hidden", "preview", "urgent", "success", "upcoming");
   ui.gatherBanner.classList.add(state.phase);
   ui.gatherBannerTitle.textContent = state.title;
-  ui.gatherBannerCountdown.textContent = formatGatherCountdown(state.seconds);
+  ui.gatherBannerCountdown.textContent = formatDuelGatherCountdown(state.seconds);
   ui.gatherBannerHint.textContent = state.hint;
   if (ui.hud) ui.hud.classList.add("gather-active");
 }
@@ -1943,12 +1764,6 @@ function updateDuelGather() {
   if (activeWindow && isPlayerInGatherCircle()) {
     duelGatherMetWindow = true;
   }
-}
-
-function generateDuelHerdDirection(cycleIndex, worldSeed) {
-  const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 2654435761));
-  const angle = rng() * Math.PI * 2;
-  return new THREE.Vector2(Math.sin(angle), Math.cos(angle)).normalize();
 }
 
 function updateDuelHerdState() {
