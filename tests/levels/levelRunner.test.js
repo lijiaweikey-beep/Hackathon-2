@@ -82,3 +82,20 @@ test("关卡动作可以向主循环返回结果", () => {
 
   assert.deepEqual(runner.handleAction({ type: "inspect" }), { received: "inspect" });
 });
+
+test("关卡更新可以向主循环返回帧结果", () => {
+  const runner = createLevelRunner({
+    createContext: ({ scope }) => ({ scope }),
+  });
+  const definition = createDefinition("frame", []);
+  definition.createLevel = () => ({
+    start() {},
+    update: () => ({ pauseWorld: true }),
+    handleAction() {},
+    dispose() {},
+  });
+
+  runner.load(definition);
+
+  assert.deepEqual(runner.update(0.1), { pauseWorld: true });
+});

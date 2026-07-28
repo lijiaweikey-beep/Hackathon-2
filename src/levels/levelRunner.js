@@ -58,11 +58,12 @@ export function createLevelRunner({ createContext, onError = () => {} }) {
     },
 
     update(deltaSeconds) {
-      if (!active) return;
+      if (!active) return undefined;
       try {
-        active.instance.update(deltaSeconds);
+        return active.instance.update(deltaSeconds);
       } catch (error) {
         fail(error, active.definition);
+        return undefined;
       }
     },
 
