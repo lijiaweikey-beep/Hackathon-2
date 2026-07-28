@@ -28,6 +28,12 @@ function createFakeContext({ npcCount = 4 } = {}) {
   const created = [];
   const overlays = [];
   const player = createActor(-1);
+  const records = {
+    created,
+    overlays,
+    introSounds: 0,
+    player,
+  };
   const sceneData = {
     lightningTimer: 100,
     lightningFlash: 0,
@@ -45,88 +51,98 @@ function createFakeContext({ npcCount = 4 } = {}) {
   const context = {
     definition: { hudMission: "找到引路人" },
     sceneData,
-    npcCount,
-    npcSpeed: 3,
-    created,
-    overlays,
-    introSounds: 0,
-    player,
-    createNpc(id, flags) {
-      const actor = createActor(id, flags);
-      created.push(actor);
-      return actor;
+    actors: {
+      npcCount,
+      npcSpeed: 3,
+      createNpc(id, flags) {
+        const actor = createActor(id, flags);
+        created.push(actor);
+        return actor;
+      },
+      addNpc() {},
+      addWanderNpc(id) {
+        return context.actors.createNpc(id, {});
+      },
+      getNpcs: () => created,
+      getPlayer: () => player,
+      dissolve(actor) {
+        actor.alive = false;
+        actor.group.visible = false;
+      },
+      compactDead() {},
+      randomizePosition() {},
+      setPartsVisible() {},
     },
-    addNpc() {},
-    addWanderNpc(id) {
-      return context.createNpc(id, {});
+    time: {
+      getStatus: () => "playing",
+      getTotal: () => 0,
     },
-    getNpcs: () => created,
-    getPlayer: () => player,
-    getGameStatus: () => "playing",
-    getTotalTime: () => 0,
-    randomRange: (min) => min,
-    randomOpenPosition: () => new THREE.Vector3(8, 0, 8),
-    moveNpcToward: () => false,
-    faceNpcToward() {},
-    isActorFacingTarget: () => false,
-    dissolveNpc(actor) {
-      actor.alive = false;
-      actor.group.visible = false;
+    movement: {
+      randomOpenPosition: () => new THREE.Vector3(8, 0, 8),
+      moveNpcToward: () => false,
+      faceNpcToward() {},
+      isActorFacingTarget: () => false,
     },
-    compactDeadNpcs() {},
-    randomizeActorPosition() {},
-    setActorPartsVisible() {},
-    showOverlay(kind, html) {
-      overlays.push({ kind, html });
+    combat: {
+      triggerShake() {},
+      triggerHitstop() {},
+      finishLevel() {},
     },
-    hideOverlay() {},
-    flashHud() {},
-    playLevelSound() {},
-    triggerShake() {},
-    triggerHitstop() {},
-    finishLevel() {},
-    refreshHud() {},
-    resetPlayerInput() {},
-    effects: {
-      setBloodmoonClawIntensity() {},
-      positionBloodmoonCue() {},
+    ui: {
+      showOverlay(kind, html) {
+        overlays.push({ kind, html });
+      },
+      hideOverlay() {},
+      flashHud() {},
+      refreshHud() {},
+      resetPlayerInput() {},
     },
     audio: {
+      playSound() {},
       playIntro() {
-        context.introSounds += 1;
+        records.introSounds += 1;
+      },
+    },
+    random: {
+      range: (min) => min,
+    },
+    world: {
+      effects: {
+        setBloodmoonClawIntensity() {},
+        positionBloodmoonCue() {},
       },
     },
   };
-  return context;
+  return { context, records };
 }
 
 test("血月插件生成引路人与剩余角色", () => {
-  const context = createFakeContext({ npcCount: 4 });
+  const { context, records } = createFakeContext({ npcCount: 4 });
   const level = createBloodmoonLevel(context);
 
   level.start();
 
-  assert.deepEqual(context.created.map(({ id }) => id), [0, 1, 2, 3]);
-  assert.equal(context.created[0].isLevelTarget, true);
-  assert.equal(context.created[0].levelManaged, true);
+  assert.deepEqual(records.created.map(({ id }) => id), [0, 1, 2, 3]);
+  assert.equal(records.created[0].isLevelTarget, true);
+  assert.equal(records.created[0].levelManaged, true);
 });
 
 test("进入正式游戏时由血月关卡播放开场音效", () => {
-  const context = createFakeContext();
+  const { context, records } = createFakeContext();
   const level = createBloodmoonLevel(context);
 
   assert.deepEqual(level.handleAction({ type: "beginPlay" }), { handled: true });
-  assert.equal(context.introSounds, 1);
+  assert.equal(records.introSounds, 1);
 });
 
 test("第一次命中首领进入猎杀演出", () => {
-  const context = createFakeContext();
+  const { context, records } = createFakeContext();
   const level = createBloodmoonLevel(context);
   level.start();
 
   const result = level.handleAction({
     type: "hitTarget",
-    hit: { correct: true, npc: context.created[0] },
+    hit: { correct: true, npc: records.created[0] },
   });
 
   assert.deepEqual(result, { handled: true });
@@ -134,27 +150,27 @@ test("第一次命中首领进入猎杀演出", () => {
     level.handleAction({ type: "getHudState" }).mission,
     "血月引路人正在发动猎杀时刻...",
   );
-  assert.equal(context.created[0].preserveWhenDead, true);
-  assert.equal(context.overlays.at(-1).kind, "huntIntro");
+  assert.equal(records.created[0].preserveWhenDead, true);
+  assert.equal(records.overlays.at(-1).kind, "huntIntro");
 });
 
 test("猎杀演出结束后暂停世界并展示说明卡", () => {
-  const context = createFakeContext();
+  const { context, records } = createFakeContext();
   const level = createBloodmoonLevel(context);
   level.start();
   level.handleAction({
     type: "hitTarget",
-    hit: { correct: true, npc: context.created[0] },
+    hit: { correct: true, npc: records.created[0] },
   });
 
   const frame = level.update(BLOODMOON_HUNT_INTRO_SECONDS);
 
   assert.deepEqual(frame, { pauseWorld: true });
-  assert.equal(context.overlays.at(-1).kind, "huntCard");
+  assert.equal(records.overlays.at(-1).kind, "huntCard");
 });
 
 test("血月攻击使用狼爪冷却并在猎杀演出期间禁用", () => {
-  const context = createFakeContext();
+  const { context, records } = createFakeContext();
   const level = createBloodmoonLevel(context);
   level.start();
 
@@ -168,7 +184,7 @@ test("血月攻击使用狼爪冷却并在猎杀演出期间禁用", () => {
 
   level.handleAction({
     type: "hitTarget",
-    hit: { correct: true, npc: context.created[0] },
+    hit: { correct: true, npc: records.created[0] },
   });
   assert.equal(level.handleAction({ type: "beforeAttack" }).blocked, true);
 });

@@ -4,7 +4,7 @@ export function createGamingLevel(context) {
 
   function start() {
     const computer = computers[2];
-    target = context.createNpc(0, { gamingTarget: true, levelTarget: true });
+    target = context.actors.createNpc(0, { gamingTarget: true, levelTarget: true });
     target.levelManaged = true;
     target.group.position.copy(computer);
     target.group.position.x += 0.2;
@@ -15,12 +15,12 @@ export function createGamingLevel(context) {
       computerIndex: 2,
       waypoint: null,
     };
-    context.faceNpcToward(target, computer.clone().setZ(computer.z - 1.2));
-    context.setBlackEye(target, 0.62);
-    context.addNpc(target);
+    context.movement.faceNpcToward(target, computer.clone().setZ(computer.z - 1.2));
+    context.ui.setBlackEye(target, 0.62);
+    context.actors.addNpc(target);
 
-    for (let id = 1; id < context.npcCount; id += 1) {
-      context.addWanderNpc(id);
+    for (let id = 1; id < context.actors.npcCount; id += 1) {
+      context.actors.addWanderNpc(id);
     }
   }
 
@@ -35,29 +35,29 @@ export function createGamingLevel(context) {
       const computer = computers[script.computerIndex];
       const facingPoint = computer.clone();
       facingPoint.z += computer.z > 0 ? -1.1 : 1.1;
-      context.faceNpcToward(target, facingPoint);
+      context.movement.faceNpcToward(target, facingPoint);
       const progress = 1 - script.timer / (script.playDuration || script.timer || 1);
-      context.setBlackEye(target, 0.62 + progress * 0.28);
+      context.ui.setBlackEye(target, 0.62 + progress * 0.28);
       if (script.timer <= 0) {
-        context.setBlackEye(target, 1);
+        context.ui.setBlackEye(target, 1);
         script.state = "leave";
-        script.timer = context.randomRange(5, 7);
-        script.waypoint = context.randomOpenPosition();
+        script.timer = context.random.range(5, 7);
+        script.waypoint = context.movement.randomOpenPosition();
       }
       return;
     }
 
     if (script.state === "leave") {
       target.walking = true;
-      const reached = context.moveNpcToward(
+      const reached = context.movement.moveNpcToward(
         target,
         script.waypoint,
-        context.npcSpeed * 1.08,
+        context.actors.npcSpeed * 1.08,
         deltaSeconds,
       );
       script.timer -= deltaSeconds;
       if (reached || script.timer <= 0) {
-        script.computerIndex = Math.floor(context.randomRange(0, computers.length));
+        script.computerIndex = Math.floor(context.random.range(0, computers.length));
         script.waypoint = computers[script.computerIndex].clone();
         script.state = "seek";
       }
@@ -66,17 +66,17 @@ export function createGamingLevel(context) {
 
     if (script.state === "seek") {
       target.walking = true;
-      const reached = context.moveNpcToward(
+      const reached = context.movement.moveNpcToward(
         target,
         script.waypoint,
-        context.npcSpeed * 1.12,
+        context.actors.npcSpeed * 1.12,
         deltaSeconds,
       );
       if (reached) {
         script.state = "play";
-        script.timer = context.randomRange(2.2, 3.4);
+        script.timer = context.random.range(2.2, 3.4);
         script.playDuration = script.timer;
-        context.setBlackEye(target, 0.62);
+        context.ui.setBlackEye(target, 0.62);
       }
     }
   }

@@ -13,7 +13,7 @@ import {
 } from "../../entities/templeShadows.js";
 
 export function createTempleLevel(context) {
-  const effects = context.effects ?? {
+  const effects = context.world.effects ?? {
     positionShadowCue,
     setShadowCueIntensity,
     setTempleLocalShadow,
@@ -45,7 +45,7 @@ export function createTempleLevel(context) {
     let fallback = null;
 
     for (let attempts = 0; attempts < 60; attempts += 1) {
-      const position = context.randomOpenPosition();
+      const position = context.movement.randomOpenPosition();
       const distance = Math.hypot(position.x - moonPoint.x, position.z - moonPoint.z);
       if (!fallback || distance > Math.hypot(fallback.x - moonPoint.x, fallback.z - moonPoint.z)) {
         fallback = position;
@@ -58,14 +58,14 @@ export function createTempleLevel(context) {
       return position;
     }
 
-    return fallback ?? context.randomOpenPosition();
+    return fallback ?? context.movement.randomOpenPosition();
   }
 
   function randomDisturbPoint() {
     const moonPoint = context.sceneData.moonPoint;
     for (let attempts = 0; attempts < 24; attempts += 1) {
-      const angle = context.randomRange(0, Math.PI * 2);
-      const radius = context.randomRange(
+      const angle = context.random.range(0, Math.PI * 2);
+      const radius = context.random.range(
         TEMPLE_MOON_RADIUS * 0.48,
         TEMPLE_MOON_RADIUS * 0.86,
       );
@@ -74,13 +74,13 @@ export function createTempleLevel(context) {
         0,
         moonPoint.z + Math.cos(angle) * radius,
       );
-      if (!context.collidesWithObstacle(position)) return position;
+      if (!context.movement.collidesWithObstacle(position)) return position;
     }
 
     return moonPoint.clone().add(new THREE.Vector3(
-      context.randomRange(-2.8, 2.8),
+      context.random.range(-2.8, 2.8),
       0,
-      context.randomRange(-2.8, 2.8),
+      context.random.range(-2.8, 2.8),
     ));
   }
 
@@ -107,7 +107,7 @@ export function createTempleLevel(context) {
 
   function pulseClues(npc) {
     if (!npc.marked) return;
-    const pulse = 0.5 + Math.sin(context.getTotalTime() * 3.2) * 0.5;
+    const pulse = 0.5 + Math.sin(context.time.getTotal() * 3.2) * 0.5;
     effects.positionShadowCue(context.sceneData.shadowCue, npc);
     effects.setShadowCueIntensity(
       context.sceneData.shadowCue,
@@ -119,7 +119,7 @@ export function createTempleLevel(context) {
   function configureDecoy(npc, index) {
     if (index >= context.definition.moonDecoyCount) return;
     npc.isMoonDisturber = true;
-    npc.moonDisturbTimer = context.randomRange(12, 18);
+    npc.moonDisturbTimer = context.random.range(12, 18);
     npc.moonDisturbWaypoint = null;
   }
 
@@ -129,28 +129,28 @@ export function createTempleLevel(context) {
     if (npc.deoyState !== "moonApproach" && npc.deoyState !== "moonPause") {
       npc.moonDisturbTimer -= deltaSeconds;
       if (npc.moonDisturbTimer <= 0) {
-        if (context.randomRange(0, 1) < 0.65) {
+        if (context.random.range(0, 1) < 0.65) {
           npc.deoyState = "moonApproach";
-          npc.decoyTimer = context.randomRange(4, 6);
+          npc.decoyTimer = context.random.range(4, 6);
           npc.moonDisturbWaypoint = randomDisturbPoint();
         } else {
-          npc.moonDisturbTimer = context.randomRange(12, 18);
+          npc.moonDisturbTimer = context.random.range(12, 18);
         }
       }
     }
 
     if (npc.deoyState === "moonApproach") {
       npc.walking = true;
-      const reached = context.moveNpcToward(
+      const reached = context.movement.moveNpcToward(
         npc,
         npc.moonDisturbWaypoint,
-        context.npcSpeed * 0.92,
+        context.actors.npcSpeed * 0.92,
         deltaSeconds,
       );
       npc.decoyTimer -= deltaSeconds;
       if (reached || npc.decoyTimer <= 0) {
         npc.deoyState = "moonPause";
-        npc.decoyTimer = context.randomRange(0.8, 1.4);
+        npc.decoyTimer = context.random.range(0.8, 1.4);
       }
       return true;
     }
@@ -158,14 +158,14 @@ export function createTempleLevel(context) {
     if (npc.deoyState === "moonPause") {
       npc.walking = false;
       npc.decoyTimer -= deltaSeconds;
-      context.faceNpcToward(npc, new THREE.Vector3(7.1, 0, -10.4));
+      context.movement.faceNpcToward(npc, new THREE.Vector3(7.1, 0, -10.4));
       if (npc.decoyTimer <= 0) {
         npc.deoyState = "wander";
-        npc.decoyTimer = context.randomRange(1, 2.5);
-        npc.moonDisturbTimer = context.randomRange(12, 18);
+        npc.decoyTimer = context.random.range(1, 2.5);
+        npc.moonDisturbTimer = context.random.range(12, 18);
         npc.moonDisturbWaypoint = null;
-        npc.wanderTimer = context.randomRange(0.5, 1.5);
-        npc.pauseTimer = context.randomRange(0.2, 0.8);
+        npc.wanderTimer = context.random.range(0.5, 1.5);
+        npc.pauseTimer = context.random.range(0.2, 0.8);
       }
       return true;
     }
@@ -174,10 +174,10 @@ export function createTempleLevel(context) {
   }
 
   function updateShadows() {
-    context.getActors().forEach((actor) => {
+    context.actors.getAll().forEach((actor) => {
       const influence = getMoonInfluence(actor.group.position);
       const pulse = 0.9
-        + Math.sin(context.getTotalTime() * 2.4 + (actor.id ?? 0)) * 0.08;
+        + Math.sin(context.time.getTotal() * 2.4 + (actor.id ?? 0)) * 0.08;
       const strength = actor.isSuShiTarget ? 0.86 : actor.isDecoy ? 0.84 : 0.8;
       effects.setTempleLocalShadow(actor, influence, strength, pulse);
     });
@@ -190,7 +190,7 @@ export function createTempleLevel(context) {
   }
 
   function start() {
-    target = context.createNpc(0, {
+    target = context.actors.createNpc(0, {
       suShiTarget: true,
       templeClone: true,
       levelTarget: true,
@@ -200,21 +200,21 @@ export function createTempleLevel(context) {
     target.group.position.copy(startPosition);
     target.script = {
       state: "wander",
-      timer: context.randomRange(2.4, 4.2),
+      timer: context.random.range(2.4, 4.2),
       waypoint: randomOutsideMoon(startPosition),
       moonPoint: context.sceneData.moonPoint.clone(),
       revealProgress: 0,
       exposed: false,
       wanderRouteLeft: 2,
-      nextMoonDelay: context.randomRange(
+      nextMoonDelay: context.random.range(
         TEMPLE_TRUE_INITIAL_MOON_DELAY[0],
         TEMPLE_TRUE_INITIAL_MOON_DELAY[1],
       ),
     };
-    context.addNpc(target);
+    context.actors.addNpc(target);
 
-    for (let id = 1; id < context.npcCount; id += 1) {
-      context.addWanderNpc(id);
+    for (let id = 1; id < context.actors.npcCount; id += 1) {
+      context.actors.addWanderNpc(id);
     }
   }
 
@@ -225,15 +225,15 @@ export function createTempleLevel(context) {
     if (script.state === "seekMoon") {
       target.walking = true;
       if (
-        context.moveNpcToward(
+        context.movement.moveNpcToward(
           target,
           script.moonPoint,
-          context.npcSpeed * 0.96,
+          context.actors.npcSpeed * 0.96,
           deltaSeconds,
         )
       ) {
         script.state = "moonPause";
-        script.timer = context.randomRange(1.6, 2.1);
+        script.timer = context.random.range(1.6, 2.1);
         script.revealProgress = 0;
         script.exposed = false;
       }
@@ -243,7 +243,7 @@ export function createTempleLevel(context) {
     if (script.state === "moonPause") {
       target.walking = false;
       script.timer -= deltaSeconds;
-      context.faceNpcToward(target, new THREE.Vector3(7.1, 0, -10.4));
+      context.movement.faceNpcToward(target, new THREE.Vector3(7.1, 0, -10.4));
       if (script.timer <= TEMPLE_TRUE_REVEAL_AT || script.exposed) {
         script.exposed = true;
         script.revealProgress = Math.min(1, script.revealProgress + deltaSeconds * 0.65);
@@ -251,10 +251,10 @@ export function createTempleLevel(context) {
       }
       if (script.timer <= 0) {
         script.state = "wander";
-        script.timer = context.randomRange(2.4, 4.2);
+        script.timer = context.random.range(2.4, 4.2);
         script.waypoint = randomOutsideMoon(target.group.position);
-        script.wanderRouteLeft = context.randomRange(0, 1) < 0.5 ? 1 : 2;
-        script.nextMoonDelay = context.randomRange(10, 15);
+        script.wanderRouteLeft = context.random.range(0, 1) < 0.5 ? 1 : 2;
+        script.nextMoonDelay = context.random.range(10, 15);
         script.revealProgress = 0;
         script.exposed = false;
         target.marked = false;
@@ -266,10 +266,10 @@ export function createTempleLevel(context) {
 
     if (script.state === "wander") {
       target.walking = true;
-      const reached = context.moveNpcToward(
+      const reached = context.movement.moveNpcToward(
         target,
         script.waypoint,
-        context.npcSpeed * 1.02,
+        context.actors.npcSpeed * 1.02,
         deltaSeconds,
       );
       script.timer -= deltaSeconds;
@@ -277,10 +277,10 @@ export function createTempleLevel(context) {
       if (reached || script.timer <= 0) {
         if (script.wanderRouteLeft > 0 || script.nextMoonDelay > 0) {
           if (reached) script.wanderRouteLeft = Math.max(0, script.wanderRouteLeft - 1);
-          script.timer = context.randomRange(2.4, 4.2);
+          script.timer = context.random.range(2.4, 4.2);
           script.waypoint = script.nextMoonDelay > 0
             ? randomOutsideMoon(target.group.position)
-            : context.randomOpenPosition();
+            : context.movement.randomOpenPosition();
         } else {
           script.state = "seekMoon";
           script.waypoint = script.moonPoint.clone();

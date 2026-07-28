@@ -5,8 +5,8 @@ export function createLibraryLevel(context) {
   let pair = null;
 
   function start() {
-    const a = context.createNpc(0, { lover: true, levelTarget: true });
-    const b = context.createNpc(1, { lover: true, levelTarget: true });
+    const a = context.actors.createNpc(0, { lover: true, levelTarget: true });
+    const b = context.actors.createNpc(1, { lover: true, levelTarget: true });
     const separationGroup = Symbol("library-lovers");
     a.levelManaged = true;
     b.levelManaged = true;
@@ -14,8 +14,8 @@ export function createLibraryLevel(context) {
     b.separationGroup = separationGroup;
     a.group.position.set(-0.38, 0, -0.2);
     b.group.position.set(0.38, 0, -0.2);
-    context.addNpc(a);
-    context.addNpc(b);
+    context.actors.addNpc(a);
+    context.actors.addNpc(b);
     pair = {
       members: [a, b],
       state: "kiss",
@@ -24,8 +24,8 @@ export function createLibraryLevel(context) {
       scatterPoints: [new THREE.Vector3(-3, 0, 2.5), new THREE.Vector3(3, 0, 1.6)],
     };
 
-    for (let id = 2; id < context.npcCount; id += 1) {
-      context.addWanderNpc(id);
+    for (let id = 2; id < context.actors.npcCount; id += 1) {
+      context.actors.addWanderNpc(id);
     }
   }
 
@@ -34,12 +34,12 @@ export function createLibraryLevel(context) {
     let attempts = 0;
     do {
       point = new THREE.Vector3(
-        context.randomRange(-5.5, 5.5),
+        context.random.range(-5.5, 5.5),
         0,
-        context.randomRange(-4.5, 5.8),
+        context.random.range(-4.5, 5.8),
       );
       attempts += 1;
-    } while (attempts < 30 && context.collidesWithObstacle(point));
+    } while (attempts < 30 && context.movement.collidesWithObstacle(point));
     return point;
   }
 
@@ -52,25 +52,25 @@ export function createLibraryLevel(context) {
       a.walking = false;
       b.walking = false;
       pair.timer -= deltaSeconds;
-      context.faceNpcToward(a, b.group.position);
-      context.faceNpcToward(b, a.group.position);
+      context.movement.faceNpcToward(a, b.group.position);
+      context.movement.faceNpcToward(b, a.group.position);
       const intensity = Math.min(1, a.markIntensity + deltaSeconds * 0.32);
-      context.setLipstick(a, intensity);
-      context.setLipstick(b, intensity);
+      context.ui.setLipstick(a, intensity);
+      context.ui.setLipstick(b, intensity);
       if (pair.timer <= 0) {
         pair.state = "scatter";
-        pair.timer = context.randomRange(3.4, 4.8);
-        const angle = context.randomRange(0, Math.PI * 2);
+        pair.timer = context.random.range(3.4, 4.8);
+        const angle = context.random.range(0, Math.PI * 2);
         pair.scatterPoints = [
           new THREE.Vector3(
-            Math.cos(angle) * context.randomRange(3.2, 5.6),
+            Math.cos(angle) * context.random.range(3.2, 5.6),
             0,
-            Math.sin(angle) * context.randomRange(2.8, 5.4),
+            Math.sin(angle) * context.random.range(2.8, 5.4),
           ),
           new THREE.Vector3(
-            Math.cos(angle + Math.PI) * context.randomRange(3.2, 5.6),
+            Math.cos(angle + Math.PI) * context.random.range(3.2, 5.6),
             0,
-            Math.sin(angle + Math.PI) * context.randomRange(2.8, 5.4),
+            Math.sin(angle + Math.PI) * context.random.range(2.8, 5.4),
           ),
         ];
       }
@@ -80,16 +80,16 @@ export function createLibraryLevel(context) {
     if (pair.state === "scatter") {
       a.walking = true;
       b.walking = true;
-      const aDone = context.moveNpcToward(
+      const aDone = context.movement.moveNpcToward(
         a,
         pair.scatterPoints[0],
-        context.npcSpeed * 1.15,
+        context.actors.npcSpeed * 1.15,
         deltaSeconds,
       );
-      const bDone = context.moveNpcToward(
+      const bDone = context.movement.moveNpcToward(
         b,
         pair.scatterPoints[1],
-        context.npcSpeed * 1.15,
+        context.actors.npcSpeed * 1.15,
         deltaSeconds,
       );
       pair.timer -= deltaSeconds;
@@ -104,21 +104,21 @@ export function createLibraryLevel(context) {
       const offset = new THREE.Vector3(0.32, 0, 0);
       a.walking = true;
       b.walking = true;
-      const aDone = context.moveNpcToward(
+      const aDone = context.movement.moveNpcToward(
         a,
         pair.meetingPoint.clone().sub(offset),
-        context.npcSpeed * 1.05,
+        context.actors.npcSpeed * 1.05,
         deltaSeconds,
       );
-      const bDone = context.moveNpcToward(
+      const bDone = context.movement.moveNpcToward(
         b,
         pair.meetingPoint.clone().add(offset),
-        context.npcSpeed * 1.05,
+        context.actors.npcSpeed * 1.05,
         deltaSeconds,
       );
       if (aDone && bDone) {
         pair.state = "kiss";
-        pair.timer = context.randomRange(1.7, 2.6);
+        pair.timer = context.random.range(1.7, 2.6);
       }
     }
   }
@@ -136,8 +136,8 @@ export function createLibraryLevel(context) {
       b.group.position.x - playerPos.x,
       b.group.position.z - playerPos.z,
     );
-    const aInRange = toA.length() <= HIT_PAIR_RANGE && context.isFacingTarget(facing, toA);
-    const bInRange = toB.length() <= HIT_PAIR_RANGE && context.isFacingTarget(facing, toB);
+    const aInRange = toA.length() <= HIT_PAIR_RANGE && context.combat.isFacingTarget(facing, toA);
+    const bInRange = toB.length() <= HIT_PAIR_RANGE && context.combat.isFacingTarget(facing, toB);
     return aInRange || bInRange ? { correct: true, npcs: [a, b] } : undefined;
   }
 

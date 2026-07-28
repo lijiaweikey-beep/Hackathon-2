@@ -4,113 +4,124 @@ import * as THREE from "three";
 import { createTempleLevel } from "../../src/levels/temple/createLevel.js";
 
 function createFakeContext({ npcCount, moveReached = false }) {
-  const context = {
-    definition: { moonDecoyCount: 3 },
-    npcCount,
-    npcSpeed: 3,
-    sceneData: {
-      moonPoint: new THREE.Vector3(0, 0, 0.15),
-      shadowCue: {},
-    },
+  const records = {
     created: [],
     actors: [],
     target: null,
     cueIntensities: [],
-    moveReached,
-    createNpc(id, flags) {
-      const npc = {
-        id,
-        alive: true,
-        walking: false,
-        marked: false,
-        markIntensity: 0,
-        isSuShiTarget: Boolean(flags.suShiTarget),
-        group: { position: new THREE.Vector3() },
-      };
-      context.created.push({ id, flags, npc });
-      return npc;
+  };
+  const context = {
+    definition: { moonDecoyCount: 3 },
+    sceneData: {
+      moonPoint: new THREE.Vector3(0, 0, 0.15),
+      shadowCue: {},
     },
-    addNpc(npc) {
-      context.actors.push(npc);
-      if (npc.isSuShiTarget) context.target = npc;
+    actors: {
+      npcCount,
+      npcSpeed: 3,
+      createNpc(id, flags) {
+        const npc = {
+          id,
+          alive: true,
+          walking: false,
+          marked: false,
+          markIntensity: 0,
+          isSuShiTarget: Boolean(flags.suShiTarget),
+          group: { position: new THREE.Vector3() },
+        };
+        records.created.push({ id, flags, npc });
+        return npc;
+      },
+      addNpc(npc) {
+        records.actors.push(npc);
+        if (npc.isSuShiTarget) records.target = npc;
+      },
+      addWanderNpc(id) {
+        const npc = context.actors.createNpc(id, {});
+        npc.group.position.set(7 + id, 0, 7);
+        context.actors.addNpc(npc);
+      },
+      getAll() {
+        return records.actors;
+      },
     },
-    addWanderNpc(id) {
-      const npc = context.createNpc(id, {});
-      npc.group.position.set(7 + id, 0, 7);
-      context.addNpc(npc);
+    movement: {
+      randomOpenPosition() {
+        return new THREE.Vector3(8, 0, 8);
+      },
+      collidesWithObstacle() {
+        return false;
+      },
+      moveNpcToward() {
+        return moveReached;
+      },
+      faceNpcToward() {},
     },
-    randomRange(min) {
-      return min;
+    time: {
+      getTotal() {
+        return 2;
+      },
     },
-    randomOpenPosition() {
-      return new THREE.Vector3(8, 0, 8);
+    random: {
+      range(min) {
+        return min;
+      },
     },
-    collidesWithObstacle() {
-      return false;
-    },
-    moveNpcToward() {
-      return context.moveReached;
-    },
-    faceNpcToward() {},
-    getActors() {
-      return context.actors;
-    },
-    getTotalTime() {
-      return 2;
-    },
-    effects: {
-      setTempleLocalShadow() {},
-      positionShadowCue() {},
-      setShadowCueIntensity(_cue, intensity) {
-        context.cueIntensities.push(intensity);
+    world: {
+      effects: {
+        setTempleLocalShadow() {},
+        positionShadowCue() {},
+        setShadowCueIntensity(_cue, intensity) {
+          records.cueIntensities.push(intensity);
+        },
       },
     },
   };
-  return context;
+  return { context, records };
 }
 
 test("承天寺插件生成真苏轼和剩余影分身", () => {
-  const context = createFakeContext({ npcCount: 4 });
+  const { context, records } = createFakeContext({ npcCount: 4 });
   const level = createTempleLevel(context);
   level.start();
 
-  assert.deepEqual(context.created.map(({ id }) => id), [0, 1, 2, 3]);
-  assert.equal(context.target.levelManaged, true);
-  assert.equal(context.target.isSuShiTarget, true);
-  assert.equal(context.target.script.state, "wander");
+  assert.deepEqual(records.created.map(({ id }) => id), [0, 1, 2, 3]);
+  assert.equal(records.target.levelManaged, true);
+  assert.equal(records.target.isSuShiTarget, true);
+  assert.equal(records.target.script.state, "wander");
 });
 
 test("真苏轼完成外围路线后转向月光中庭", () => {
-  const context = createFakeContext({ npcCount: 2, moveReached: true });
+  const { context, records } = createFakeContext({ npcCount: 2, moveReached: true });
   const level = createTempleLevel(context);
   level.start();
-  context.target.script.timer = 0;
-  context.target.script.wanderRouteLeft = 0;
-  context.target.script.nextMoonDelay = 0;
+  records.target.script.timer = 0;
+  records.target.script.wanderRouteLeft = 0;
+  records.target.script.nextMoonDelay = 0;
 
   level.update(0.1);
 
-  assert.equal(context.target.script.state, "seekMoon");
+  assert.equal(records.target.script.state, "seekMoon");
 });
 
 test("真苏轼在月光中庭显露竹柏影", () => {
-  const context = createFakeContext({ npcCount: 2 });
+  const { context, records } = createFakeContext({ npcCount: 2 });
   const level = createTempleLevel(context);
   level.start();
-  context.target.group.position.copy(context.sceneData.moonPoint);
-  context.target.script.state = "moonPause";
-  context.target.script.timer = 0.5;
+  records.target.group.position.copy(context.sceneData.moonPoint);
+  records.target.script.state = "moonPause";
+  records.target.script.timer = 0.5;
 
   level.update(0.1);
 
-  assert.equal(context.target.marked, true);
-  assert.ok(context.cueIntensities.at(-1) > 0);
+  assert.equal(records.target.marked, true);
+  assert.ok(records.cueIntensities.at(-1) > 0);
 });
 
 test("前三个替身被配置为月光干扰者", () => {
-  const context = createFakeContext({ npcCount: 2 });
+  const { context } = createFakeContext({ npcCount: 2 });
   const level = createTempleLevel(context);
-  const npc = context.createNpc(8, {});
+  const npc = context.actors.createNpc(8, {});
 
   level.handleAction({ type: "configureDecoy", npc, index: 1 });
 
@@ -119,9 +130,9 @@ test("前三个替身被配置为月光干扰者", () => {
 });
 
 test("月光干扰者倒计时结束后走向中庭", () => {
-  const context = createFakeContext({ npcCount: 2 });
+  const { context } = createFakeContext({ npcCount: 2 });
   const level = createTempleLevel(context);
-  const npc = context.createNpc(8, {});
+  const npc = context.actors.createNpc(8, {});
   npc.deoyState = "wander";
   npc.decoyTimer = 1;
   level.handleAction({ type: "configureDecoy", npc, index: 0 });

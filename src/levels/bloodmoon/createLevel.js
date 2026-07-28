@@ -34,11 +34,11 @@ const PAUSED_MODES = new Set(["huntIntro", "huntBriefing"]);
 const ATTACK_BLOCKED_MODES = new Set([...PAUSED_MODES, "hunt"]);
 
 export function createBloodmoonLevel(context) {
-  const effects = context.effects ?? {
+  const effects = context.world.effects ?? {
     positionBloodmoonCue,
     setBloodmoonClawIntensity,
   };
-  const audio = context.audio ?? { playIntro: playBloodmoonIntro };
+  const playIntro = context.audio.playIntro ?? playBloodmoonIntro;
   const resources = context.sceneData;
   const state = {
     mode: "phase1",
@@ -53,57 +53,57 @@ export function createBloodmoonLevel(context) {
     playerInvuln: 0,
     hostility: 1,
     summonWave: 0,
-    nextNpcId: context.npcCount,
+    nextNpcId: context.actors.npcCount,
     safeZones: [],
     huntBoss: null,
   };
   let target = null;
 
   function initializeNpc(npc, isTarget = false) {
-    npc.alertTimer = context.randomRange(0.4, 2.6);
+    npc.alertTimer = context.random.range(0.4, 2.6);
     npc.attackTimer = 0;
     npc.attackResolveTimer = 0;
-    npc.attackCooldown = context.randomRange(0.7, 1.7);
+    npc.attackCooldown = context.random.range(0.7, 1.7);
     npc.hostility = isTarget
       ? 1.15
-      : context.randomRange(0.82, 1.12);
+      : context.random.range(0.82, 1.12);
   }
 
   function initializeTargetScript(npc) {
     npc.script = {
       state: "wander",
-      timer: context.randomRange(2.2, 4.4),
-      waypoint: context.randomOpenPosition(),
+      timer: context.random.range(2.2, 4.4),
+      waypoint: context.movement.randomOpenPosition(),
       cluePause: 0,
     };
   }
 
   function start() {
-    target = context.createNpc(0, {
+    target = context.actors.createNpc(0, {
       levelTarget: true,
     });
     target.levelManaged = true;
-    target.group.position.copy(context.randomOpenPosition());
+    target.group.position.copy(context.movement.randomOpenPosition());
     initializeTargetScript(target);
     initializeNpc(target, true);
-    context.addNpc(target);
+    context.actors.addNpc(target);
 
-    for (let id = 1; id < context.npcCount; id += 1) {
-      const npc = context.addWanderNpc(id);
+    for (let id = 1; id < context.actors.npcCount; id += 1) {
+      const npc = context.actors.addWanderNpc(id);
       initializeNpc(npc);
     }
   }
 
   function shuffleActors(actors) {
     for (let index = actors.length - 1; index > 0; index -= 1) {
-      const swapIndex = Math.floor(context.randomRange(0, index + 1));
+      const swapIndex = Math.floor(context.random.range(0, index + 1));
       [actors[index], actors[swapIndex]] = [actors[swapIndex], actors[index]];
     }
   }
 
   function assignDecoyCues() {
     if (!resources.decoyCues?.length) return;
-    const candidates = context.getNpcs().filter(
+    const candidates = context.actors.getNpcs().filter(
       (npc) => npc.alive && npc !== target,
     );
     shuffleActors(candidates);
@@ -111,9 +111,9 @@ export function createBloodmoonLevel(context) {
     resources.decoyCues.forEach((cue, index) => {
       const npc = candidates[index];
       cue.userData.decoyNpc = npc ?? null;
-      cue.userData.seed = context.randomRange(0, 100);
-      cue.userData.missingToe = Math.floor(context.randomRange(0, 4));
-      cue.userData.decoyCompleteness = context.randomRange(0.38, 0.72);
+      cue.userData.seed = context.random.range(0, 100);
+      cue.userData.missingToe = Math.floor(context.random.range(0, 4));
+      cue.userData.decoyCompleteness = context.random.range(0.38, 0.72);
       if (!npc) effects.setBloodmoonClawIntensity(cue, 0);
     });
   }
@@ -132,16 +132,16 @@ export function createBloodmoonLevel(context) {
     state.clueTimer = Math.max(0, state.clueTimer - deltaSeconds);
 
     if (state.lightningTimer <= 0) {
-      state.lightningTimer = context.randomRange(
+      state.lightningTimer = context.random.range(
         BLOODMOON_LIGHTNING_INTERVAL[0],
         BLOODMOON_LIGHTNING_INTERVAL[1],
       );
       state.lightningFlash = 1;
       state.clueTimer = BLOODMOON_CLUE_SECONDS;
       state.revealCount = Math.min(3, state.revealCount + 1);
-      context.triggerShake(0.42, 0.32);
-      context.flashHud("bloodmoon-lightning", 360);
-      context.playLevelSound("thunder", context.randomRange(180, 420));
+      context.combat.triggerShake(0.42, 0.32);
+      context.ui.flashHud("bloodmoon-lightning", 360);
+      context.audio.playSound("thunder", context.random.range(180, 420));
 
       if (target?.script) {
         target.script.cluePause = BLOODMOON_CLUE_SECONDS;
@@ -150,7 +150,7 @@ export function createBloodmoonLevel(context) {
       assignDecoyCues();
     }
 
-    const totalTime = context.getTotalTime();
+    const totalTime = context.time.getTotal();
     const flash = state.lightningFlash;
     const strobe = flash > 0
       ? flash * (0.75 + Math.abs(Math.sin(totalTime * 44)) * 0.65)
@@ -199,23 +199,23 @@ export function createBloodmoonLevel(context) {
       effects.setBloodmoonClawIntensity(cue, 0);
     });
     hideSafeZones();
-    hideHuntCard(context);
-    showHuntIntro(context);
-    context.flashHud("bloodmoon-lightning", 520);
-    context.triggerShake(0.5, 0.34);
+    hideHuntCard(context.ui);
+    showHuntIntro(context.ui);
+    context.ui.flashHud("bloodmoon-lightning", 520);
+    context.combat.triggerShake(0.5, 0.34);
   }
 
   function handleBossHit(boss) {
     if (state.mode === "hunt") return;
-    context.triggerHitstop(0.08);
-    context.triggerShake(0.42, 0.22);
-    context.playLevelSound("hit");
+    context.combat.triggerHitstop(0.08);
+    context.combat.triggerShake(0.42, 0.22);
+    context.audio.playSound("hit");
 
     const transition = getBossHitTransition(state.mode, state.bossHp);
     state.bossHp = transition.nextBossHp;
     if (transition.defeated) {
-      context.dissolveNpc(boss);
-      context.finishLevel(true, null, 760);
+      context.actors.dissolve(boss);
+      context.combat.finishLevel(true, null, 760);
       return;
     }
     startHunt(boss);
@@ -226,8 +226,8 @@ export function createBloodmoonLevel(context) {
     state.cutsceneTimer = Math.max(0, state.cutsceneTimer - deltaSeconds);
     if (state.cutsceneTimer > 0) return;
     state.mode = "huntBriefing";
-    hideHuntIntro(context);
-    showHuntCard(context);
+    hideHuntIntro(context.ui);
+    showHuntCard(context.ui);
   }
 
   function safeZoneSpacing() {
@@ -239,13 +239,13 @@ export function createBloodmoonLevel(context) {
     for (let index = 0; index < BLOODMOON_SAFE_ZONE_COUNT; index += 1) {
       let position = null;
       for (let attempts = 0; attempts < 50; attempts += 1) {
-        const candidate = context.randomOpenPosition();
+        const candidate = context.movement.randomOpenPosition();
         if (zones.every((zone) => candidate.distanceTo(zone) > safeZoneSpacing())) {
           position = candidate;
           break;
         }
       }
-      zones.push(position ?? context.randomOpenPosition());
+      zones.push(position ?? context.movement.randomOpenPosition());
     }
     return zones;
   }
@@ -271,24 +271,24 @@ export function createBloodmoonLevel(context) {
     if (state.mode !== "huntBriefing") return;
     state.mode = "hunt";
     state.huntTimer = BLOODMOON_HUNT_SECONDS;
-    hideHuntCard(context);
-    context.setActorPartsVisible(context.getPlayer(), "wolfParts", false);
+    hideHuntCard(context.ui);
+    context.actors.setPartsVisible(context.actors.getPlayer(), "wolfParts", false);
 
     state.safeZones = pickSafeZones();
     showSafeZones();
-    context.randomizeActorPosition(context.getPlayer());
-    context.resetPlayerInput();
-    context.getNpcs().forEach((npc) => {
+    context.actors.randomizePosition(context.actors.getPlayer());
+    context.ui.resetPlayerInput();
+    context.actors.getNpcs().forEach((npc) => {
       if ((!npc.alive && npc !== state.huntBoss) || npc === state.huntBoss) return;
-      context.randomizeActorPosition(npc);
+      context.actors.randomizePosition(npc);
       npc.attackTimer = 0;
       npc.attackCooldown = BLOODMOON_HUNT_SECONDS + 2;
     });
-    context.triggerShake(0.5, 0.34);
+    context.combat.triggerShake(0.5, 0.34);
   }
 
   function updateSafeZoneVisuals() {
-    const totalTime = context.getTotalTime();
+    const totalTime = context.time.getTotal();
     const pulse = 0.65 + Math.abs(Math.sin(totalTime * 5.5)) * 0.35;
     resources.safeZoneVisuals?.forEach((visual, index) => {
       if (!visual.mesh.visible) return;
@@ -299,14 +299,14 @@ export function createBloodmoonLevel(context) {
   }
 
   function restoreNpcAttacks() {
-    context.getNpcs().forEach((npc) => {
+    context.actors.getNpcs().forEach((npc) => {
       if (!npc.alive) return;
       npc.attackTimer = 0;
       npc.attackResolveTimer = 0;
-      npc.alertTimer = context.randomRange(0.2, 0.9);
+      npc.alertTimer = context.random.range(0.2, 0.9);
       npc.attackCooldown = npc.isWolfGuard
         ? 0.35
-        : context.randomRange(0.45, 1.15);
+        : context.random.range(0.45, 1.15);
       npc.hostility = npc.isWolfGuard
         ? 2.2
         : Math.max(npc.hostility ?? 1, 1.05);
@@ -316,16 +316,16 @@ export function createBloodmoonLevel(context) {
   function respawnBoss() {
     let boss = state.huntBoss;
     if (!boss) {
-      boss = context.createNpc(state.nextNpcId, {
+      boss = context.actors.createNpc(state.nextNpcId, {
         levelTarget: true,
       });
       state.nextNpcId += 1;
-      context.addNpc(boss);
+      context.actors.addNpc(boss);
     }
     boss.alive = true;
     boss.preserveWhenDead = false;
     boss.group.visible = true;
-    boss.group.position.copy(context.randomOpenPosition());
+    boss.group.position.copy(context.movement.randomOpenPosition());
     initializeTargetScript(boss);
     initializeNpc(boss, true);
     target = boss;
@@ -335,31 +335,31 @@ export function createBloodmoonLevel(context) {
   function randomGuardPosition() {
     let fallback = null;
     for (let attempts = 0; attempts < 60; attempts += 1) {
-      const position = context.randomOpenPosition();
+      const position = context.movement.randomOpenPosition();
       fallback ??= position;
       const farFromPlayer = position.distanceTo(
-        context.getPlayer().group.position,
+        context.actors.getPlayer().group.position,
       ) >= 5.2;
       const farFromBoss = !target?.alive
         || position.distanceTo(target.group.position) >= 3.4;
       if (farFromPlayer && farFromBoss) return position;
     }
-    return fallback ?? context.randomOpenPosition();
+    return fallback ?? context.movement.randomOpenPosition();
   }
 
   function summonWave() {
     state.summonWave += 1;
     for (let index = 0; index < BLOODMOON_SUMMON_COUNT; index += 1) {
-      const npc = context.createNpc(state.nextNpcId, {});
+      const npc = context.actors.createNpc(state.nextNpcId, {});
       state.nextNpcId += 1;
-      npc.group.position.copy(context.randomOpenPosition());
-      npc.wanderTimer = context.randomRange(0.4, 1.7);
-      npc.pauseTimer = context.randomRange(0.1, 0.8);
+      npc.group.position.copy(context.movement.randomOpenPosition());
+      npc.wanderTimer = context.random.range(0.4, 1.7);
+      npc.pauseTimer = context.random.range(0.1, 0.8);
       initializeNpc(npc);
-      context.addNpc(npc);
+      context.actors.addNpc(npc);
     }
 
-    const guard = context.createNpc(state.nextNpcId, { wolfGuard: true });
+    const guard = context.actors.createNpc(state.nextNpcId, { wolfGuard: true });
     state.nextNpcId += 1;
     guard.levelManaged = true;
     guard.group.position.copy(randomGuardPosition());
@@ -367,12 +367,12 @@ export function createBloodmoonLevel(context) {
     guard.attackCooldown = 0.8;
     guard.hostility = 1.8;
     initializeNpc(guard);
-    context.addNpc(guard);
+    context.actors.addNpc(guard);
   }
 
   function resolveHunt() {
-    if (state.mode !== "hunt" || context.getGameStatus() !== "playing") return;
-    const player = context.getPlayer();
+    if (state.mode !== "hunt" || context.time.getStatus() !== "playing") return;
+    const player = context.actors.getPlayer();
     const playerSafe = isInsideSafeZone(
       player.group.position,
       state.safeZones,
@@ -382,30 +382,30 @@ export function createBloodmoonLevel(context) {
     if (!playerSafe) {
       state.sanity = 0;
       hideSafeZones();
-      context.setActorPartsVisible(player, "wolfParts", true);
-      context.triggerShake(0.55, 0.35);
-      context.finishLevel(false, null, 700);
+      context.actors.setPartsVisible(player, "wolfParts", true);
+      context.combat.triggerShake(0.55, 0.35);
+      context.combat.finishLevel(false, null, 700);
       return;
     }
 
-    context.getNpcs().forEach((npc) => {
+    context.actors.getNpcs().forEach((npc) => {
       if (!npc.alive) return;
       const safe = isInsideSafeZone(
         npc.group.position,
         state.safeZones,
         resources.safeZoneRadius,
       );
-      if (!safe && npc !== target) context.dissolveNpc(npc);
+      if (!safe && npc !== target) context.actors.dissolve(npc);
     });
     hideSafeZones();
-    context.setActorPartsVisible(player, "wolfParts", true);
-    context.compactDeadNpcs();
+    context.actors.setPartsVisible(player, "wolfParts", true);
+    context.actors.compactDead();
     respawnBoss();
     summonWave();
     restoreNpcAttacks();
     state.mode = "phase2";
     state.huntTimer = 0;
-    context.triggerShake(0.36, 0.22);
+    context.combat.triggerShake(0.36, 0.22);
   }
 
   function updateHunt(deltaSeconds) {
@@ -421,31 +421,31 @@ export function createBloodmoonLevel(context) {
     if (script.cluePause > 0) {
       script.cluePause -= deltaSeconds;
       target.walking = false;
-      context.faceNpcToward(target, new THREE.Vector3(7.2, 0, -10.8));
+      context.movement.faceNpcToward(target, new THREE.Vector3(7.2, 0, -10.8));
       return;
     }
 
     target.walking = true;
-    const reached = context.moveNpcToward(
+    const reached = context.movement.moveNpcToward(
       target,
       script.waypoint,
-      context.npcSpeed * 1.06,
+      context.actors.npcSpeed * 1.06,
       deltaSeconds,
     );
     script.timer -= deltaSeconds;
     if (reached || script.timer <= 0) {
-      script.timer = context.randomRange(2.2, 4.4);
-      script.waypoint = context.randomOpenPosition();
+      script.timer = context.random.range(2.2, 4.4);
+      script.waypoint = context.movement.randomOpenPosition();
     }
   }
 
   function resolveNpcHit(npc) {
     if (
       state.playerInvuln > 0
-      || context.getGameStatus() !== "playing"
-      || !context.isActorFacingTarget(
+      || context.time.getStatus() !== "playing"
+      || !context.movement.isActorFacingTarget(
         npc,
-        context.getPlayer(),
+        context.actors.getPlayer(),
         BLOODMOON_NPC_HIT_RANGE,
       )
     ) return;
@@ -457,11 +457,11 @@ export function createBloodmoonLevel(context) {
       ),
     );
     state.playerInvuln = 0.72;
-    context.triggerShake(0.28, 0.2);
-    context.playLevelSound("npcHit");
-    context.flashHud("bloodmoon-hit", 180);
-    context.refreshHud();
-    if (state.sanity <= 0) context.finishLevel(false, null, 620);
+    context.combat.triggerShake(0.28, 0.2);
+    context.audio.playSound("npcHit");
+    context.ui.flashHud("bloodmoon-hit", 180);
+    context.ui.refreshHud();
+    if (state.sanity <= 0) context.combat.finishLevel(false, null, 620);
   }
 
   function updateNpcThreat(npc, deltaSeconds) {
@@ -479,9 +479,9 @@ export function createBloodmoonLevel(context) {
     }
     if (
       npc.attackCooldown > 0
-      || !context.isActorFacingTarget(
+      || !context.movement.isActorFacingTarget(
         npc,
-        context.getPlayer(),
+        context.actors.getPlayer(),
         BLOODMOON_NPC_HIT_RANGE,
       )
     ) return;
@@ -489,18 +489,18 @@ export function createBloodmoonLevel(context) {
     const pressure = state.hostility * npc.hostility;
     if (
       npc.alertTimer <= 0
-      && context.randomRange(0, 1) < deltaSeconds * 1.8 * pressure
+      && context.random.range(0, 1) < deltaSeconds * 1.8 * pressure
     ) {
       npc.attackTimer = 0.26;
       npc.attackResolveTimer = 0.12;
-      npc.attackCooldown = context.randomRange(1, 1.7) / pressure;
-      context.faceNpcToward(npc, context.getPlayer().group.position);
+      npc.attackCooldown = context.random.range(1, 1.7) / pressure;
+      context.movement.faceNpcToward(npc, context.actors.getPlayer().group.position);
     }
   }
 
   function updateWolfGuard(npc, deltaSeconds) {
-    const player = context.getPlayer();
-    const reached = context.moveNpcToward(
+    const player = context.actors.getPlayer();
+    const reached = context.movement.moveNpcToward(
       npc,
       player.group.position,
       npc.speed ?? BLOODMOON_GUARD_SPEED,
@@ -511,7 +511,7 @@ export function createBloodmoonLevel(context) {
       npc.alertTimer = 0;
       npc.hostility = 2.2;
       npc.attackCooldown = Math.min(npc.attackCooldown ?? 0.6, 0.18);
-      context.faceNpcToward(npc, player.group.position);
+      context.movement.faceNpcToward(npc, player.group.position);
     }
   }
 
@@ -526,7 +526,7 @@ export function createBloodmoonLevel(context) {
       effects.setBloodmoonClawIntensity(
         resources.targetCue,
         intensity,
-        0.9 + Math.abs(Math.sin(context.getTotalTime() * 15)) * 0.28,
+        0.9 + Math.abs(Math.sin(context.time.getTotal() * 15)) * 0.28,
         completeness,
       );
     }
@@ -538,7 +538,7 @@ export function createBloodmoonLevel(context) {
         return;
       }
       effects.positionBloodmoonCue(cue, npc);
-      const totalTime = context.getTotalTime();
+      const totalTime = context.time.getTotal();
       const flicker = 0.56
         + Math.abs(Math.sin(totalTime * 20 + cue.userData.seed)) * 0.34;
       effects.setBloodmoonClawIntensity(
@@ -560,7 +560,7 @@ export function createBloodmoonLevel(context) {
     updateHunt(deltaSeconds);
     if (state.mode !== "hunt") {
       updateTarget(deltaSeconds);
-      context.getNpcs().forEach((npc) => {
+      context.actors.getNpcs().forEach((npc) => {
         if (npc.isWolfGuard && npc.alive) updateWolfGuard(npc, deltaSeconds);
       });
     }
@@ -575,11 +575,11 @@ export function createBloodmoonLevel(context) {
     }
 
     if (hit.npc) {
-      context.dissolveNpc(hit.npc);
-      context.compactDeadNpcs();
-      context.triggerHitstop(0.06);
-      context.triggerShake(0.14, 0.1);
-      context.playLevelSound("miss");
+      context.actors.dissolve(hit.npc);
+      context.actors.compactDead();
+      context.combat.triggerHitstop(0.06);
+      context.combat.triggerShake(0.14, 0.1);
+      context.audio.playSound("miss");
       state.revealCount = Math.max(0, state.revealCount - 1);
       state.hostility = Math.min(2.35, state.hostility + 0.12);
     }
@@ -588,7 +588,7 @@ export function createBloodmoonLevel(context) {
 
   function handleAction(action) {
     if (action.type === "beginPlay") {
-      audio.playIntro();
+      playIntro();
       return { handled: true };
     }
     if (action.type === "beforeAttack") {
@@ -603,10 +603,10 @@ export function createBloodmoonLevel(context) {
     if (action.type === "hitTarget") return handleHitTarget(action.hit);
     if (action.type === "afterNpcUpdate") {
       if (state.mode !== "hunt") {
-        context.getNpcs().forEach((npc) => updateNpcThreat(npc, action.deltaSeconds));
+        context.actors.getNpcs().forEach((npc) => updateNpcThreat(npc, action.deltaSeconds));
       }
       updateTargetCue();
-      context.compactDeadNpcs();
+      context.actors.compactDead();
       return undefined;
     }
     if (action.type === "actorDissolved" && action.actor === target) {
@@ -632,7 +632,7 @@ export function createBloodmoonLevel(context) {
     handleAction,
     dispose() {
       hideSafeZones();
-      hideBloodmoonOverlays(context);
+      hideBloodmoonOverlays(context.ui);
       target = null;
     },
   };
