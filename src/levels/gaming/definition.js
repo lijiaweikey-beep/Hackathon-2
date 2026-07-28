@@ -1,7 +1,11 @@
+import { createGamingLevel } from "./createLevel.js";
+
 export default {
   id: "gaming",
   order: 10,
-  legacy: true,
+  legacy: false,
+  createLevel: createGamingLevel,
+  decoyCount: 3,
   sceneName: "凌晨三点",
   emoji: "🌙",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找到凌晨三点还在打游戏的人`,

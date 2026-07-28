@@ -155,6 +155,7 @@ import {
   getDuelGatherHudHint as getDuelGatherHudHintFromState,
   getDuelGatherUiState as buildDuelGatherUiState,
 } from "./modes/duel/rules.js";
+import { createLevelRunner } from "./levels/levelRunner.js";
 
 let renderer;
 let scene;
@@ -202,6 +203,30 @@ let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
 let punchTier = 0; // 0=第1拳(1s), 1+=后续(2s)
 let punchResetTimer = 0; // 停止出拳后重置计时
 let totalTime = 0;
+
+const levelRunner = createLevelRunner({
+  createContext: ({ scope }) => ({
+    scope,
+    npcCount: getMatchNpcCount(),
+    computers: levelState.computers,
+    npcSpeed: NPC_SPEED,
+    createNpc,
+    addNpc(npc) {
+      npcs.push(npc);
+      scene.add(npc.group);
+    },
+    addWanderNpc,
+    randomRange,
+    randomOpenPosition,
+    faceNpcToward,
+    moveNpcToward,
+    setBlackEye,
+    updateEnvironment: updateFlashlight,
+  }),
+  onError(error, definition) {
+    console.error(`关卡运行失败：${definition.id}`, error);
+  },
+});
 
 /* ---- NPC 人数设置 ---- */
 function getMatchNpcCount() {
@@ -1237,6 +1262,7 @@ function resize() {
 }
 
 function disposeScene() {
+  levelRunner.dispose();
   if (!scene) return;
   removeGatherMarker();
   // 清理粒子（材质是共享缓存的，不 dispose）
@@ -1408,26 +1434,9 @@ function spawnNpcs(level) {
     return;
   }
 
-  if (level.id === "gaming") {
-    const target = createNpc(0, { gamingTarget: true });
-    const computer = levelState.computers[2];
-    target.group.position.copy(computer);
-    target.group.position.x += 0.2;
-    target.script = {
-      state: "play",
-      timer: 2.6,
-      playDuration: 2.6,
-      computerIndex: 2,
-      waypoint: null,
-    };
-    faceNpcToward(target, levelState.computers[2].clone().setZ(levelState.computers[2].z - 1.2));
-    setBlackEye(target, 0.62);
-    npcs.push(target);
-    scene.add(target.group);
-
-    for (let i = 1; i < getMatchNpcCount(); i += 1) {
-      addWanderNpc(i);
-    }
+  if (!level.legacy) {
+    levelRunner.load(level);
+    levelRunner.start();
   } else if (level.id === "library") {
     const a = createNpc(0, { lover: true });
     const b = createNpc(1, { lover: true });
@@ -1487,8 +1496,15 @@ function spawnNpcs(level) {
     }
   }
 
-  const decoyCount = level.id === "temple" ? 5 : level.id === "library" ? 4 : level.id === "bloodmoon" ? 6 : 3;
-  const wanderNpcs = npcs.filter((n) => !n.isGamingTarget && !n.isLover && !n.isSuShiTarget && !n.isBloodmoonTarget && n.alive);
+  const decoyCount = level.decoyCount
+    ?? (level.id === "temple" ? 5 : level.id === "library" ? 4 : level.id === "bloodmoon" ? 6 : 3);
+  const wanderNpcs = npcs.filter(
+    (npc) => !npc.levelManaged
+      && !npc.isLover
+      && !npc.isSuShiTarget
+      && !npc.isBloodmoonTarget
+      && npc.alive,
+  );
   shuffleArray(wanderNpcs);
   for (let i = 0; i < Math.min(decoyCount, wanderNpcs.length); i += 1) {
     initDecoy(wanderNpcs[i], level.id === "temple" && i < 3);
@@ -2747,7 +2763,6 @@ function tick() {
       if (levelState.bloodmoon?.mode === "huntIntro" || levelState.bloodmoon?.mode === "huntBriefing") {
         updateHud();
         updateParticles(dt);
-        if (levelState?.level?.id === "gaming") updateFlashlight(dt);
         updateShake(dt);
         renderer.render(scene, camera);
         return;
@@ -2785,7 +2800,6 @@ function tick() {
     updateRemotePlayerAnim(dt);
   }
 
-  if (levelState?.level?.id === "gaming") updateFlashlight(dt);
   updateParticles(dt);
   updateShake(dt);
   renderer.render(scene, camera);
@@ -2971,9 +2985,24 @@ function updateNpcs(dt) {
     return;
   }
 
-  if (levelState.level.id === "gaming") {
-    updateGamingTarget(dt);
-  } else if (levelState.level.id === "library") {
+  if (!levelState.level.legacy) {
+    levelRunner.update(dt);
+    npcs.forEach((npc) => {
+      if (!npc.alive) return;
+      if (!npc.levelManaged) {
+        if (npc.isDecoy) {
+          updateDecoy(npc, dt);
+        } else {
+          updateWander(npc, dt);
+        }
+      }
+      animateActor(npc, dt, npc.walking);
+    });
+    separateActors();
+    return;
+  }
+
+  if (levelState.level.id === "library") {
     updateLovers(dt);
   } else {
     updateTempleTarget(dt);
@@ -2981,10 +3010,6 @@ function updateNpcs(dt) {
 
   npcs.forEach((npc) => {
     if (!npc.alive) return;
-    if (npc.isGamingTarget) {
-      animateActor(npc, dt, npc.walking);
-      return;
-    }
     if (npc.isLover || npc.isSuShiTarget) return;
     if (npc.isDecoy) {
       updateDecoy(npc, dt);
@@ -2996,52 +3021,6 @@ function updateNpcs(dt) {
 
   separateActors();
   updateTempleShadows();
-}
-
-function updateGamingTarget(dt) {
-  const target = npcs.find((npc) => npc.isGamingTarget);
-  if (!target || !target.alive) return;
-  const script = target.script;
-
-  if (script.state === "play") {
-    target.walking = false;
-    script.timer -= dt;
-    const computer = levelState.computers[script.computerIndex];
-    faceNpcToward(target, new THREE.Vector3(computer.x, 0, computer.z > 0 ? computer.z - 1.1 : computer.z + 1.1));
-    const playProgress = 1 - script.timer / (script.playDuration || script.timer || 1);
-    setBlackEye(target, 0.62 + playProgress * 0.28);
-    if (script.timer <= 0) {
-      setBlackEye(target, 1);
-      script.state = "leave";
-      script.timer = randomRange(5, 7);
-      script.waypoint = randomOpenPosition();
-    }
-    return;
-  }
-
-  if (script.state === "leave") {
-    target.walking = true;
-    const reached = moveNpcToward(target, script.waypoint, NPC_SPEED * 1.08, dt);
-    script.timer -= dt;
-    if (reached || script.timer <= 0) {
-      const nextIndex = Math.floor(Math.random() * levelState.computers.length);
-      script.computerIndex = nextIndex;
-      script.waypoint = levelState.computers[nextIndex].clone();
-      script.state = "seek";
-    }
-    return;
-  }
-
-  if (script.state === "seek") {
-    target.walking = true;
-    const reached = moveNpcToward(target, script.waypoint, NPC_SPEED * 1.12, dt);
-    if (reached) {
-      script.state = "play";
-      script.timer = randomRange(2.2, 3.4);
-      script.playDuration = script.timer;
-      setBlackEye(target, 0.62);
-    }
-  }
 }
 
 function updateLovers(dt) {
