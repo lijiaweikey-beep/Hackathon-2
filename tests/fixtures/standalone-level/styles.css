@@ -1,0 +1,23 @@
+:host {
+  color: #fff7ed;
+  font-family: system-ui, sans-serif;
+}
+
+.reaction-game {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  background: radial-gradient(circle, #7c2d12, #1c1917 68%);
+}
+
+button {
+  padding: 16px 28px;
+  border: 0;
+  border-radius: 999px;
+  background: #f97316;
+  color: white;
+  font: inherit;
+  font-weight: 800;
+}

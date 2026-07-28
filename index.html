@@ -3,17 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>俯视角动作小游戏</title>
+    <title>梗哥的半生</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <div id="damageFlash" class="damage-flash" aria-hidden="true"></div>
-    <div id="proximityPulse" class="proximity-pulse hidden" aria-hidden="true">
-      <div class="proximity-heart-wrap">
-        <span class="proximity-heart" aria-hidden="true">❤️</span>
-        <span class="proximity-label">对手在附近</span>
-      </div>
-    </div>
     <canvas id="gameCanvas" aria-label="3D top-down action game"></canvas>
 
     <main id="hud" class="hud" aria-label="游戏界面">
@@ -22,11 +16,6 @@
           <div id="sceneName" class="scene-name">凌晨三点</div>
           <div id="missionText" class="mission-text">任务加载中</div>
           <div id="mechanicHint" class="mechanic-hint" aria-live="polite"></div>
-        </div>
-        <div id="gatherBanner" class="gather-banner hidden" aria-live="polite">
-          <div id="gatherBannerTitle" class="gather-banner-title">集合报到</div>
-          <div id="gatherBannerCountdown" class="gather-banner-countdown">30s</div>
-          <div id="gatherBannerHint" class="gather-banner-hint">走到地面绿圈内站好，最后 5 秒必须在里面，否则扣 1 ❤️</div>
         </div>
         <div class="status-strip">
           <div class="status-chip">
@@ -41,7 +30,7 @@
         </div>
       </section>
 
-      <div id="duelTopHud" class="duel-top-hud">
+      <div class="clue-bar-wrap">
         <div id="clueBar" class="clue-bar">🔍 目标特征加载中</div>
       </div>
 
@@ -72,29 +61,23 @@
     <section id="levelSelectModal" class="modal visible">
       <div id="levelSelectPanel" class="level-select-panel">
         <header class="level-select-header">
-          <div id="gameLogo" class="game-logo">🔥 别让我逮到你 🔥</div>
+          <div class="game-kicker"><span aria-hidden="true"></span>一拳解压人生</div>
+          <div id="gameLogo" class="game-logo">梗哥的半生</div>
+          <p class="level-select-tagline">从消失的体育课，打到下班前一分钟</p>
+          <div class="life-timeline" aria-label="梗哥的人生阶段">
+            <span class="life-stage active">小学</span>
+            <span class="life-stage">中学</span>
+            <span class="life-stage">大学</span>
+            <span class="life-stage">研究生</span>
+            <span class="life-stage">职场</span>
+            <span class="life-stage wild">旷野</span>
+          </div>
           <div class="level-select-tags">
-            <span class="level-tag">适合8人</span>
-            <span class="level-tag">4种玩法</span>
-            <span class="level-tag">一多点用</span>
+            <span class="level-tag">单人剧情</span>
+            <span class="level-tag">人生闯关</span>
+            <span class="level-tag">一拳解压</span>
           </div>
         </header>
-
-        <div id="duelLobbyPanel" class="duel-lobby-panel" hidden>
-          <div class="duel-lobby-title">⚔️ 图书馆决斗</div>
-          <p id="duelLobbyHint" class="duel-lobby-hint">把下方链接发给选手，选手打开即可加入</p>
-          <div id="mpShareBox" class="mp-share-box mp-share-box--duel">
-            <div class="mp-status" id="mpStatusText">🔗 正在创建房间...</div>
-            <div class="mp-link-row">
-              <input id="mpLinkInput" class="mp-link-input" readonly />
-              <button id="mpCopyBtn" class="mp-copy-btn" type="button">复制链接</button>
-            </div>
-          </div>
-          <div id="duelGuestWaiting" class="duel-guest-waiting" hidden>
-            <p id="duelGuestStatus" class="duel-guest-status">🔗 正在加入房间...</p>
-          </div>
-          <button id="duelBackBtn" class="secondary-button duel-back-btn" type="button">返回单人模式</button>
-        </div>
 
         <div id="soloModeStack" class="level-select-stack">
           <div class="match-settings">
@@ -123,15 +106,10 @@
               </div>
             </div>
           </div>
-          <p class="level-section-label">选择关卡</p>
+          <p class="level-section-label">原型试玩</p>
           <div id="levelCards" class="level-cards">
             <!-- 关卡卡片将通过JavaScript动态生成 -->
           </div>
-          <div class="level-section-divider" aria-hidden="true"><span>或</span></div>
-          <button id="mpCreateBtn" class="mp-create-btn" type="button">
-            <span class="mp-create-btn-icon" aria-hidden="true">🎮</span>
-            <span class="mp-create-btn-text">创建私房间网 · 找人游玩</span>
-          </button>
         </div>
       </div>
     </section>
@@ -156,7 +134,6 @@
           <div class="guide-item"><span class="guide-icon">🕹</span> 摇杆/WASD 移动</div>
           <div class="guide-item"><span class="guide-icon">👊</span> 拳按钮/空格 攻击</div>
         </div>
-        <div id="taskMpHint" class="task-mp-hint" hidden></div>
         <div class="task-actions">
           <button id="backFromTaskButton" class="secondary-button" type="button">返回选关</button>
           <button id="startButton" class="primary-button" type="button">开始行动</button>

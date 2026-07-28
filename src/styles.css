@@ -247,79 +247,6 @@ button {
   100% { opacity: 0; }
 }
 
-/* ---- 对手近距离心跳提示（不显示方向） ---- */
-.proximity-pulse {
-  --proximity-glow: 0.2;
-  --beat-duration: 0.9s;
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 90;
-  opacity: 0;
-  transition: opacity 0.35s ease;
-}
-
-.proximity-pulse.beating {
-  opacity: 1;
-}
-
-.proximity-pulse.beating::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  box-shadow:
-    inset 0 0 90px rgba(220, 38, 38, var(--proximity-glow)),
-    inset 0 0 160px rgba(127, 29, 29, calc(var(--proximity-glow) * 0.55));
-  animation: proximity-edge-beat var(--beat-duration) ease-in-out infinite;
-}
-
-.proximity-heart-wrap {
-  position: absolute;
-  left: 50%;
-  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 118px);
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.proximity-heart {
-  display: block;
-  font-size: 28px;
-  line-height: 1;
-  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.55));
-  animation: proximity-heart-beat var(--beat-duration) ease-in-out infinite;
-}
-
-.proximity-label {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: rgba(254, 202, 202, 0.95);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
-}
-
-@keyframes proximity-heart-beat {
-  0%, 100% { transform: scale(1); }
-  12% { transform: scale(1.22); }
-  24% { transform: scale(1); }
-  36% { transform: scale(1.14); }
-  48% { transform: scale(1); }
-}
-
-@keyframes proximity-edge-beat {
-  0%, 100% { opacity: 0.55; }
-  12% { opacity: 1; }
-  24% { opacity: 0.6; }
-  36% { opacity: 0.92; }
-  48% { opacity: 0.55; }
-}
-
-.proximity-pulse.hidden {
-  display: none;
-}
-
 .hearts-display {
   font-size: 1.05em;
   letter-spacing: 0.06em;
@@ -443,8 +370,8 @@ button {
   margin-top: 4px;
 }
 
-/* ---- HUD 顶部信息区（决斗生命条）---- */
-.duel-top-hud {
+/* ---- HUD 顶部线索区 ---- */
+.clue-bar-wrap {
   position: absolute;
   top: calc(max(12px, env(safe-area-inset-top)) + 66px);
   left: 12px;
@@ -469,125 +396,9 @@ button {
   animation: cluePulse 2.5s ease-in-out infinite;
 }
 
-.hud.is-duel-play .clue-bar {
-  color: #fde68a;
-  border-color: rgba(253, 224, 71, 0.22);
-  background: rgba(8, 12, 20, 0.88);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
 @keyframes cluePulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.85; }
-}
-
-/* ---- 决斗集合圈提示（嵌入 topbar 中央）---- */
-.topbar .gather-banner {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: min(calc(100% - 220px), 320px);
-  padding: 6px 10px 5px;
-  border-radius: 10px;
-  border: 2px solid rgba(21, 128, 61, 0.85);
-  background: rgba(6, 40, 22, 0.92);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(14px);
-  text-align: center;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.gather-banner.hidden {
-  display: none;
-}
-
-.hud.gather-active .mission-strip {
-  opacity: 0;
-}
-
-.gather-banner-title {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: #bbf7d0;
-  line-height: 1.2;
-}
-
-.gather-banner-countdown {
-  margin-top: 1px;
-  font-size: 22px;
-  line-height: 1;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  color: #4ade80;
-  text-shadow: 0 0 18px rgba(74, 222, 128, 0.35);
-}
-
-.gather-banner-hint {
-  margin-top: 3px;
-  font-size: 10px;
-  line-height: 1.25;
-  font-weight: 600;
-  color: rgba(220, 252, 231, 0.92);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.gather-banner.preview {
-  border-color: rgba(21, 128, 61, 0.95);
-  background: rgba(6, 40, 22, 0.9);
-}
-
-.gather-banner.upcoming {
-  border-color: rgba(22, 101, 52, 0.8);
-  background: rgba(8, 32, 18, 0.82);
-}
-
-.gather-banner.upcoming .gather-banner-countdown {
-  font-size: 20px;
-  color: #86efac;
-}
-
-.gather-banner.urgent {
-  border-color: rgba(185, 28, 28, 0.95);
-  background: rgba(48, 8, 8, 0.92);
-  animation: gatherUrgentPulseTopbar 0.85s ease-in-out infinite;
-}
-
-.gather-banner.urgent .gather-banner-title {
-  color: #fecaca;
-}
-
-.gather-banner.urgent .gather-banner-countdown {
-  color: #f87171;
-  text-shadow: 0 0 20px rgba(248, 113, 113, 0.45);
-}
-
-.gather-banner.urgent .gather-banner-hint {
-  color: rgba(254, 226, 226, 0.95);
-}
-
-.gather-banner.success {
-  border-color: rgba(20, 83, 45, 0.95);
-  background: rgba(5, 36, 20, 0.9);
-}
-
-.gather-banner.success .gather-banner-title {
-  color: #86efac;
-}
-
-.gather-banner.success .gather-banner-countdown {
-  color: #4ade80;
-}
-
-@keyframes gatherUrgentPulseTopbar {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.02); }
 }
 
 /* ---- 关卡选择界面 ---- */
@@ -613,14 +424,15 @@ button {
   position: absolute;
   inset: -40px -20px auto;
   height: 180px;
-  background: radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.08), transparent 70%);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(251, 113, 133, 0.11), transparent 54%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 9px);
   pointer-events: none;
   z-index: 0;
 }
 
 .level-select-header,
-.level-select-stack,
-.duel-lobby-panel {
+.level-select-stack {
   position: relative;
   z-index: 1;
 }
@@ -629,11 +441,31 @@ button {
   margin-bottom: 22px;
 }
 
+.game-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  color: rgba(251, 191, 36, 0.86);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.game-kicker span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fb7185;
+  box-shadow: 0 0 14px rgba(251, 113, 133, 0.8);
+}
+
 .game-logo {
-  font-size: 26px;
+  font-size: 32px;
   font-weight: 950;
   line-height: 1.25;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
   margin-bottom: 8px;
   background: linear-gradient(135deg, #fde68a 0%, #fb7185 42%, #2dd4bf 100%);
   -webkit-background-clip: text;
@@ -646,9 +478,69 @@ button {
   margin: 0;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(247, 251, 255, 0.42);
+  letter-spacing: 0.08em;
+  color: rgba(247, 251, 255, 0.58);
+}
+
+.life-timeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  margin: 18px auto 0;
+  max-width: 410px;
+}
+
+.life-timeline::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 8.5%;
+  right: 8.5%;
+  height: 1px;
+  background: linear-gradient(90deg, #fb7185, rgba(45, 212, 191, 0.55));
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.22);
+}
+
+.life-stage {
+  position: relative;
+  padding-top: 16px;
+  color: rgba(247, 251, 255, 0.46);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.life-stage::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 1px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #0b111b;
+  border-radius: 50%;
+  background: #64748b;
+  transform: translateX(-50%);
+}
+
+.life-stage.active {
+  color: #fda4af;
+}
+
+.life-stage.active::before {
+  background: #fb7185;
+  box-shadow: 0 0 14px rgba(251, 113, 133, 0.78);
+}
+
+.life-stage.wild {
+  color: #5eead4;
+}
+
+.life-stage.wild::before {
+  background: #2dd4bf;
+  box-shadow: 0 0 14px rgba(45, 212, 191, 0.65);
 }
 
 .level-select-tags {
@@ -659,31 +551,16 @@ button {
 }
 
 .level-tag {
-  padding: 6px 16px;
+  padding: 5px 13px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: rgba(247, 251, 255, 0.8);
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: rgba(247, 251, 255, 0.72);
+  font-size: 11px;
   font-weight: 700;
 }
 
-.level-select-panel.is-duel-lobby .level-select-tagline {
-  display: none;
-}
-
-.level-select-panel.is-duel-lobby .game-logo {
-  background: linear-gradient(135deg, #2dd4bf, #5eead4);
-  -webkit-background-clip: text;
-  background-clip: text;
-  filter: drop-shadow(0 0 16px rgba(45, 212, 191, 0.45));
-}
-
 [hidden] {
-  display: none !important;
-}
-
-.level-select-panel.is-duel-lobby .level-select-stack {
   display: none !important;
 }
 
@@ -870,21 +747,6 @@ button {
   pointer-events: auto;
   overflow: hidden;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-}
-
-.level-card--gaming {
-  --card-accent: #818cf8;
-  --card-glow: rgba(129, 140, 248, 0.28);
-}
-
-.level-card--library {
-  --card-accent: #2dd4bf;
-  --card-glow: rgba(45, 212, 191, 0.28);
-}
-
-.level-card--temple {
-  --card-accent: #fbbf24;
-  --card-glow: rgba(251, 191, 36, 0.28);
 }
 
 .level-card-accent {
@@ -1209,13 +1071,25 @@ button {
   }
 
   .game-logo {
-    font-size: 22px;
+    font-size: 27px;
     margin-bottom: 6px;
   }
 
   .level-select-tagline {
     font-size: 10px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.04em;
+  }
+
+  .life-stage {
+    font-size: 8px;
+  }
+
+  .level-select-tags {
+    gap: 6px;
+  }
+
+  .level-tag {
+    padding: 5px 9px;
   }
 
   .level-card {
@@ -1249,205 +1123,9 @@ button {
   }
 }
 
-/* ---- 双人决斗大厅 ---- */
-.duel-lobby-panel {
-  padding: 4px 2px 8px;
-  text-align: center;
-  pointer-events: auto;
-}
-
-.duel-lobby-title {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  color: var(--accent);
-  margin-bottom: 8px;
-  text-shadow: 0 0 16px rgba(45, 212, 191, 0.35);
-}
-
-.duel-lobby-hint {
-  margin: 0 0 18px;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-.duel-guest-waiting {
-  padding: 28px 16px;
-  border: 1px solid rgba(45, 212, 191, 0.25);
-  border-radius: 12px;
-  background: rgba(45, 212, 191, 0.06);
-}
-
-.duel-guest-status {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--accent);
-  line-height: 1.6;
-}
-
-.duel-back-btn {
-  margin-top: 18px;
-  width: 100%;
-  pointer-events: auto;
-}
-
-/* ---- 多人联机 ---- */
-.level-select-stack .mp-create-btn {
-  margin-top: 2px;
-  width: 100%;
-}
-
-.mp-create-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 14px 20px;
-  border-radius: 16px;
-  border: 1px solid rgba(45, 212, 191, 0.4);
-  background:
-    linear-gradient(160deg, rgba(45, 212, 191, 0.22), rgba(245, 158, 11, 0.15)),
-    rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 900;
-  cursor: pointer;
-  pointer-events: auto;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 12px 32px rgba(45, 212, 191, 0.15);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.mp-create-btn-icon {
-  font-size: 20px;
-  line-height: 1;
-}
-
-.mp-create-btn-text {
-  line-height: 1.3;
-}
-
-.mp-create-btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(45, 212, 191, 0.55);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 24px rgba(45, 212, 191, 0.2),
-    0 12px 32px rgba(0, 0, 0, 0.28);
-}
-
-.mp-create-btn:active {
-  transform: translateY(0) scale(0.99);
-}
-
-.mp-share-box {
-  padding: 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(45, 212, 191, 0.3);
-  background: rgba(45, 212, 191, 0.06);
-  margin-bottom: 12px;
-}
-
-.mp-share-box--duel {
-  padding: 18px;
-  text-align: left;
-}
-
-.mp-share-box--duel .mp-link-input {
-  font-size: 13px;
-  padding: 10px 12px;
-}
-
-.mp-share-box--duel .mp-copy-btn {
-  padding: 10px 16px;
-  font-size: 13px;
-}
-
-.mp-status {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 10px;
-}
-
-.mp-link-row {
-  display: flex;
-  gap: 8px;
-}
-
-.mp-link-input {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.3);
-  color: var(--text);
-  font-size: 12px;
-  font-family: monospace;
-  outline: none;
-  min-width: 0;
-}
-
-.mp-copy-btn {
-  padding: 8px 14px;
-  border-radius: 6px;
-  border: 0;
-  background: var(--accent);
-  color: #04100e;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.mp-copy-btn:active {
-  transform: scale(0.95);
-}
-
-.task-mp-hint {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(45, 212, 191, 0.25);
-  background: rgba(45, 212, 191, 0.08);
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 700;
-  text-align: center;
-}
-
 .primary-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-/* ---- bloodmoon mode (from zjy) ---- */
-.scene-name.bloodmoon-text {
-  color: #fb7185;
-  text-shadow: 0 0 16px rgba(248, 113, 113, 0.55);
-}
-
-.status-chip.bloodmoon strong {
-  color: #fca5a5;
-  text-shadow: 0 0 14px rgba(248, 113, 113, 0.55);
-}
-
-.attack-button.bloodmoon {
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 34%),
-    linear-gradient(160deg, #7f1d1d, #fb7185 58%, #111116);
-  box-shadow: 0 18px 34px rgba(248, 113, 113, 0.34), 0 20px 36px var(--shadow);
-  color: #fff5f5;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
-}
-
-.clue-bar.bloodmoon {
-  color: #fecdd3;
-  text-shadow: 0 0 14px rgba(248, 113, 113, 0.42);
 }
 
 .mechanic-hint {
@@ -1513,156 +1191,4 @@ button {
 
 .clue-bar.hidden {
   display: none;
-}
-
-.hud.bloodmoon-hit::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at center, transparent 42%, rgba(127, 29, 29, 0.32)),
-    rgba(248, 113, 113, 0.22);
-  animation: bloodmoonHitFlash 180ms ease-out both;
-}
-
-.hud.bloodmoon-lightning::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(105deg, transparent 0 42%, rgba(255, 255, 255, 0.86) 43%, transparent 46% 58%, rgba(219, 234, 254, 0.72) 59%, transparent 62%),
-    rgba(239, 246, 255, 0.42);
-  mix-blend-mode: screen;
-  animation: bloodmoonLightningFlash 360ms steps(3, end) both;
-}
-
-.hunt-intro {
-  position: fixed;
-  inset: 0;
-  z-index: 4;
-  display: none;
-  place-items: center;
-  pointer-events: none;
-  background: rgba(8, 2, 4, 0.72);
-}
-
-.hunt-intro.visible {
-  display: grid;
-  animation: huntIntroFlash 2.8s ease both;
-}
-
-.hunt-intro > * {
-  grid-area: 1 / 1;
-}
-
-.hunt-intro-moon {
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 34%, #fecdd3, #dc2626 48%, #450a0a 74%);
-  box-shadow: 0 0 60px rgba(248, 113, 113, 0.44);
-  animation: huntMoonPulse 2.8s ease both;
-}
-
-.hunt-intro-title {
-  margin-top: -54px;
-  color: #fecdd3;
-  font-size: 15px;
-  font-weight: 950;
-  text-shadow: 0 0 18px rgba(248, 113, 113, 0.78);
-}
-
-.hunt-intro-quote {
-  margin-top: 74px;
-  width: min(520px, calc(100% - 34px));
-  text-align: center;
-  color: #fff1f2;
-  font-size: 24px;
-  line-height: 1.28;
-  font-weight: 950;
-  text-shadow: 0 0 24px rgba(0, 0, 0, 0.72);
-}
-
-.hunt-card {
-  position: fixed;
-  left: 50%;
-  top: 22%;
-  z-index: 4;
-  width: min(420px, calc(100% - 32px));
-  padding: 16px 18px;
-  border: 1px solid rgba(248, 113, 113, 0.44);
-  border-radius: 8px;
-  background: rgba(20, 6, 10, 0.9);
-  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.46), 0 0 28px rgba(248, 113, 113, 0.18);
-  color: var(--text);
-  pointer-events: none;
-  opacity: 0;
-  transform: translate(-50%, -14px) scale(0.98);
-}
-
-.hunt-card.visible {
-  pointer-events: auto;
-  opacity: 1;
-  transform: translate(-50%, 0) scale(1);
-}
-
-.hunt-card-title {
-  color: #fca5a5;
-  font-size: 13px;
-  line-height: 1.2;
-  font-weight: 950;
-}
-
-.hunt-card-quote {
-  margin-top: 7px;
-  color: #fff1f2;
-  font-size: 19px;
-  line-height: 1.28;
-  font-weight: 950;
-}
-
-.hunt-card-rule {
-  margin-top: 9px;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
-  font-weight: 800;
-}
-
-.hunt-card-button {
-  width: 100%;
-  min-height: 42px;
-  margin-top: 14px;
-  border-radius: 8px;
-  background: #22c55e;
-  color: #052e16;
-  font-weight: 950;
-}
-
-@keyframes huntIntroFlash {
-  0% { opacity: 0; }
-  12% { opacity: 1; }
-  82% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-@keyframes huntMoonPulse {
-  0% { transform: scale(0.58); opacity: 0; }
-  20% { transform: scale(1.06); opacity: 1; }
-  62% { transform: scale(0.98); opacity: 1; }
-  100% { transform: scale(1.18); opacity: 0; }
-}
-
-@keyframes bloodmoonHitFlash {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-@keyframes bloodmoonLightningFlash {
-  0% { opacity: 0; }
-  12% { opacity: 1; }
-  28% { opacity: 0.22; }
-  42% { opacity: 0.95; }
-  100% { opacity: 0; }
 }

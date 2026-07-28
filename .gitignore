@@ -2,6 +2,7 @@ node_modules/
 dist/
 .specstory/
 .cursorindexingignore
+.DS_Store
 *.log
 serve.out.log
 serve.err.log
