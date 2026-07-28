@@ -27,17 +27,6 @@ import { renderTargetPreview } from "./ui/targetPreview.js";
 import { renderTaskModal } from "./ui/taskModal.js";
 import { clampToWorld, lerpAngle, gridKey, getFacingVector } from "./utils/math.js";
 import {
-  setShadowCueIntensity,
-  positionShadowCue,
-  setTempleLocalShadow,
-  createSuShiShadowCue,
-} from "./entities/templeShadows.js";
-import {
-  setBloodmoonClawIntensity,
-  positionBloodmoonCue,
-  createBloodmoonClawCue,
-} from "./entities/bloodmoonCues.js";
-import {
   createPlayer as createPlayerEntity,
   createNpc as createNpcEntity,
 } from "./entities/actors.js";
@@ -99,7 +88,7 @@ const levelRunner = createLevelRunner({
   createContext: ({ definition, scope }) => ({
     definition,
     scope,
-    sceneData: levelState[definition.id],
+    sceneData: levelState.sceneData,
     npcCount: getMatchNpcCount(),
     computers: levelState.computers,
     npcSpeed: NPC_SPEED,
@@ -136,11 +125,6 @@ const levelRunner = createLevelRunner({
     refreshHud: updateHud,
     resetPlayerInput,
     isActorFacingTarget,
-    setTempleLocalShadow,
-    setShadowCueIntensity,
-    positionShadowCue,
-    setBloodmoonClawIntensity,
-    positionBloodmoonCue,
     updateEnvironment: updateFlashlight,
   }),
   onError(error, definition) {
@@ -246,8 +230,6 @@ function getWorldContext() {
     getMatchNpcCount,
     collidesWithObstacle: (pos, radius) => collidesWithObstacleInLevel(levelState, pos, radius),
     registerObstacle: (x, z, halfW, halfD) => registerObstacleInLevel(levelState, x, z, halfW, halfD),
-    createBloodmoonClawCue,
-    createSuShiShadowCue,
     createLightningBolt: (x, z, width, height, tilt) => createLightningBolt(x, z, width, height, tilt, randomRange),
   };
 }

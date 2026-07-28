@@ -58,10 +58,12 @@ function createFakeContext({ npcCount, moveReached = false }) {
     getTotalTime() {
       return 2;
     },
-    setTempleLocalShadow() {},
-    positionShadowCue() {},
-    setShadowCueIntensity(_cue, intensity) {
-      context.cueIntensities.push(intensity);
+    effects: {
+      setTempleLocalShadow() {},
+      positionShadowCue() {},
+      setShadowCueIntensity(_cue, intensity) {
+        context.cueIntensities.push(intensity);
+      },
     },
   };
   return context;

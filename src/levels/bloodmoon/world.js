@@ -1,3 +1,5 @@
+import { createBloodmoonClawCue } from "../../entities/bloodmoonCues.js";
+
 export function createWorld(world) {
-  world.buildBloodmoonStreet(world.baseLight);
+  return world.buildBloodmoonStreet(world.baseLight, createBloodmoonClawCue);
 }

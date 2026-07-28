@@ -86,8 +86,10 @@ function createFakeContext({ npcCount = 4 } = {}) {
     finishLevel() {},
     refreshHud() {},
     resetPlayerInput() {},
-    setBloodmoonClawIntensity() {},
-    positionBloodmoonCue() {},
+    effects: {
+      setBloodmoonClawIntensity() {},
+      positionBloodmoonCue() {},
+    },
   };
   return context;
 }

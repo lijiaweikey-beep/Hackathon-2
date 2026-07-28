@@ -6,8 +6,18 @@ import {
   TEMPLE_TRUE_REVEAL_AT,
   TEMPLE_TRUE_SHADOW_MAX,
 } from "../../config/constants.js";
+import {
+  positionShadowCue,
+  setShadowCueIntensity,
+  setTempleLocalShadow,
+} from "../../entities/templeShadows.js";
 
 export function createTempleLevel(context) {
+  const effects = context.effects ?? {
+    positionShadowCue,
+    setShadowCueIntensity,
+    setTempleLocalShadow,
+  };
   let target = null;
 
   function segmentPassesMoon(fromPosition, toPosition, radius) {
@@ -88,8 +98,8 @@ export function createTempleLevel(context) {
     const clueIntensity = Math.min(intensity, TEMPLE_TRUE_SHADOW_MAX);
     npc.marked = true;
     npc.markIntensity = clueIntensity;
-    context.positionShadowCue(context.sceneData.shadowCue, npc);
-    context.setShadowCueIntensity(
+    effects.positionShadowCue(context.sceneData.shadowCue, npc);
+    effects.setShadowCueIntensity(
       context.sceneData.shadowCue,
       clueIntensity * getMoonInfluence(npc.group.position),
     );
@@ -98,8 +108,8 @@ export function createTempleLevel(context) {
   function pulseClues(npc) {
     if (!npc.marked) return;
     const pulse = 0.5 + Math.sin(context.getTotalTime() * 3.2) * 0.5;
-    context.positionShadowCue(context.sceneData.shadowCue, npc);
-    context.setShadowCueIntensity(
+    effects.positionShadowCue(context.sceneData.shadowCue, npc);
+    effects.setShadowCueIntensity(
       context.sceneData.shadowCue,
       npc.markIntensity * getMoonInfluence(npc.group.position),
       0.78 + pulse * 0.12,
@@ -169,13 +179,13 @@ export function createTempleLevel(context) {
       const pulse = 0.9
         + Math.sin(context.getTotalTime() * 2.4 + (actor.id ?? 0)) * 0.08;
       const strength = actor.isSuShiTarget ? 0.86 : actor.isDecoy ? 0.84 : 0.8;
-      context.setTempleLocalShadow(actor, influence, strength, pulse);
+      effects.setTempleLocalShadow(actor, influence, strength, pulse);
     });
 
     if (target?.marked) {
       pulseClues(target);
     } else {
-      context.setShadowCueIntensity(context.sceneData.shadowCue, 0);
+      effects.setShadowCueIntensity(context.sceneData.shadowCue, 0);
     }
   }
 
@@ -249,7 +259,7 @@ export function createTempleLevel(context) {
         script.exposed = false;
         target.marked = false;
         target.markIntensity = 0;
-        context.setShadowCueIntensity(context.sceneData.shadowCue, 0);
+        effects.setShadowCueIntensity(context.sceneData.shadowCue, 0);
       }
       return;
     }
@@ -293,7 +303,7 @@ export function createTempleLevel(context) {
         return updateShadows();
       }
       if (action.type === "actorDissolved" && action.actor === target) {
-        context.setShadowCueIntensity(context.sceneData.shadowCue, 0);
+        effects.setShadowCueIntensity(context.sceneData.shadowCue, 0);
       }
       return undefined;
     },

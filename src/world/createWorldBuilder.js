@@ -259,8 +259,8 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   });
 }
 
-  function buildTempleCourtyard() {
-  ctx.getLevelState().temple = {
+  function buildTempleCourtyard(createShadowCue) {
+  const resources = {
     moonPoint: new THREE.Vector3(0, 0, 0.15),
   };
 
@@ -365,8 +365,9 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   addCypress(-8.7, 0.4, 1.05);
   addCypress(8.6, 0.2, 1.0);
 
-  ctx.getLevelState().temple.shadowCue = ctx.createSuShiShadowCue(0);
-  ctx.getScene().add(ctx.getLevelState().temple.shadowCue);
+  resources.shadowCue = createShadowCue(0);
+  ctx.getScene().add(resources.shadowCue);
+  return resources;
 }
 
   function addBambooCluster(x, z) {
@@ -406,13 +407,13 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   ctx.registerObstacle(x, z, 0.55 * scale, 0.55 * scale);
 }
 
-  function buildBloodmoonStreet(baseLight) {
-  ctx.getLevelState().bloodmoon = {
+  function buildBloodmoonStreet(baseLight, createClawCue) {
+  const resources = {
     lightningTimer: ctx.randomRange(BLOODMOON_LIGHTNING_INTERVAL[0], BLOODMOON_LIGHTNING_INTERVAL[1]),
     lightningFlash: 0,
     clueTimer: 0,
     revealCount: 0,
-    targetCue: ctx.createBloodmoonClawCue(0),
+    targetCue: createClawCue(0),
     decoyCues: [],
     mode: "phase1",
     huntTimer: 0,
@@ -444,24 +445,24 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   const lightningLight = new THREE.PointLight(0xdbeafe, 0, 28);
   lightningLight.position.set(-3, 9.4, -2);
   ctx.getScene().add(lightningLight);
-  ctx.getLevelState().bloodmoon.lightningLight = lightningLight;
+  resources.lightningLight = lightningLight;
 
-  ctx.getLevelState().bloodmoon.lightningBolts = [
+  resources.lightningBolts = [
     ctx.createLightningBolt(-5.4, -11.72, 1.25, 4.9, 0.22),
     ctx.createLightningBolt(1.4, -11.73, 1.6, 5.5, -0.12),
     ctx.createLightningBolt(5.4, -11.74, 1.1, 4.2, 0.34),
   ];
-  ctx.getLevelState().bloodmoon.lightningBolts.forEach((bolt) => {
+  resources.lightningBolts.forEach((bolt) => {
     bolt.visible = false;
     ctx.getScene().add(bolt);
   });
 
   for (let i = 0; i < BLOODMOON_DECOY_CUES; i += 1) {
-    const cue = ctx.createBloodmoonClawCue(0);
+    const cue = createClawCue(0);
     cue.userData.isDecoyCue = true;
     cue.userData.decoyNpc = null;
     cue.userData.decoyCompleteness = 0.45;
-    ctx.getLevelState().bloodmoon.decoyCues.push(cue);
+    resources.decoyCues.push(cue);
     ctx.getScene().add(cue);
   }
 
@@ -469,7 +470,7 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   const moonDisk = new THREE.Mesh(new THREE.CircleGeometry(1.35, 48), moonMaterial);
   moonDisk.position.set(7.2, 5.25, -11.75);
   ctx.getScene().add(moonDisk);
-  ctx.getLevelState().bloodmoon.moonMaterial = moonMaterial;
+  resources.moonMaterial = moonMaterial;
 
   const moonHalo = new THREE.Mesh(
     new THREE.CircleGeometry(2.15, 48),
@@ -571,7 +572,7 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
     ctx.registerObstacle(x, z, 0.18, 0.18);
   });
 
-  ctx.getScene().add(ctx.getLevelState().bloodmoon.targetCue);
+  ctx.getScene().add(resources.targetCue);
 
   for (let i = 0; i < BLOODMOON_SAFE_ZONE_COUNT; i += 1) {
     const safeZoneMat = new THREE.MeshBasicMaterial({
@@ -596,8 +597,9 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
     safeZoneRing.renderOrder = 15;
     safeZoneRing.visible = false;
     ctx.getScene().add(safeZoneRing);
-    ctx.getLevelState().bloodmoon.safeZoneVisuals.push({ mesh: safeZoneMesh, ring: safeZoneRing });
+    resources.safeZoneVisuals.push({ mesh: safeZoneMesh, ring: safeZoneRing });
   }
+  return resources;
 }
 
   function buildWorld(level) {
@@ -663,7 +665,7 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   floor.receiveShadow = true;
   ctx.getScene().add(floor);
 
-  level.extensions?.createWorld?.({
+  ctx.getLevelState().sceneData = level.extensions?.createWorld?.({
     THREE,
     scene: ctx.getScene(),
     state: ctx.getLevelState(),
@@ -675,7 +677,7 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
     buildTempleCourtyard,
     buildBloodmoonStreet,
     baseLight: sun,
-  });
+  }) ?? null;
 }
 
   return {

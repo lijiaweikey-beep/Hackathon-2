@@ -15,6 +15,10 @@ import {
   BLOODMOON_SUMMON_COUNT,
   BLOODMOON_WOLF_COOLDOWN,
 } from "../../config/constants.js";
+import {
+  positionBloodmoonCue,
+  setBloodmoonClawIntensity,
+} from "../../entities/bloodmoonCues.js";
 import { getBossHitTransition, isInsideSafeZone } from "./rules.js";
 import { createBloodmoonViewModel } from "./viewModel.js";
 
@@ -38,6 +42,10 @@ const PAUSED_MODES = new Set(["huntIntro", "huntBriefing"]);
 const ATTACK_BLOCKED_MODES = new Set([...PAUSED_MODES, "hunt"]);
 
 export function createBloodmoonLevel(context) {
+  const effects = context.effects ?? {
+    positionBloodmoonCue,
+    setBloodmoonClawIntensity,
+  };
   const resources = context.sceneData;
   const state = {
     mode: "phase1",
@@ -113,7 +121,7 @@ export function createBloodmoonLevel(context) {
       cue.userData.seed = context.randomRange(0, 100);
       cue.userData.missingToe = Math.floor(context.randomRange(0, 4));
       cue.userData.decoyCompleteness = context.randomRange(0.38, 0.72);
-      if (!npc) context.setBloodmoonClawIntensity(cue, 0);
+      if (!npc) effects.setBloodmoonClawIntensity(cue, 0);
     });
   }
 
@@ -193,9 +201,9 @@ export function createBloodmoonLevel(context) {
       boss.group.visible = false;
       boss.alive = false;
     }
-    context.setBloodmoonClawIntensity(resources.targetCue, 0);
+    effects.setBloodmoonClawIntensity(resources.targetCue, 0);
     resources.decoyCues?.forEach((cue) => {
-      context.setBloodmoonClawIntensity(cue, 0);
+      effects.setBloodmoonClawIntensity(cue, 0);
     });
     hideSafeZones();
     context.hideOverlay("huntCard");
@@ -521,8 +529,8 @@ export function createBloodmoonLevel(context) {
     if (resources.targetCue && target?.alive) {
       const revealStage = Math.max(1, state.revealCount);
       const completeness = revealStage === 1 ? 0.3 : revealStage === 2 ? 0.64 : 1;
-      context.positionBloodmoonCue(resources.targetCue, target);
-      context.setBloodmoonClawIntensity(
+      effects.positionBloodmoonCue(resources.targetCue, target);
+      effects.setBloodmoonClawIntensity(
         resources.targetCue,
         intensity,
         0.9 + Math.abs(Math.sin(context.getTotalTime() * 15)) * 0.28,
@@ -533,14 +541,14 @@ export function createBloodmoonLevel(context) {
     resources.decoyCues?.forEach((cue) => {
       const npc = cue.userData.decoyNpc;
       if (!npc?.alive) {
-        context.setBloodmoonClawIntensity(cue, 0);
+        effects.setBloodmoonClawIntensity(cue, 0);
         return;
       }
-      context.positionBloodmoonCue(cue, npc);
+      effects.positionBloodmoonCue(cue, npc);
       const totalTime = context.getTotalTime();
       const flicker = 0.56
         + Math.abs(Math.sin(totalTime * 20 + cue.userData.seed)) * 0.34;
-      context.setBloodmoonClawIntensity(
+      effects.setBloodmoonClawIntensity(
         cue,
         intensity * 0.82,
         flicker,
@@ -605,7 +613,7 @@ export function createBloodmoonLevel(context) {
       return undefined;
     }
     if (action.type === "actorDissolved" && action.actor === target) {
-      context.setBloodmoonClawIntensity(resources.targetCue, 0);
+      effects.setBloodmoonClawIntensity(resources.targetCue, 0);
       return undefined;
     }
     if (action.type === "beginSpecialPhase") {

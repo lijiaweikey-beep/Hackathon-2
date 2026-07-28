@@ -1,3 +1,5 @@
+import { createSuShiShadowCue } from "../../entities/templeShadows.js";
+
 export function createWorld(world) {
-  world.buildTempleCourtyard();
+  return world.buildTempleCourtyard(createSuShiShadowCue);
 }
