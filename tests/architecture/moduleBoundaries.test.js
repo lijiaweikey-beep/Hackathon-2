@@ -10,7 +10,10 @@ async function readSource(relativePath) {
 }
 
 async function readDirectorySources(relativePath) {
-  const root = new URL(relativePath, sourceRoot);
+  return readTreeSources(new URL(relativePath, sourceRoot));
+}
+
+async function readTreeSources(root) {
   const sources = [];
   async function visit(directory) {
     const entries = await readdir(directory, { withFileTypes: true });
@@ -157,12 +160,13 @@ test("注册中心以内联文本发现关卡样式", async () => {
 });
 
 test("独立玩法样例不依赖经典玩法系统", async () => {
-  const source = await readFile(
-    new URL("../fixtures/standalone-level/createExperience.js", import.meta.url),
-    "utf8",
+  const sources = await readTreeSources(
+    new URL("../fixtures/standalone-level/", import.meta.url),
   );
-  assert.doesNotMatch(
-    source,
-    /createActorSystem|createCombatSystem|createInputController|createGameUiController|actions\.js/,
-  );
+  for (const source of sources) {
+    assert.doesNotMatch(
+      source,
+      /createActorSystem|createCombatSystem|createInputController|createGameUiController|actions\.js/,
+    );
+  }
 });

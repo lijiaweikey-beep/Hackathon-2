@@ -202,7 +202,9 @@ export function boot() {
     randomRange,
   });
   inputController = createInputController({
-    isActive: () => session.phase === GAME_PHASES.PLAYING,
+    isActive: () =>
+      session.phase === GAME_PHASES.PLAYING
+      && experienceManager?.presentation === "classic",
     joystick: ui.joystick,
     joystickKnob: ui.joystickKnob,
     primeAudio: audio.resume,

@@ -36,11 +36,16 @@ export function createStandaloneExperience(host) {
         <main class="reaction-game">
           <h1>独立玩法样例</h1>
           <p>连续命中三次目标</p>
+          <button type="button" data-start>开始挑战</button>
           <button type="button" data-strike>出击</button>
           <strong data-hit-count>0 / ${TARGET_HITS}</strong>
         </main>
       `);
       host.input.listen(host.surface.root, "click", (event) => {
+        if (event.target?.closest?.("[data-start]")) {
+          host.flow.start();
+          return;
+        }
         if (event.target?.closest?.("[data-strike]")) strike();
       });
       host.input.listen(host.input.windowTarget, "keydown", (event) => {

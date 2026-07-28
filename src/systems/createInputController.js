@@ -66,6 +66,7 @@ export function createInputController(dependencies) {
   }
 
   function updateJoystick(event, joystick) {
+    if (!isActive()) return;
     if (!consumeAction()) return;
     const rect = joystick.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
@@ -96,6 +97,7 @@ export function createInputController(dependencies) {
     joystick.addEventListener("pointerdown", primeAudio, { once: true });
     windowTarget.addEventListener("keydown", primeAudio, { once: true });
     joystick.addEventListener("pointerdown", (event) => {
+      if (!isActive()) return;
       pointerId = event.pointerId;
       joystick.setPointerCapture(event.pointerId);
       updateJoystick(event, joystick);
@@ -109,6 +111,7 @@ export function createInputController(dependencies) {
     windowTarget.addEventListener("pointerup", releaseJoystick);
     windowTarget.addEventListener("pointercancel", releaseJoystick);
     windowTarget.addEventListener("keydown", (event) => {
+      if (!isActive()) return;
       if (event.code === "KeyW" || event.code === "ArrowUp") setKeyAxis("y", 1);
       if (event.code === "KeyS" || event.code === "ArrowDown") setKeyAxis("y", -1);
       if (event.code === "KeyA" || event.code === "ArrowLeft") setKeyAxis("x", -1);

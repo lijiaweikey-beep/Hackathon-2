@@ -34,11 +34,12 @@ export function createExperienceManager({
     try {
       const host = createHost({ definition, scope });
       const factory = definition.extensions?.createExperience;
+      const presentation = factory ? "standalone" : "classic";
       const experience = factory
         ? factory(host)
         : createClassicExperience(definition, host);
       validateExperience(experience, definition);
-      current = { definition, experience, scope };
+      current = { definition, experience, presentation, scope };
       return experience;
     } catch (error) {
       scope.dispose();
@@ -69,7 +70,7 @@ export function createExperienceManager({
       return current?.definition ?? null;
     },
     get presentation() {
-      return current?.experience.presentation ?? "classic";
+      return current?.presentation ?? null;
     },
     load,
     mount: () => invoke("mount"),

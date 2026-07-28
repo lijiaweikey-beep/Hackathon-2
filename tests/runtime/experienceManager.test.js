@@ -23,6 +23,7 @@ test("体验管理器统一委托独立玩法生命周期", () => {
       createExperience: () => createExperience(calls),
     },
   });
+  assert.equal(manager.presentation, "standalone");
 
   manager.mount();
   manager.start();
@@ -52,6 +53,7 @@ test("加载新体验前先销毁旧体验和资源域", () => {
   manager.load({ id: "first", extensions: {} });
   manager.load({ id: "second", extensions: {} });
 
+  assert.equal(manager.presentation, "classic");
   assert.deepEqual(calls, ["first:dispose", "first:scope"]);
 });
 
