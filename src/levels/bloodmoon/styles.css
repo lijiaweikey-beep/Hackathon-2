@@ -1,0 +1,175 @@
+.scene-name[data-level-theme="bloodmoon"] {
+  color: #fb7185;
+  text-shadow: 0 0 16px rgba(248, 113, 113, 0.55);
+}
+
+.status-chip[data-level-theme="bloodmoon"] strong {
+  color: #fca5a5;
+  text-shadow: 0 0 14px rgba(248, 113, 113, 0.55);
+}
+
+.attack-button[data-level-theme="bloodmoon"] {
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(160deg, #7f1d1d, #fb7185 58%, #111116);
+  box-shadow: 0 18px 34px rgba(248, 113, 113, 0.34), 0 20px 36px var(--shadow);
+  color: #fff5f5;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+}
+
+.clue-bar[data-level-theme="bloodmoon"] {
+  color: #fecdd3;
+  text-shadow: 0 0 14px rgba(248, 113, 113, 0.42);
+}
+
+.hud.bloodmoon-hit::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 42%, rgba(127, 29, 29, 0.32)),
+    rgba(248, 113, 113, 0.22);
+  animation: bloodmoonHitFlash 180ms ease-out both;
+}
+
+.hud.bloodmoon-lightning::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(105deg, transparent 0 42%, rgba(255, 255, 255, 0.86) 43%, transparent 46% 58%, rgba(219, 234, 254, 0.72) 59%, transparent 62%),
+    rgba(239, 246, 255, 0.42);
+  mix-blend-mode: screen;
+  animation: bloodmoonLightningFlash 360ms steps(3, end) both;
+}
+
+.hunt-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: none;
+  place-items: center;
+  pointer-events: none;
+  background: rgba(8, 2, 4, 0.72);
+}
+
+.hunt-intro.visible {
+  display: grid;
+  animation: huntIntroFlash 2.8s ease both;
+}
+
+.hunt-intro > * {
+  grid-area: 1 / 1;
+}
+
+.hunt-intro-moon {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #fecdd3, #dc2626 48%, #450a0a 74%);
+  box-shadow: 0 0 60px rgba(248, 113, 113, 0.44);
+  animation: huntMoonPulse 2.8s ease both;
+}
+
+.hunt-intro-title {
+  margin-top: -54px;
+  color: #fecdd3;
+  font-size: 15px;
+  font-weight: 950;
+  text-shadow: 0 0 18px rgba(248, 113, 113, 0.78);
+}
+
+.hunt-intro-quote {
+  margin-top: 74px;
+  width: min(520px, calc(100% - 34px));
+  text-align: center;
+  color: #fff1f2;
+  font-size: 24px;
+  line-height: 1.28;
+  font-weight: 950;
+  text-shadow: 0 0 24px rgba(0, 0, 0, 0.72);
+}
+
+.hunt-card {
+  position: fixed;
+  left: 50%;
+  top: 22%;
+  z-index: 4;
+  width: min(420px, calc(100% - 32px));
+  padding: 16px 18px;
+  border: 1px solid rgba(248, 113, 113, 0.44);
+  border-radius: 8px;
+  background: rgba(20, 6, 10, 0.9);
+  box-shadow: 0 22px 58px rgba(0, 0, 0, 0.46), 0 0 28px rgba(248, 113, 113, 0.18);
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -14px) scale(0.98);
+}
+
+.hunt-card.visible {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.hunt-card-title {
+  color: #fca5a5;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 950;
+}
+
+.hunt-card-quote {
+  margin-top: 7px;
+  color: #fff1f2;
+  font-size: 19px;
+  line-height: 1.28;
+  font-weight: 950;
+}
+
+.hunt-card-rule {
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.hunt-card-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 14px;
+  border-radius: 8px;
+  background: #22c55e;
+  color: #052e16;
+  font-weight: 950;
+}
+
+@keyframes huntIntroFlash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes huntMoonPulse {
+  0% { transform: scale(0.58); opacity: 0; }
+  20% { transform: scale(1.06); opacity: 1; }
+  62% { transform: scale(0.98); opacity: 1; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+@keyframes bloodmoonHitFlash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes bloodmoonLightningFlash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  28% { opacity: 0.22; }
+  42% { opacity: 0.95; }
+  100% { opacity: 0; }
+}

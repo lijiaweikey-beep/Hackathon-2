@@ -25,6 +25,7 @@ import { canvas, ui } from "./ui/dom.js";
 import { createLevelCardModel } from "./ui/levelCardModel.js";
 import { renderTargetPreview } from "./ui/targetPreview.js";
 import { renderTaskModal } from "./ui/taskModal.js";
+import { createLevelViewHost } from "./ui/createLevelViewHost.js";
 import { clampToWorld, lerpAngle, gridKey, getFacingVector } from "./utils/math.js";
 import {
   createPlayer as createPlayerEntity,
@@ -74,6 +75,7 @@ let currentLevelIndex = 0;
 let levelState;
 let fx;
 let worldBuilder;
+let levelViewHost;
 
 let npcs = [];
 let particles = [];
@@ -282,21 +284,12 @@ function setActorPartsVisible(actor, partKey, visible) {
   });
 }
 
-function getOverlay(kind) {
-  return kind === "huntIntro" ? ui.huntIntro : ui.huntCard;
-}
-
-function showOverlay(kind, html) {
-  const overlay = getOverlay(kind);
-  if (!overlay) return;
-  overlay.innerHTML = html;
-  overlay.classList.remove("visible");
-  void overlay.offsetWidth;
-  overlay.classList.add("visible");
+function showOverlay(kind, options) {
+  levelViewHost?.showOverlay(kind, options);
 }
 
 function hideOverlay(kind) {
-  getOverlay(kind)?.classList.remove("visible");
+  levelViewHost?.hideOverlay(kind);
 }
 
 function flashHud(className, durationMs) {
@@ -381,13 +374,7 @@ function showLevelSelect() {
   gameStatus = "levelSelect";
   syncNpcCountInput();
   buildLevelCards();
-  if (ui.hud) ui.hud.classList.remove("bloodmoon-mode", "bloodmoon-hit", "bloodmoon-lightning");
-  ui.huntIntro?.classList.remove("visible");
-  ui.huntCard?.classList.remove("visible");
-  ui.attackButton?.classList.remove("bloodmoon");
-  ui.sceneName?.classList.remove("bloodmoon-text");
-  ui.clueBar?.classList.remove("bloodmoon");
-  ui.attemptChip?.classList.remove("bloodmoon");
+  levelViewHost?.clear();
   ui.levelSelectModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
   ui.resultModal.classList.remove("visible");
@@ -475,15 +462,17 @@ export function boot() {
 }
 
 function setupUi() {
-  ui.huntIntro = document.createElement("div");
-  ui.huntIntro.className = "hunt-intro";
-  ui.huntIntro.setAttribute("aria-live", "assertive");
-  ui.hud.appendChild(ui.huntIntro);
-
-  ui.huntCard = document.createElement("div");
-  ui.huntCard.className = "hunt-card";
-  ui.huntCard.setAttribute("aria-live", "polite");
-  ui.hud.appendChild(ui.huntCard);
+  levelViewHost = createLevelViewHost({
+    root: ui.hud,
+    themedElements: [
+      ui.hud,
+      ui.attackButton,
+      ui.sceneName,
+      ui.clueBar,
+      ui.attemptChip,
+    ],
+    onAction: (action) => levelRunner.handleAction(action),
+  });
 
   matchNpcCount = loadMatchNpcCount();
   syncNpcCountInput();
@@ -530,12 +519,6 @@ function setupUi() {
     resetLevel(currentLevelIndex);
   });
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
-  ui.huntCard.addEventListener("pointerdown", (event) => {
-    const button = event.target.closest?.("[data-hunt-start]");
-    if (!button) return;
-    event.preventDefault();
-    levelRunner.handleAction({ type: "beginSpecialPhase" });
-  });
   ui.attackButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     triggerAttack();
@@ -1410,8 +1393,7 @@ function finishRound(won, failMessage) {
 
   ui.resultModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
-  ui.huntIntro?.classList.remove("visible");
-  ui.huntCard?.classList.remove("visible");
+  levelViewHost?.clear();
 
   // 保存最佳成绩
   if (won) {
@@ -1430,7 +1412,7 @@ function updateHud() {
   const levelHud = levelRunner.handleAction({ type: "getHudState" });
   const mechanicHintHtml = levelState.level.mechanicHintHtml ?? "";
   const levelMechanicVisible = Boolean(levelHud?.mechanicVisible);
-  const bloodmoonTheme = levelHud?.theme === "bloodmoon";
+  levelViewHost?.setTheme(levelHud?.theme);
   ui.sceneName.textContent = levelState.level.sceneName;
   ui.missionText.textContent = levelHud?.mission
     || levelState.level.hudMission
@@ -1447,11 +1429,6 @@ function updateHud() {
   );
 
   if (ui.attackIcon) ui.attackIcon.textContent = levelHud?.attackIcon ?? "拳";
-  ui.hud?.classList.toggle("bloodmoon-mode", bloodmoonTheme);
-  ui.attackButton?.classList.toggle("bloodmoon", bloodmoonTheme);
-  ui.sceneName?.classList.toggle("bloodmoon-text", bloodmoonTheme);
-  ui.clueBar?.classList.toggle("bloodmoon", bloodmoonTheme);
-  ui.attemptChip?.classList.toggle("bloodmoon", bloodmoonTheme);
   if (ui.mechanicHint) {
     ui.mechanicHint.classList.toggle(
       "visible",

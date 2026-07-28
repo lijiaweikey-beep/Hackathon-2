@@ -65,3 +65,8 @@ test("共享运行时不按具体关卡标识或资源变体分派", async () =>
     );
   }
 });
+
+test("共享运行时不包含关卡专属界面标识", async () => {
+  const source = await readSource("game.js");
+  assert.doesNotMatch(source, /bloodmoon|huntIntro|huntCard/);
+});

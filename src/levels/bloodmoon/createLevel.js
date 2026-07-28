@@ -22,22 +22,13 @@ import {
 import { getBossHitTransition, isInsideSafeZone } from "./rules.js";
 import { createBloodmoonViewModel } from "./viewModel.js";
 import { playBloodmoonIntro } from "./audio.js";
-
-const HUNT_INTRO_HTML = `
-    <div class="hunt-intro-moon"></div>
-    <div class="hunt-intro-title">猎杀时刻</div>
-    <div class="hunt-intro-quote">“认不出自己的人，都会留在月光外。”</div>
-  `;
-
-const HUNT_CARD_HTML = `
-    <div class="hunt-card-title">血月引路人</div>
-    <div class="hunt-card-quote">“认不出自己的人，都会留在月光外。”</div>
-    <div class="hunt-card-rule">机制 1：关闭这张卡片后，玩家和所有 NPC 会立刻随机散落到地图任意位置。</div>
-    <div class="hunt-card-rule">机制 2：你的狼人耳朵、狼爪和披风会暂时消失，NPC 也会暂停攻击。</div>
-    <div class="hunt-card-rule">机制 3：你有 20 秒找到自己，并进入任意一个绿色安全区域。</div>
-    <div class="hunt-card-rule">处决：倒计时结束时，绿色区域外的所有生物都会被血月秒杀。</div>
-    <button class="hunt-card-button" type="button" data-hunt-start>关闭卡片，开始倒计时</button>
-  `;
+import {
+  hideBloodmoonOverlays,
+  hideHuntCard,
+  hideHuntIntro,
+  showHuntCard,
+  showHuntIntro,
+} from "./view.js";
 
 const PAUSED_MODES = new Set(["huntIntro", "huntBriefing"]);
 const ATTACK_BLOCKED_MODES = new Set([...PAUSED_MODES, "hunt"]);
@@ -208,8 +199,8 @@ export function createBloodmoonLevel(context) {
       effects.setBloodmoonClawIntensity(cue, 0);
     });
     hideSafeZones();
-    context.hideOverlay("huntCard");
-    context.showOverlay("huntIntro", HUNT_INTRO_HTML);
+    hideHuntCard(context);
+    showHuntIntro(context);
     context.flashHud("bloodmoon-lightning", 520);
     context.triggerShake(0.5, 0.34);
   }
@@ -235,8 +226,8 @@ export function createBloodmoonLevel(context) {
     state.cutsceneTimer = Math.max(0, state.cutsceneTimer - deltaSeconds);
     if (state.cutsceneTimer > 0) return;
     state.mode = "huntBriefing";
-    context.hideOverlay("huntIntro");
-    context.showOverlay("huntCard", HUNT_CARD_HTML);
+    hideHuntIntro(context);
+    showHuntCard(context);
   }
 
   function safeZoneSpacing() {
@@ -280,7 +271,7 @@ export function createBloodmoonLevel(context) {
     if (state.mode !== "huntBriefing") return;
     state.mode = "hunt";
     state.huntTimer = BLOODMOON_HUNT_SECONDS;
-    context.hideOverlay("huntCard");
+    hideHuntCard(context);
     context.setActorPartsVisible(context.getPlayer(), "wolfParts", false);
 
     state.safeZones = pickSafeZones();
@@ -641,8 +632,7 @@ export function createBloodmoonLevel(context) {
     handleAction,
     dispose() {
       hideSafeZones();
-      context.hideOverlay("huntIntro");
-      context.hideOverlay("huntCard");
+      hideBloodmoonOverlays(context);
       target = null;
     },
   };
