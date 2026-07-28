@@ -14,7 +14,7 @@ import {
   BLOODMOON_SANITY_MAX,
   BLOODMOON_SUMMON_COUNT,
   BLOODMOON_WOLF_COOLDOWN,
-} from "../../config/constants.js";
+} from "./constants.js";
 import {
   positionBloodmoonCue,
   setBloodmoonClawIntensity,

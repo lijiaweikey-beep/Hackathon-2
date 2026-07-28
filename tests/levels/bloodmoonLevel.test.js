@@ -4,7 +4,7 @@ import * as THREE from "three";
 import {
   BLOODMOON_HUNT_INTRO_SECONDS,
   BLOODMOON_WOLF_COOLDOWN,
-} from "../../src/config/constants.js";
+} from "../../src/levels/bloodmoon/constants.js";
 import { createBloodmoonLevel } from "../../src/levels/bloodmoon/createLevel.js";
 
 function createActor(id, flags = {}) {

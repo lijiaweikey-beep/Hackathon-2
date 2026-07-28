@@ -1,4 +1,4 @@
-import { BLOODMOON_PHASE2_HP_MAX } from "../../config/constants.js";
+import { BLOODMOON_PHASE2_HP_MAX } from "./constants.js";
 
 const HUNT_CLUE = "🟢 机制：玩家和 NPC 已随机散开，NPC 暂停攻击。绿区外会被血月秒杀。";
 

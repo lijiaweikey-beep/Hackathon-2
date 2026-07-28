@@ -84,3 +84,12 @@ test("共享配置和场景构建器不包含承天寺专属实现", async () =>
   assert.doesNotMatch(constants, /TEMPLE_/);
   assert.doesNotMatch(worldBuilder, /buildTempleCourtyard|addBambooCluster|addCypress/);
 });
+
+test("共享配置和场景构建器不包含血月专属实现", async () => {
+  const [constants, worldBuilder] = await Promise.all([
+    readSource("config/constants.js"),
+    readSource("world/createWorldBuilder.js"),
+  ]);
+  assert.doesNotMatch(constants, /BLOODMOON_/);
+  assert.doesNotMatch(worldBuilder, /buildBloodmoonStreet|bloodmoon/i);
+});

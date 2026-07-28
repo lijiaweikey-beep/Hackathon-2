@@ -1,4 +1,4 @@
-import { BLOODMOON_SANITY_MAX } from "../../config/constants.js";
+import { BLOODMOON_SANITY_MAX } from "./constants.js";
 import { createNpc, createPlayer } from "./actors.js";
 import { createBloodmoonLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
