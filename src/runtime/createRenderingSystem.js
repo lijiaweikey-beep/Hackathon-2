@@ -5,7 +5,7 @@ export function createRenderingSystem({
   isCachedTexture = () => false,
 }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(windowTarget.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(windowTarget.devicePixelRatio ?? 1, 1.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -53,6 +53,7 @@ export function createRenderingSystem({
     camera.top = viewHeight / 2;
     camera.bottom = -viewHeight / 2;
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(windowTarget.devicePixelRatio ?? 1, 1.5));
     renderer.setSize(width, height, false);
   }
 

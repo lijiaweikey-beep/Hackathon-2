@@ -76,3 +76,44 @@ test("经典输入停用时不响应移动和攻击键", () => {
   assert.equal(attacks, 0);
   assert.equal(captures, 0);
 });
+
+test("重置输入会释放摇杆指针并阻止旧手指继续移动", () => {
+  const windowTarget = new EventTarget();
+  const joystick = new EventTarget();
+  joystick.setPointerCapture = () => {};
+  joystick.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 100,
+  });
+  const input = createInputController({
+    isActive: () => true,
+    now: () => 1000,
+    windowTarget,
+    joystick,
+    joystickKnob: { style: {} },
+  });
+  const direction = new THREE.Vector2();
+  input.bind();
+
+  const pointerDown = new Event("pointerdown");
+  Object.defineProperties(pointerDown, {
+    pointerId: { value: 7 },
+    clientX: { value: 80 },
+    clientY: { value: 50 },
+  });
+  joystick.dispatchEvent(pointerDown);
+  input.reset();
+
+  const staleMove = new Event("pointermove");
+  Object.defineProperties(staleMove, {
+    pointerId: { value: 7 },
+    clientX: { value: 90 },
+    clientY: { value: 50 },
+  });
+  joystick.dispatchEvent(staleMove);
+  input.readDirection(direction);
+
+  assert.deepEqual(direction.toArray(), [0, 0]);
+});

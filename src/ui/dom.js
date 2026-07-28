@@ -52,4 +52,5 @@ export const ui = {
   joystickKnob: document.querySelector("#joystickKnob"),
   attackButton: document.querySelector("#attackButton"),
   cooldownOverlay: document.querySelector("#cooldownOverlay"),
+  orientationOverlay: document.querySelector("#orientationOverlay"),
 };

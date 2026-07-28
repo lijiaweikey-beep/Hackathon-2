@@ -54,8 +54,8 @@ button {
 .topbar {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
-  left: 12px;
-  right: 12px;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -161,14 +161,15 @@ button {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 0 22px;
+  padding-left: max(22px, env(safe-area-inset-left));
+  padding-right: max(22px, env(safe-area-inset-right));
   pointer-events: none;
 }
 
 .joystick {
   position: relative;
-  width: 136px;
-  height: 136px;
+  width: clamp(96px, 20vmin, 136px);
+  height: clamp(96px, 20vmin, 136px);
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background:
@@ -193,6 +194,49 @@ button {
     rgba(45, 212, 191, 0.56);
   box-shadow: 0 12px 30px rgba(45, 212, 191, 0.16);
   transform: translate(0, 0);
+}
+
+.orientation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 20%, rgba(45, 212, 191, 0.18), transparent 48%),
+    #060914;
+  color: var(--text);
+  text-align: center;
+}
+
+.orientation-card {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.orientation-phone {
+  font-size: 58px;
+  animation: rotate-phone 1.8s ease-in-out infinite;
+}
+
+.orientation-card strong {
+  font-size: 26px;
+}
+
+.orientation-card span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@keyframes rotate-phone {
+  0%, 25% { transform: rotate(0deg); }
+  70%, 100% { transform: rotate(90deg); }
 }
 
 .attack-button {
@@ -1154,6 +1198,57 @@ button {
 
   .result-rating {
     font-size: 42px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .topbar {
+    top: max(6px, env(safe-area-inset-top));
+    min-height: 44px;
+  }
+
+  .mission-strip {
+    padding: 7px 10px;
+  }
+
+  .status-chip {
+    width: 62px;
+    min-height: 44px;
+    padding: 5px 6px;
+  }
+
+  .status-chip strong {
+    font-size: 18px;
+  }
+
+  .pause-button {
+    min-height: 44px;
+  }
+
+  .clue-bar-wrap {
+    top: calc(max(6px, env(safe-area-inset-top)) + 52px);
+  }
+
+  .controls {
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .joystick {
+    width: clamp(88px, 24vh, 116px);
+    height: clamp(88px, 24vh, 116px);
+  }
+
+  .attack-button {
+    width: clamp(72px, 20vh, 88px);
+    height: clamp(72px, 20vh, 88px);
+  }
+
+  .modal {
+    padding: 10px;
+  }
+
+  .level-select-header {
+    margin-bottom: 12px;
   }
 }
 

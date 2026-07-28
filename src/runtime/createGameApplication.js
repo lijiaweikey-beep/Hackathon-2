@@ -29,22 +29,11 @@ import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
 import { randomRange } from "../utils/math.js";
+import { createOrientationController } from "./createOrientationController.js";
 
-let scene;
-let player;
-let fx;
-let levelViewHost;
-let actorSystem;
-let combatSystem;
-let uiController;
-let gameLoop;
-let inputController;
-let rendering;
-let settlement;
-let worldRuntime;
-let experienceManager;
-let storyProgress;
-
+let scene, player, fx, levelViewHost;
+let actorSystem, combatSystem, inputController, worldRuntime;
+let uiController, gameLoop, rendering, settlement, experienceManager, storyProgress;
 let totalTime = 0;
 const session = createGameSession();
 const audio = createGameAudio();
@@ -329,6 +318,17 @@ export function boot() {
 
   inputController.bind();
   uiController.bind();
+  createOrientationController({
+    windowTarget: window,
+    documentTarget: document,
+    overlay: ui.orientationOverlay,
+    isPlaying: () => session.phase === GAME_PHASES.PLAYING,
+    isPaused: () => session.phase === GAME_PHASES.PAUSED,
+    pause: pauseExperience,
+    resume: resumeExperience,
+    resetInput: inputController.reset,
+    onResize: rendering.resize,
+  }).bind();
   uiController.showLevelSelect();
   rendering.start((deltaSeconds) => gameLoop.tick(deltaSeconds));
 }

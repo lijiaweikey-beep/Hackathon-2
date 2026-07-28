@@ -51,12 +51,16 @@ export function createInputController(dependencies) {
   }
 
   function reset() {
+    pointerId = null;
     joystickDirection.set(0, 0);
     keyDirection.set(0, 0);
     playerVelocity.set(0, 0);
     acceptedDirection.set(0, 0);
     acceptedAt = -Infinity;
     lastActionAt = -Infinity;
+    if (dependencies.joystickKnob?.style) {
+      dependencies.joystickKnob.style.transform = "translate(0px, 0px)";
+    }
   }
 
   function setKeyAxis(axis, value) {
