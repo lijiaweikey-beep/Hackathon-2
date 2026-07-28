@@ -34,3 +34,13 @@ test("注册中心可以按标识获取关卡", () => {
   assert.equal(registry.getById("a")?.id, "a");
   assert.equal(registry.getById("missing"), null);
 });
+
+test("注册中心按排序后的稳定下标解析关卡标识", () => {
+  const registry = createLevelRegistry([
+    ["b", legacy("b", 20)],
+    ["a", legacy("a", 10)],
+  ]);
+  assert.equal(registry.getIndexById("a"), 0);
+  assert.equal(registry.getIndexById("b"), 1);
+  assert.equal(registry.getIndexById("missing"), -1);
+});
