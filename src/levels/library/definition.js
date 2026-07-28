@@ -4,7 +4,7 @@ export default {
   legacy: true,
   sceneName: "图书馆",
   emoji: "📚",
-  cardDesc: "在人群中找到图书馆里亲嘴的情侣",
+  cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找到图书馆里亲嘴的情侣`,
   mission: "图书馆里有一对情侣在亲嘴，太辣眼睛了！",
   clue: "目标特征：两个人贴在一起，嘴上有口红印",
   targetDesc: "亲嘴的情侣",

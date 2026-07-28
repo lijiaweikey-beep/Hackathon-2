@@ -4,7 +4,7 @@ export default {
   legacy: true,
   sceneName: "血月街区",
   emoji: "🌕",
-  cardDesc: "为了你变成狼人，在雷暴里找出血月引路人",
+  cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找出血月引路人`,
   mission: "血月升起，你收到一句求救：“别让我在血月里认不出你。”为了赶到对方身边，你主动踏进血月，变成狼人模样。找出伪装在人群里的血月引路人，击倒他，解除狼化。",
   hudMission: "为了你，我变成狼人模样。找出血月引路人。",
   clue: "电光照亮时，真正的血月引路人脚下会露出狼爪影",

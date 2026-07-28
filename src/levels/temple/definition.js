@@ -4,7 +4,7 @@ export default {
   legacy: true,
   sceneName: "承天寺夜游",
   emoji: "🌕",
-  cardDesc: "在苏轼影分身里找出真正吵醒怀民的苏轼",
+  cardDesc: ({ npcCount }) => `在 ${npcCount} 个苏轼影分身里找出真正吵醒怀民的苏轼`,
   mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
   hudMission: "观察月下显形线索，找出真正的苏轼。",
   clue: "目标特征：会在月色最亮的中庭停留，脚下竹柏影会像藻荇一样交横聚拢",

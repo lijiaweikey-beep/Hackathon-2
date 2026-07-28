@@ -70,8 +70,10 @@ import {
   LEVELS,
   getDuelLevelIndex,
   isDuelLevel as checkDuelLevel,
+  levelRegistry,
 } from "./config/levels.js";
 import { canvas, ui } from "./ui/dom.js";
+import { createLevelCardModel } from "./ui/levelCardModel.js";
 import { renderTargetPreview } from "./ui/targetPreview.js";
 import { renderTaskModal } from "./ui/taskModal.js";
 import { clampToWorld, lerpAngle, gridKey, getFacingVector } from "./utils/math.js";
@@ -98,7 +100,6 @@ import {
   clampNpcCount,
   loadMatchNpcCount,
   saveMatchNpcCount,
-  getBestScore,
   saveBestScore,
   parseNpcCountRaw,
 } from "./utils/storage.js";
@@ -222,15 +223,6 @@ function getNpcCountForDisplay() {
     return getNpcCountPreview();
   }
   return matchNpcCount;
-}
-
-function formatLevelCardDesc(level) {
-  const n = getNpcCountForDisplay();
-  if (level.id === "gaming") return `在 ${n} 人中找到凌晨三点还在打游戏的人`;
-  if (level.id === "library") return `在 ${n} 人中找到图书馆里亲嘴的情侣`;
-  if (level.id === "temple") return `在 ${n} 个苏轼影分身里找出真正吵醒怀民的苏轼`;
-  if (level.id === "bloodmoon") return `在 ${n} 人中找出血月引路人`;
-  return level.cardDesc;
 }
 
 function onNpcCountInput() {
@@ -513,32 +505,14 @@ function buildLevelCards() {
   const mpGuest = isMpGuestSession();
   const mpHostWaiting = isConnected() && getIsHost() && mpStatus !== "connected";
 
-  LEVELS.forEach((level, i) => {
-    if (level.duelMode) return;
-
-    const best = getBestScore(level.id);
+  levelRegistry.visible.forEach((level) => {
+    const model = createLevelCardModel(level, {
+      npcCount: getNpcCountForDisplay(),
+    });
     const starsHtml = Array.from({ length: 3 }, (_, si) =>
       `<span class="level-star${si < level.difficulty ? " is-on" : ""}">★</span>`,
     ).join("");
-    const bestText = best ? `${best.grade} · ${best.time}s` : "--";
     const disabled = mpGuest || mpHostWaiting;
-
-    // 难度标签
-    let difficultyLabel = "";
-    let difficultyClass = "";
-    if (level.difficulty === 1) {
-      difficultyLabel = "简单";
-      difficultyClass = "easy";
-    } else if (level.difficulty === 2) {
-      difficultyLabel = "经典";
-      difficultyClass = "classic";
-    } else if (level.difficulty === 3) {
-      difficultyLabel = "推荐";
-      difficultyClass = "recommended";
-    } else if (level.difficulty >= 4) {
-      difficultyLabel = "困难";
-      difficultyClass = "hard";
-    }
 
     const card = document.createElement("button");
     card.className = `level-card level-card--${level.id}${disabled ? " disabled" : ""}`;
@@ -549,8 +523,8 @@ function buildLevelCards() {
       <div class="level-card-accent" aria-hidden="true"></div>
       <div class="level-card-icon">${level.emoji}</div>
       <div class="level-card-body">
-        <div class="level-card-name">${level.sceneName} <span class="level-card-difficulty ${difficultyClass}">${difficultyLabel}</span></div>
-        <div class="level-card-desc">${formatLevelCardDesc(level)}</div>
+        <div class="level-card-name">${level.sceneName} <span class="level-card-difficulty ${model.difficulty.className}">${model.difficulty.label}</span></div>
+        <div class="level-card-desc">${model.description}</div>
         <div class="level-card-meta">
           <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${starsHtml}</span>
         </div>
@@ -558,7 +532,7 @@ function buildLevelCards() {
       <div class="level-card-go" aria-hidden="true"><span>›</span></div>
     `;
     if (!disabled) {
-      card.addEventListener("click", () => selectLevel(i));
+      card.addEventListener("click", () => selectLevelById(level.id));
     }
     ui.levelCards.appendChild(card);
   });
@@ -909,6 +883,11 @@ function createMpCallbacks() {
       if (ui.mpStatusText) ui.mpStatusText.textContent = `❌ ${msg}`;
     },
   };
+}
+
+function selectLevelById(id) {
+  const index = levelRegistry.getIndexById(id);
+  if (index >= 0) selectLevel(index);
 }
 
 function selectLevel(index) {
