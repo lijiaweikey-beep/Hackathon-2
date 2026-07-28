@@ -63,6 +63,8 @@ import {
 } from "./world/obstacles.js";
 import { createLevelRunner } from "./levels/levelRunner.js";
 import { createLevelContext } from "./levels/createLevelContext.js";
+import { GAME_PHASES } from "./core/gamePhase.js";
+import { createGameSession } from "./runtime/createGameSession.js";
 
 let renderer;
 let scene;
@@ -71,28 +73,26 @@ let clock;
 let player;
 let settleTimer = null;
 let matchNpcCount = DEFAULT_NPC_COUNT;
-let currentLevelIndex = 0;
-let levelState;
 let fx;
 let worldBuilder;
 let levelViewHost;
 
 let npcs = [];
 let particles = [];
-let gameStatus = "briefing";
 let punchCooldown = 0;
 let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
 let punchTier = 0; // 0=第1拳(1s), 1+=后续(2s)
 let punchResetTimer = 0; // 停止出拳后重置计时
 let totalTime = 0;
+const session = createGameSession();
 
 const levelRunner = createLevelRunner({
   createContext: ({ definition, scope }) => createLevelContext({
     definition,
     scope,
-    sceneData: levelState.sceneData,
+    sceneData: session.levelState.sceneData,
     time: {
-      getStatus: () => gameStatus,
+      getStatus: () => session.phase,
       getTotal: () => totalTime,
     },
     actors: {
@@ -240,39 +240,39 @@ function bindNpcCountInput() {
 function getWorldContext() {
   return {
     getScene: () => scene,
-    getLevelState: () => levelState,
+    getLevelState: () => session.levelState,
     randomRange,
     getMatchNpcCount,
-    collidesWithObstacle: (pos, radius) => collidesWithObstacleInLevel(levelState, pos, radius),
-    registerObstacle: (x, z, halfW, halfD) => registerObstacleInLevel(levelState, x, z, halfW, halfD),
+    collidesWithObstacle: (pos, radius) => collidesWithObstacleInLevel(session.levelState, pos, radius),
+    registerObstacle: (x, z, halfW, halfD) => registerObstacleInLevel(session.levelState, x, z, halfW, halfD),
     createLightningBolt: (x, z, width, height, tilt) => createLightningBolt(x, z, width, height, tilt, randomRange),
   };
 }
 
 function createPlayer() {
-  return levelState?.level.extensions?.createPlayer?.()
+  return session.levelState?.level.extensions?.createPlayer?.()
     ?? createPlayerEntity();
 }
 
 function createNpc(id, flags) {
-  return levelState?.level.extensions?.createNpc?.(id, flags, randomRange)
+  return session.levelState?.level.extensions?.createNpc?.(id, flags, randomRange)
     ?? createNpcEntity(id, flags, {}, randomRange);
 }
 
 function registerObstacle(x, z, halfW, halfD) {
-  registerObstacleInLevel(levelState, x, z, halfW, halfD);
+  registerObstacleInLevel(session.levelState, x, z, halfW, halfD);
 }
 
 function collidesWithObstacle(pos, radius) {
-  return collidesWithObstacleInLevel(levelState, pos, radius);
+  return collidesWithObstacleInLevel(session.levelState, pos, radius);
 }
 
 function resolveObstacleCollisions(position, radius, velocity) {
-  return resolveObstacleCollisionsInLevel(levelState, position, radius, velocity);
+  return resolveObstacleCollisionsInLevel(session.levelState, position, radius, velocity);
 }
 
 function clampActorPosition(position, velocity) {
-  clampActorPositionInLevel(levelState, position, velocity);
+  clampActorPositionInLevel(session.levelState, position, velocity);
 }
 
 function buildWorld(level) {
@@ -336,8 +336,8 @@ function updateShake(dt) {
 }
 
 function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
-  if (gameStatus === "won" || gameStatus === "lost" || gameStatus === "settling") return;
-  gameStatus = "settling";
+  if (session.phase !== GAME_PHASES.PLAYING) return;
+  session.transition(GAME_PHASES.SETTLING);
   if (settleTimer) window.clearTimeout(settleTimer);
   settleTimer = window.setTimeout(() => {
     settleTimer = null;
@@ -381,7 +381,7 @@ function showLevelSelect() {
   clearPendingRoundEndTimers();
   disposeScene();
   scene = null;
-  gameStatus = "levelSelect";
+  session.reset();
   syncNpcCountInput();
   buildLevelCards();
   levelViewHost?.clear();
@@ -489,34 +489,34 @@ function setupUi() {
   bindNpcCountInput();
 
   ui.startButton.addEventListener("click", () => {
-    if (gameStatus !== "briefing") return;
+    if (session.phase !== GAME_PHASES.BRIEFING) return;
 
-    gameStatus = "playing";
-    levelState.startTime = totalTime;
+    session.transition(GAME_PHASES.PLAYING);
+    session.levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
     updateHud();
     levelRunner.handleAction({ type: "beginPlay" });
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
-    if (gameStatus !== "briefing") return;
+    if (session.phase !== GAME_PHASES.BRIEFING) return;
     showLevelSelect();
   });
 
   ui.pauseButton.addEventListener("click", () => {
-    if (gameStatus !== "playing") return;
-    gameStatus = "paused";
+    if (session.phase !== GAME_PHASES.PLAYING) return;
+    session.transition(GAME_PHASES.PAUSED);
     ui.pauseModal.classList.add("visible");
   });
 
   ui.resumeButton.addEventListener("click", () => {
-    if (gameStatus !== "paused") return;
-    gameStatus = "playing";
+    if (session.phase !== GAME_PHASES.PAUSED) return;
+    session.transition(GAME_PHASES.PLAYING);
     ui.pauseModal.classList.remove("visible");
   });
 
   ui.backFromPauseButton.addEventListener("click", () => {
-    if (gameStatus !== "paused") return;
+    if (session.phase !== GAME_PHASES.PAUSED) return;
     ui.pauseModal.classList.remove("visible");
     showLevelSelect();
   });
@@ -526,7 +526,7 @@ function setupUi() {
       window.clearTimeout(settleTimer);
       settleTimer = null;
     }
-    resetLevel(currentLevelIndex);
+    resetLevel(session.currentLevelIndex);
   });
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
   ui.attackButton.addEventListener("pointerdown", (event) => {
@@ -574,7 +574,7 @@ function setupInput() {
 }
 
 function shouldApplyActionLock() {
-  return gameStatus === "playing";
+  return session.phase === GAME_PHASES.PLAYING;
 }
 
 function consumeActionInterval() {
@@ -665,7 +665,6 @@ function resetLevel(index, options = {}) {
   // 先清理旧场景资源
   disposeScene();
 
-  currentLevelIndex = index;
   const level = LEVELS[index];
 
   scene = new THREE.Scene();
@@ -679,9 +678,7 @@ function resetLevel(index, options = {}) {
   fx?.reset();
   playerInputVel.set(0, 0);
   resetActionIntervalLock();
-  gameStatus = options.skipBriefing ? "playing" : "briefing";
-
-  levelState = {
+  const nextLevelState = {
     level,
     remaining: level.timeLimit === null
       ? 9999
@@ -690,6 +687,9 @@ function resetLevel(index, options = {}) {
     startTime: 0,
     obstacles: [],
   };
+  session.loadLevel({ index, state: nextLevelState });
+  session.transition(GAME_PHASES.BRIEFING);
+  if (options.skipBriefing) session.transition(GAME_PHASES.PLAYING);
 
   buildWorld(level);
 
@@ -700,7 +700,7 @@ function resetLevel(index, options = {}) {
   spawnNpcs(level);
 
   if (options.skipBriefing) {
-    levelState.startTime = totalTime - (options.elapsed ?? 0);
+    session.levelState.startTime = totalTime - (options.elapsed ?? 0);
     ui.levelSelectModal.classList.remove("visible");
     ui.taskModal.classList.remove("visible");
   } else {
@@ -711,7 +711,7 @@ function resetLevel(index, options = {}) {
 }
 
 function showTask() {
-  const level = levelState.level;
+  const level = session.levelState.level;
   renderTaskModal(ui, {
     level,
     npcCount: getMatchNpcCount(),
@@ -900,10 +900,10 @@ function tick() {
   const clampedDt = Math.min(rawDt, 0.033);
 
   // 关卡选择状态或无场景时不渲染
-  if (!scene || gameStatus === "levelSelect") return;
+  if (!scene || session.phase === GAME_PHASES.LEVEL_SELECT) return;
 
   // 暂停状态：只渲染，不更新逻辑
-  if (gameStatus === "paused") {
+  if (session.phase === GAME_PHASES.PAUSED) {
     renderer.render(scene, camera);
     return;
   }
@@ -918,7 +918,7 @@ function tick() {
   const dt = clampedDt;
   totalTime += dt;
 
-  if (gameStatus === "playing") {
+  if (session.phase === GAME_PHASES.PLAYING) {
     const frameResult = levelRunner.update(dt);
     if (frameResult?.pauseWorld) {
       updateHud();
@@ -927,9 +927,9 @@ function tick() {
       renderer.render(scene, camera);
       return;
     }
-    if (levelState.level.timeLimit !== null) {
-      levelState.remaining = Math.max(0, levelState.remaining - dt);
-      if (levelState.remaining <= 0) {
+    if (session.levelState.level.timeLimit !== null) {
+      session.levelState.remaining = Math.max(0, session.levelState.remaining - dt);
+      if (session.levelState.remaining <= 0) {
         finishRound(false);
       }
     }
@@ -941,7 +941,7 @@ function tick() {
     updatePlayer(dt);
     updateNpcs(dt);
     updateHud();
-  } else if (gameStatus === "won") {
+  } else if (session.phase === GAME_PHASES.RESULT && session.result?.won) {
     animateCheer(dt);
   }
 
@@ -988,7 +988,7 @@ function updatePlayer(dt) {
 
   if (punchCooldown > 0) punchCooldown = Math.max(0, punchCooldown - dt);
   if (player.punchTimer > 0) player.punchTimer = Math.max(0, player.punchTimer - dt);
-  if (levelState.level.attackComboExpires !== false && punchResetTimer > 0) {
+  if (session.levelState.level.attackComboExpires !== false && punchResetTimer > 0) {
     punchResetTimer -= dt;
     if (punchResetTimer <= 0) punchTier = 0;
   }
@@ -1030,7 +1030,7 @@ function animateCheer(dt) {
 }
 
 function updateNpcs(dt) {
-  if (!levelState.level.legacy) {
+  if (!session.levelState.level.legacy) {
     npcs.forEach((npc) => {
       if (!npc.alive) return;
       if (!npc.levelManaged) {
@@ -1211,7 +1211,7 @@ function pushApart(a, b, minDistance, strength) {
 }
 
 function triggerAttack() {
-  if (gameStatus !== "playing" || punchCooldown > 0) return;
+  if (session.phase !== GAME_PHASES.PLAYING || punchCooldown > 0) return;
   const attack = levelRunner.handleAction({ type: "beforeAttack" }) ?? {};
   if (attack.blocked) return;
   if (!consumeActionInterval()) return;
@@ -1251,9 +1251,9 @@ function triggerAttack() {
   dissolveNpc(hit.npc);
   triggerShake(0.12, 0.1);
   sfxMiss();
-  levelState.attempts = Math.max(0, levelState.attempts - 1);
+  session.levelState.attempts = Math.max(0, session.levelState.attempts - 1);
   updateHud();
-  if (levelState.attempts <= 0) {
+  if (session.levelState.attempts <= 0) {
     settleRound(false, null, 680);
   }
 }
@@ -1374,22 +1374,27 @@ function updateParticles(dt) {
 }
 
 function finishRound(won, failMessage) {
-  if (gameStatus === "won" || gameStatus === "lost" || gameStatus === "levelSelect") return;
-  if (!levelState?.level || !scene) return;
+  if ([GAME_PHASES.RESULT, GAME_PHASES.LEVEL_SELECT].includes(session.phase)) return;
+  if (!session.levelState?.level || !scene) return;
   clearPendingRoundEndTimers();
-  gameStatus = won ? "won" : "lost";
+  if (session.phase === GAME_PHASES.PLAYING) {
+    session.transition(GAME_PHASES.SETTLING);
+  }
+  if (session.phase !== GAME_PHASES.SETTLING) return;
   player.cheer = won;
   if (won) sfxWin(); else sfxLose();
 
   const resultResource = levelRunner.handleAction({ type: "getResultStats" });
-  const timeUsed = Math.round(totalTime - levelState.startTime);
-  const attemptsLeft = resultResource?.attemptsLeft ?? levelState.attempts;
+  const timeUsed = Math.round(totalTime - session.levelState.startTime);
+  const attemptsLeft = resultResource?.attemptsLeft ?? session.levelState.attempts;
   const rating = calcRating(won, timeUsed, attemptsLeft);
+  session.setResult({ won, failMessage, timeUsed, attemptsLeft, rating });
+  session.transition(GAME_PHASES.RESULT);
 
   ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
   ui.resultCopy.textContent = won
-    ? levelState.level.success
-    : (failMessage || levelState.level.failure);
+    ? session.levelState.level.success
+    : (failMessage || session.levelState.level.failure);
   ui.resultRating.textContent = rating.grade;
   ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
   ui.statTime.textContent = timeUsed + " 秒";
@@ -1407,7 +1412,11 @@ function finishRound(won, failMessage) {
 
   // 保存最佳成绩
   if (won) {
-    saveBestScore(levelState.level.id, { grade: rating.grade, rating: rating.rating, time: timeUsed });
+    saveBestScore(session.levelState.level.id, {
+      grade: rating.grade,
+      rating: rating.rating,
+      time: timeUsed,
+    });
   }
 
   if (!won) {
@@ -1420,19 +1429,24 @@ function finishRound(won, failMessage) {
 
 function updateHud() {
   const levelHud = levelRunner.handleAction({ type: "getHudState" });
-  const mechanicHintHtml = levelState.level.mechanicHintHtml ?? "";
+  const mechanicHintHtml = session.levelState.level.mechanicHintHtml ?? "";
   const levelMechanicVisible = Boolean(levelHud?.mechanicVisible);
   levelViewHost?.setTheme(levelHud?.theme);
-  ui.sceneName.textContent = levelState.level.sceneName;
+  ui.sceneName.textContent = session.levelState.level.sceneName;
   ui.missionText.textContent = levelHud?.mission
-    || levelState.level.hudMission
-    || levelState.level.mission;
-  ui.timerText.textContent = levelHud?.timerText ?? Math.ceil(levelState.remaining).toString();
+    || session.levelState.level.hudMission
+    || session.levelState.level.mission;
+  ui.timerText.textContent = levelHud?.timerText
+    ?? Math.ceil(session.levelState.remaining).toString();
   ui.attemptLabel.textContent = levelHud?.resourceLabel ?? "出拳";
-  ui.attemptText.textContent = levelHud?.resourceText ?? levelState.attempts.toString();
+  ui.attemptText.textContent = levelHud?.resourceText
+    ?? session.levelState.attempts.toString();
   ui.attemptText.classList.remove("hearts-display");
   ui.clueBar.textContent = levelHud?.clue
-    ?? ("🔍 " + (levelState.level.hudClue || levelState.level.clue));
+    ?? ("🔍 " + (
+      session.levelState.level.hudClue
+      || session.levelState.level.clue
+    ));
   ui.clueBar?.classList.toggle(
     "hidden",
     Boolean(mechanicHintHtml) && !levelMechanicVisible,
