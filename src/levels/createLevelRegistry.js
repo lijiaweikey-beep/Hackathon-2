@@ -15,11 +15,21 @@ export function createLevelRegistry(entries) {
     [...byId.values()].sort((left, right) => left.order - right.order),
   );
   const visible = Object.freeze(all.filter((level) => !level.hidden));
+  const mainline = Object.freeze(
+    visible
+      .filter((level) => level.track === "mainline")
+      .sort((left, right) => left.age - right.age || left.order - right.order),
+  );
+  const extra = Object.freeze(
+    visible.filter((level) => level.track !== "mainline"),
+  );
   const indexById = new Map(all.map((level, index) => [level.id, index]));
 
   return Object.freeze({
     all,
     visible,
+    mainline,
+    extra,
     getById(id) {
       return byId.get(id) ?? null;
     },

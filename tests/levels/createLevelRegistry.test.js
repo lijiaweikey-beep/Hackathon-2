@@ -44,3 +44,14 @@ test("注册中心按排序后的稳定下标解析关卡标识", () => {
   assert.equal(registry.getIndexById("b"), 1);
   assert.equal(registry.getIndexById("missing"), -1);
 });
+
+test("注册中心分别提供按年龄排列的主线和番外", () => {
+  const registry = createLevelRegistry([
+    ["extra", { ...legacy("extra", 1), track: "extra" }],
+    ["older", { ...legacy("older", 2), track: "mainline", age: 21 }],
+    ["younger", { ...legacy("younger", 3), track: "mainline", age: 19 }],
+  ]);
+
+  assert.deepEqual(registry.mainline.map((item) => item.id), ["younger", "older"]);
+  assert.deepEqual(registry.extra.map((item) => item.id), ["extra"]);
+});

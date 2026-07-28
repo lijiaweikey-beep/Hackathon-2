@@ -1,6 +1,7 @@
 import { isLevelAction } from "./actions.js";
 
 const REQUIRED_FIELDS = ["id", "sceneName", "order"];
+const LEVEL_TRACKS = new Set(["mainline", "extra"]);
 export const LEVEL_EXTENSIONS = Object.freeze([
   "createWorld",
   "createPlayer",
@@ -20,6 +21,19 @@ export function validateLevelDefinition(definition, source = "未知关卡") {
     if (definition[field] == null || definition[field] === "") {
       throw new Error(`关卡描述缺少字段 ${field}：${source}`);
     }
+  }
+
+  if (definition.track != null && !LEVEL_TRACKS.has(definition.track)) {
+    throw new Error(`关卡分组无效：${source}`);
+  }
+  if (
+    definition.track === "mainline"
+    && (!Number.isInteger(definition.age) || definition.age <= 0)
+  ) {
+    throw new Error(`主线关卡年龄无效：${source}`);
+  }
+  if (definition.track === "extra" && definition.age != null) {
+    throw new Error(`番外关卡不能声明年龄：${source}`);
   }
 
   const hasClassicFactory = typeof definition.createLevel === "function";

@@ -62,3 +62,33 @@ test("关卡只能声明受支持的动作和扩展函数", () => {
     /未知扩展/,
   );
 });
+
+test("人生主线必须声明有效年龄，番外不能占用年龄节点", () => {
+  const base = {
+    id: "story",
+    sceneName: "人生关卡",
+    order: 1,
+    createLevel() {},
+  };
+
+  assert.throws(
+    () => validateLevelDefinition({ ...base, track: "mainline" }, "story"),
+    /年龄/,
+  );
+  assert.throws(
+    () => validateLevelDefinition({ ...base, track: "mainline", age: 0 }, "story"),
+    /年龄/,
+  );
+  assert.throws(
+    () => validateLevelDefinition({ ...base, track: "extra", age: 20 }, "story"),
+    /番外/,
+  );
+  assert.throws(
+    () => validateLevelDefinition({ ...base, track: "unknown" }, "story"),
+    /分组/,
+  );
+  assert.equal(
+    validateLevelDefinition({ ...base, track: "mainline", age: 19 }, "story").age,
+    19,
+  );
+});
