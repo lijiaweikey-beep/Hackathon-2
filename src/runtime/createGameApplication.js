@@ -27,6 +27,8 @@ import { createWorldRuntime } from "./createWorldRuntime.js";
 import { createActorSystem } from "../systems/createActorSystem.js";
 import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
+import { createStoryProgress } from "../progression/createStoryProgress.js";
+import { randomRange } from "../utils/math.js";
 
 let scene;
 let player;
@@ -41,6 +43,7 @@ let rendering;
 let settlement;
 let worldRuntime;
 let experienceManager;
+let storyProgress;
 
 let totalTime = 0;
 const session = createGameSession();
@@ -109,6 +112,8 @@ function leaveLevel() {
 }
 
 function selectLevelById(id) {
+  const definition = levelRegistry.getById(id);
+  if (definition?.track === "mainline" && !storyProgress?.isUnlocked(id)) return;
   const index = levelRegistry.getIndexById(id);
   if (index >= 0) resetLevel(index);
 }
@@ -190,6 +195,7 @@ function createClassicRuntime(definition) {
 }
 
 export function boot() {
+  storyProgress = createStoryProgress({ levels: levelRegistry.mainline, storage: window.localStorage });
   rendering = createRenderingSystem({
     THREE,
     canvas,
@@ -268,6 +274,7 @@ export function boot() {
     session,
     levelRegistry,
     levelViewHost,
+    storyProgress,
     getHudState: () => levelRunner.handleAction({ type: "getHudState" }),
     getCooldown: () => ({
       cooldown: combatSystem.cooldown,
@@ -307,6 +314,7 @@ export function boot() {
       if (!experienceManager.showResult(result)) uiController.showResult(result);
     },
     saveBestScore,
+    onLevelCompleted: (level) => level.track === "mainline" && storyProgress.complete(level.id),
     playWin: audio.win,
     playLose: audio.lose,
   });
@@ -324,7 +332,6 @@ export function boot() {
   uiController.showLevelSelect();
   rendering.start((deltaSeconds) => gameLoop.tick(deltaSeconds));
 }
-
 function disposeClassicScene() {
   levelRunner.dispose();
   rendering?.disposeScene(scene, fx);
@@ -332,7 +339,6 @@ function disposeClassicScene() {
   scene = null;
   player = null;
 }
-
 
 function resetLevel(index, options = {}) {
   settlement.clearPending();
@@ -390,8 +396,4 @@ function resetLevel(index, options = {}) {
     return;
   }
   uiController.updateHud();
-}
-
-function randomRange(min, max) {
-  return min + Math.random() * (max - min);
 }

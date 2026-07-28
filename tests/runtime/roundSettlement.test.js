@@ -83,3 +83,38 @@ test("独立玩法没有经典玩家对象也可以失败结算", () => {
   assert.equal(session.result.failMessage, "失败");
   assert.equal(session.result.attemptsLeft, 7);
 });
+
+test("成功结算推进主线，失败结算不改变进度", () => {
+  const completed = [];
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "age-19" },
+      startTime: 0,
+      attempts: 3,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult() {},
+  };
+  const settlement = createRoundSettlement({
+    session,
+    getPlayer: () => null,
+    hasScene: () => true,
+    getTotalTime: () => 1,
+    getResultStats: () => ({ attemptsLeft: 3 }),
+    calculateRating: () => ({ grade: "S", rating: 100 }),
+    showResult() {},
+    saveBestScore() {},
+    onLevelCompleted: (level) => completed.push(level.id),
+    playWin() {},
+    playLose() {},
+  });
+
+  settlement.finish(true);
+  session.phase = GAME_PHASES.PLAYING;
+  settlement.finish(false);
+
+  assert.deepEqual(completed, ["age-19"]);
+});

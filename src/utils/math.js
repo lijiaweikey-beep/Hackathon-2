@@ -15,6 +15,10 @@ export function gridKey(cx, cz) {
   return cx * 1000 + cz;
 }
 
+export function randomRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
 const scratchFacing = new THREE.Vector2();
 
 export function getFacingVector(rotationY, out = scratchFacing) {

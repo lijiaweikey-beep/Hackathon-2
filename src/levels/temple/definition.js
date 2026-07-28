@@ -6,7 +6,8 @@ import { createWorld } from "./world.js";
 
 export default {
   id: "temple",
-  order: 40,
+  order: 100,
+  track: "extra",
   legacy: false,
   createLevel: createTempleLevel,
   extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },

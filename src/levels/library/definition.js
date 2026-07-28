@@ -6,6 +6,8 @@ import { createWorld } from "./world.js";
 export default {
   id: "library",
   order: 20,
+  track: "mainline",
+  age: 21,
   legacy: false,
   createLevel: createLibraryLevel,
   extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
@@ -27,5 +29,9 @@ export default {
   difficulty: 3,
   success: "精准命中，图书馆恢复了该有的安静。",
   failure: "这对情侣亲爽了",
+  transition: {
+    intro: "二十一岁，知识很安静，爱情却总爱在书架后面发出声音。",
+    success: "图书馆恢复安静。毕业前的夜市，又飘来一股真假难辨的香味。",
+  },
   lighting: "library",
 };

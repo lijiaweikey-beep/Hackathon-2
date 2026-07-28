@@ -6,6 +6,8 @@ import { createWorld } from "./world.js";
 export default {
   id: "gaming",
   order: 10,
+  track: "mainline",
+  age: 19,
   legacy: false,
   createLevel: createGamingLevel,
   extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
@@ -31,5 +33,9 @@ export default {
   difficulty: 2,
   success: "精准命中，宿舍终于安静了。",
   failure: "这个人游戏打爽了，大家都被吵醒了",
+  transition: {
+    intro: "十九岁，第一次离开家住进宿舍，也第一次发现青春会在凌晨三点吵得人睡不着。",
+    success: "宿舍终于安静。两年后，梗哥走进了图书馆。",
+  },
   lighting: "night",
 };

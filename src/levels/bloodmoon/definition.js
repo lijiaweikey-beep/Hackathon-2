@@ -6,7 +6,8 @@ import { createWorld } from "./world.js";
 
 export default {
   id: "bloodmoon",
-  order: 50,
+  order: 110,
+  track: "extra",
   legacy: false,
   createLevel: createBloodmoonLevel,
   extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },

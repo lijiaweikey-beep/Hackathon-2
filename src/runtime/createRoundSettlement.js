@@ -47,6 +47,7 @@ export function createRoundSettlement(dependencies) {
         rating: rating.rating,
         time: timeUsed,
       });
+      dependencies.onLevelCompleted?.(session.levelState.level);
       return;
     }
     const data = player?.group?.userData;

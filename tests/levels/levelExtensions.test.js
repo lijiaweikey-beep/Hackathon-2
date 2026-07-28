@@ -15,3 +15,14 @@ for (const definition of [gaming, library, temple, bloodmoon]) {
     assert.equal(typeof definition.extensions?.renderPreview, "function");
   });
 }
+
+test("现有关卡按年龄主线和番外正确归类", () => {
+  assert.deepEqual(
+    [gaming.track, gaming.age, library.track, library.age],
+    ["mainline", 19, "mainline", 21],
+  );
+  assert.deepEqual(
+    [temple.track, temple.age, bloodmoon.track, bloodmoon.age],
+    ["extra", undefined, "extra", undefined],
+  );
+});

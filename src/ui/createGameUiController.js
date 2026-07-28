@@ -35,41 +35,73 @@ export function createGameUiController(dependencies) {
     saveMatchNpcCount(npcCount);
   }
 
+  function createLevelCard(level, { locked = false, showAge = false } = {}) {
+    const model = createLevelCardModel(level, {
+      npcCount: getNpcCountPreview(),
+    });
+    const stars = Array.from({ length: 3 }, (_, index) =>
+      `<span class="level-star${index < level.difficulty ? " is-on" : ""}">★</span>`,
+    ).join("");
+    const completed = dependencies.storyProgress?.isCompleted(level.id) ?? false;
+    const card = document.createElement("button");
+    card.className = `level-card${completed ? " completed" : ""}`;
+    card.type = "button";
+    card.dataset.level = level.id;
+    card.disabled = locked;
+    for (const [name, value] of Object.entries(level.cardStyle ?? {})) {
+      card.style.setProperty(`--card-${name}`, value);
+    }
+    card.innerHTML = `
+      <div class="level-card-accent" aria-hidden="true"></div>
+      <div class="level-card-icon">${level.emoji}</div>
+      <div class="level-card-body">
+        <div class="level-card-name">${showAge ? `${level.age} 岁 · ` : ""}${level.sceneName} <span class="level-card-difficulty ${model.difficulty.className}">${model.difficulty.label}</span></div>
+        <div class="level-card-desc">${locked ? "尚未解锁 · 完成上一阶段后开放" : model.description}</div>
+        <div class="level-card-meta">
+          <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${stars}</span>
+          ${completed ? '<span class="level-card-state">已完成</span>' : ""}
+        </div>
+      </div>
+      <div class="level-card-go" aria-hidden="true"><span>${locked ? "🔒" : "›"}</span></div>
+    `;
+    card.addEventListener("click", () => {
+      if (locked) return;
+      commitNpcCountInput();
+      dependencies.onSelectLevel?.(level.id);
+    });
+    return card;
+  }
+
+  function renderTimeline(mainline) {
+    if (!ui.lifeTimeline) return;
+    ui.lifeTimeline.innerHTML = "";
+    mainline.forEach((level) => {
+      const node = document.createElement("span");
+      const unlocked = dependencies.storyProgress?.isUnlocked(level.id) ?? true;
+      const completed = dependencies.storyProgress?.isCompleted(level.id) ?? false;
+      node.className = `life-stage${completed ? " completed" : unlocked ? " active" : " locked"}`;
+      node.textContent = `${level.age} 岁`;
+      ui.lifeTimeline.appendChild(node);
+    });
+  }
+
   function buildLevelCards() {
     if (!ui.levelCards || !dependencies.levelRegistry) return;
+    const registry = dependencies.levelRegistry;
+    const grouped = Array.isArray(registry.mainline)
+      && (registry.mainline.length > 0 || Array.isArray(registry.extra));
+    const mainline = grouped ? registry.mainline : registry.visible;
+    const extra = grouped ? (registry.extra ?? []) : [];
     ui.levelCards.innerHTML = "";
-    dependencies.levelRegistry.visible.forEach((level) => {
-      const model = createLevelCardModel(level, {
-        npcCount: getNpcCountPreview(),
-      });
-      const stars = Array.from({ length: 3 }, (_, index) =>
-        `<span class="level-star${index < level.difficulty ? " is-on" : ""}">★</span>`,
-      ).join("");
-      const card = document.createElement("button");
-      card.className = "level-card";
-      card.type = "button";
-      card.dataset.level = level.id;
-      for (const [name, value] of Object.entries(level.cardStyle ?? {})) {
-        card.style.setProperty(`--card-${name}`, value);
-      }
-      card.innerHTML = `
-        <div class="level-card-accent" aria-hidden="true"></div>
-        <div class="level-card-icon">${level.emoji}</div>
-        <div class="level-card-body">
-          <div class="level-card-name">${level.sceneName} <span class="level-card-difficulty ${model.difficulty.className}">${model.difficulty.label}</span></div>
-          <div class="level-card-desc">${model.description}</div>
-          <div class="level-card-meta">
-            <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${stars}</span>
-          </div>
-        </div>
-        <div class="level-card-go" aria-hidden="true"><span>›</span></div>
-      `;
-      card.addEventListener("click", () => {
-        commitNpcCountInput();
-        dependencies.onSelectLevel?.(level.id);
-      });
-      ui.levelCards.appendChild(card);
+    if (ui.extraLevelCards) ui.extraLevelCards.innerHTML = "";
+    mainline.forEach((level) => {
+      const locked = !(dependencies.storyProgress?.isUnlocked(level.id) ?? true);
+      ui.levelCards.appendChild(createLevelCard(level, { locked, showAge: true }));
     });
+    extra.forEach((level) => {
+      (ui.extraLevelCards ?? ui.levelCards).appendChild(createLevelCard(level));
+    });
+    renderTimeline(mainline);
     if (ui.npcCountInput) ui.npcCountInput.disabled = false;
   }
 
@@ -100,7 +132,7 @@ export function createGameUiController(dependencies) {
   }) {
     ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
     ui.resultCopy.textContent = won
-      ? level.success
+      ? (level.transition?.success || level.success)
       : (failMessage || level.failure);
     ui.resultRating.textContent = rating.grade;
     ui.resultRating.className = `result-rating rating-${rating.grade.toLowerCase()}`;

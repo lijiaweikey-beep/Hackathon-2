@@ -417,6 +417,13 @@ button {
   text-align: center;
   color: var(--text);
   padding: 4px 2px 8px;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.level-select-panel::-webkit-scrollbar {
+  display: none;
 }
 
 .level-select-panel::before {
@@ -534,6 +541,20 @@ button {
   box-shadow: 0 0 14px rgba(251, 113, 133, 0.78);
 }
 
+.life-stage.completed {
+  color: #5eead4;
+}
+
+.life-stage.completed::before {
+  background: #2dd4bf;
+  box-shadow: 0 0 14px rgba(45, 212, 191, 0.65);
+}
+
+.life-stage.locked::before {
+  background: #334155;
+  box-shadow: none;
+}
+
 .life-stage.wild {
   color: #5eead4;
 }
@@ -578,6 +599,10 @@ button {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(45, 212, 191, 0.72);
+}
+
+.level-section-label.extra {
+  color: rgba(251, 191, 36, 0.78);
 }
 
 .level-section-divider {
@@ -765,6 +790,15 @@ button {
   cursor: not-allowed;
   pointer-events: none;
   filter: grayscale(0.35);
+}
+
+.level-card.completed {
+  border-color: color-mix(in srgb, var(--card-accent) 42%, white 8%);
+}
+
+.level-card-state {
+  color: #5eead4;
+  font-weight: 900;
 }
 
 .level-card:not(:disabled):hover,
