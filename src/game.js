@@ -585,7 +585,7 @@ function updateDuelLobbyUI() {
   if (ui.duelLobbyPanel) ui.duelLobbyPanel.hidden = !inDuelLobby;
   if (ui.soloModeStack) ui.soloModeStack.hidden = inDuelLobby;
   if (ui.gameLogo) {
-    ui.gameLogo.textContent = inDuelLobby ? "⚔️ 图书馆决斗 ⚔️" : "🔥 别让我逮到你 🔥";
+    ui.gameLogo.textContent = inDuelLobby ? "⚔️ 图书馆决斗 ⚔️" : "梗哥的半生";
   }
 
   if (!inDuelLobby) return;
