@@ -21,86 +21,6 @@ export function createWorldBuilder(ctx) {
   ctx.getScene().add(wall);
 }
 
-  function buildLibrary() {
-  const wallTex = getCachedTexture(textureCache.wall, "library", () => makeWallTexture("library"));
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    map: wallTex,
-    color: 0xf0dfbf,
-    roughness: 0.62,
-  });
-  addWall(0, -11.8, 0, wallMaterial);
-  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
-  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
-
-  const shelfMat = new THREE.MeshStandardMaterial({ color: 0x785a3a, roughness: 0.7 });
-  const tableMat = new THREE.MeshStandardMaterial({ color: 0x926c44, roughness: 0.68 });
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0x3f6f7d, roughness: 0.78 });
-  const bookColors = [0xb91c1c, 0x1d4ed8, 0x047857, 0xf59e0b, 0x7c3aed];
-
-  [-9.5, -6.2, -2.9, 2.9, 6.2, 9.5].forEach((x) => {
-    const shelf = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.45, 0.65), shelfMat);
-    shelf.position.set(x, 0.74, -9.2);
-    shelf.castShadow = true;
-    shelf.receiveShadow = true;
-    ctx.getScene().add(shelf);
-    for (let i = 0; i < 8; i += 1) {
-      const book = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.44 + Math.random() * 0.22, 0.08),
-        new THREE.MeshStandardMaterial({ color: bookColors[i % bookColors.length], roughness: 0.82 }),
-      );
-      book.position.set(x - 0.84 + i * 0.24, 1.02, -8.82);
-      ctx.getScene().add(book);
-    }
-  });
-
-  [-10.2, 10.2].forEach((x) => {
-    [-5.8, -2.5, 0.8, 4.1, 7.4].forEach((z) => {
-      const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.74, 1.35, 2.2), shelfMat);
-      shelf.position.set(x, 0.68, z);
-      shelf.castShadow = true;
-      shelf.receiveShadow = true;
-      ctx.getScene().add(shelf);
-      ctx.registerObstacle(x, z, 0.37, 1.1);
-    });
-  });
-
-  [-9.5, -6.2, -2.9, 2.9, 6.2, 9.5].forEach((x) => {
-    ctx.registerObstacle(x, -9.2, 1.1, 0.33);
-  });
-
-  // 两侧与后侧墙体碰撞（内缘与可视墙对齐）
-  ctx.registerObstacle(-10.9, 0, 0.35, 10.6);
-  ctx.registerObstacle(10.9, 0, 0.35, 10.6);
-  ctx.registerObstacle(0, -10.9, 10.6, 0.35);
-
-  const libraryTables = [
-    [-3.4, -1.4],
-    [3.4, -1.4],
-    [-3.4, 2.4],
-    [3.4, 2.4],
-  ];
-  libraryTables.forEach(([x, z]) => {
-    const table = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.35, 1.35), tableMat);
-    table.position.set(x, 0.38, z);
-    table.castShadow = true;
-    table.receiveShadow = true;
-    ctx.getScene().add(table);
-    ctx.registerObstacle(x, z, 1.35, 0.675);
-
-    const lamp = new THREE.PointLight(0xffe0a8, 0.48, 5.2);
-    lamp.position.set(x, 1.6, z);
-    ctx.getScene().add(lamp);
-
-    [-1, 1].forEach((side) => {
-      const chair = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.42, 0.58), chairMat);
-      chair.position.set(x + side * 1.15, 0.26, z);
-      chair.castShadow = true;
-      chair.receiveShadow = true;
-      ctx.getScene().add(chair);
-    });
-  });
-}
-
   function buildTempleCourtyard(createShadowCue) {
   const resources = {
     moonPoint: new THREE.Vector3(0, 0, 0.15),
@@ -522,7 +442,6 @@ export function createWorldBuilder(ctx) {
         () => makeWallTexture(id),
       ),
     },
-    buildLibrary,
     buildTempleCourtyard,
     buildBloodmoonStreet,
     baseLight: sun,
