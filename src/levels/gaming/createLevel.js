@@ -25,7 +25,7 @@ export function createGamingLevel(context) {
   }
 
   function update(deltaSeconds) {
-    context.updateEnvironment(deltaSeconds);
+    context.sceneData.updateEnvironment(deltaSeconds);
     if (!target?.alive) return;
 
     const script = target.script;

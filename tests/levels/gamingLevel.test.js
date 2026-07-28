@@ -33,6 +33,9 @@ function createFakeContext({ npcCount }) {
         createPosition(0, 0, 1),
         createPosition(2, 0, 1),
       ],
+      updateEnvironment() {
+        context.environmentUpdates += 1;
+      },
     },
     created: [],
     target: null,
@@ -65,9 +68,6 @@ function createFakeContext({ npcCount }) {
     },
     moveNpcToward() {
       return false;
-    },
-    updateEnvironment() {
-      context.environmentUpdates += 1;
     },
   };
   return context;

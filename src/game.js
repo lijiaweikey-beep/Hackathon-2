@@ -126,7 +126,6 @@ const levelRunner = createLevelRunner({
     refreshHud: updateHud,
     resetPlayerInput,
     isActorFacingTarget,
-    updateEnvironment: updateFlashlight,
   }),
   onError(error, definition) {
     console.error(`关卡运行失败：${definition.id}`, error);
@@ -264,10 +263,6 @@ function clampActorPosition(position, velocity) {
 function buildWorld(level) {
   if (!worldBuilder) worldBuilder = createWorldBuilder(getWorldContext());
   worldBuilder.buildWorld(level);
-}
-
-function updateFlashlight(dt) {
-  worldBuilder?.updateFlashlight(dt);
 }
 
 function triggerHitstop(duration) {
@@ -679,7 +674,6 @@ function resetLevel(index, options = {}) {
     attempts: ATTEMPTS,
     startTime: 0,
     obstacles: [],
-    flashlight: null,
   };
 
   buildWorld(level);

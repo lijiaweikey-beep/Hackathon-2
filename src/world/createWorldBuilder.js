@@ -21,166 +21,6 @@ export function createWorldBuilder(ctx) {
   ctx.getScene().add(wall);
 }
 
-  function buildGamingRoom() {
-  const computers = [];
-  const wallTex = getCachedTexture(textureCache.wall, "gaming", () => makeWallTexture("gaming"));
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    map: wallTex,
-    color: 0x2d374f,
-    roughness: 0.72,
-  });
-  addWall(0, -11.8, 0, wallMaterial);
-  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
-  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
-
-  const deskMat = new THREE.MeshStandardMaterial({ color: 0x2f2b26, roughness: 0.7 });
-  const monitorMat = new THREE.MeshStandardMaterial({ color: 0x070b10, roughness: 0.46 });
-  const screenMat = new THREE.MeshStandardMaterial({
-    color: 0x8ee7ff,
-    emissive: 0x1d8cff,
-    emissiveIntensity: 2.2,
-    roughness: 0.25,
-  });
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0x283348, roughness: 0.82 });
-  const spots = [
-    [-7.2, -6.7],
-    [-3.6, -7.0],
-    [0, -6.8],
-    [3.7, -7.0],
-    [7.3, -6.7],
-    [-7.0, 7.0],
-    [-3.4, 7.2],
-    [0.4, 7.0],
-    [3.8, 7.2],
-    [7.1, 7.0],
-  ];
-
-  spots.forEach(([x, z], index) => {
-    const flip = z > 0 ? Math.PI : 0;
-    const desk = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.42, 0.88), deskMat);
-    desk.position.set(x, 0.32, z);
-    desk.rotation.y = flip;
-    desk.castShadow = true;
-    desk.receiveShadow = true;
-    ctx.getScene().add(desk);
-
-    const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.5, 0.12), monitorMat);
-    monitor.position.set(x, 0.92, z + (z > 0 ? -0.25 : 0.25));
-    monitor.rotation.y = flip;
-    monitor.castShadow = true;
-    ctx.getScene().add(monitor);
-
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.34), screenMat.clone());
-    screen.position.set(x, 0.93, z + (z > 0 ? -0.32 : 0.32));
-    screen.rotation.y = z > 0 ? 0 : Math.PI;
-    ctx.getScene().add(screen);
-
-    const glow = new THREE.PointLight(0x33aaff, 0.65, 4.4);
-    glow.position.set(x, 1.2, z + (z > 0 ? -0.6 : 0.6));
-    ctx.getScene().add(glow);
-
-    const chair = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.44, 0.64), chairMat);
-    chair.position.set(x + ((index % 2) * 0.28 - 0.14), 0.24, z + (z > 0 ? 0.95 : -0.95));
-    chair.castShadow = true;
-    chair.receiveShadow = true;
-    ctx.getScene().add(chair);
-
-    computers.push(new THREE.Vector3(x, 0, z + (z > 0 ? 1.2 : -1.2)));
-  });
-
-  setupGamingFlashlight();
-
-  const bedMat = new THREE.MeshStandardMaterial({ color: 0x243448, roughness: 0.86 });
-  const quiltMat = new THREE.MeshStandardMaterial({ color: 0x445a78, roughness: 0.92 });
-  [-10.2, 10.2].forEach((x) => {
-    [-5.2, 0.6, 6.3].forEach((z) => {
-      const bed = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.38, 2.45), bedMat);
-      bed.position.set(x, 0.22, z);
-      bed.castShadow = true;
-      bed.receiveShadow = true;
-      ctx.getScene().add(bed);
-
-      const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.18, 1.55), quiltMat);
-      quilt.position.set(x, 0.52, z + 0.18);
-      quilt.castShadow = true;
-      ctx.getScene().add(quilt);
-    });
-  });
-  return { computers };
-}
-
-const FLASHLIGHT_COLOR = 0xfff0c8;
-const FLASHLIGHT_RADIUS = 22;
-const FLASHLIGHT_HEIGHT = 2.8;
-const FLASHLIGHT_SPEED = 1.45;
-const FLASHLIGHT_INTENSITY = 36;
-const FLASHLIGHT_DISTANCE = Math.hypot(FLASHLIGHT_RADIUS, FLASHLIGHT_HEIGHT) + 1.2;
-const FLASHLIGHT_PENUMBRA = 0;
-const FLASHLIGHT_DECAY = 0;
-const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
-
-  function setupGamingFlashlight() {
-  const start = randomFlashlightPoint();
-  const spot = new THREE.SpotLight(
-    FLASHLIGHT_COLOR,
-    FLASHLIGHT_INTENSITY,
-    FLASHLIGHT_DISTANCE,
-    FLASHLIGHT_SPOT_ANGLE,
-    FLASHLIGHT_PENUMBRA,
-    FLASHLIGHT_DECAY,
-  );
-  spot.position.set(start.x, FLASHLIGHT_HEIGHT, start.z);
-  spot.target.position.set(start.x, 0, start.z);
-  spot.castShadow = false;
-  ctx.getScene().add(spot);
-  ctx.getScene().add(spot.target);
-  ctx.getLevelState().flashlight = {
-    spot,
-    position: new THREE.Vector3(start.x, 0, start.z),
-    target: new THREE.Vector3(start.x, 0, start.z),
-    state: "patrol",
-    pauseTimer: 0,
-  };
-}
-
-  function randomFlashlightPoint() {
-  let pos;
-  let tries = 0;
-  do {
-    pos = new THREE.Vector3(ctx.randomRange(-8.6, 8.6), 0, ctx.randomRange(-7.6, 7.6));
-    tries += 1;
-  } while (tries < 30 && ctx.collidesWithObstacle(pos, FLASHLIGHT_RADIUS * 0.6));
-  return pos;
-}
-
-  function updateFlashlight(dt) {
-  const fl = ctx.getLevelState().flashlight;
-  if (!fl) return;
-  if (fl.state === "pause") {
-    fl.pauseTimer -= dt;
-    if (fl.pauseTimer <= 0) {
-      fl.state = "patrol";
-      fl.target.copy(randomFlashlightPoint());
-    }
-  } else {
-    const dx = fl.target.x - fl.position.x;
-    const dz = fl.target.z - fl.position.z;
-    const dist = Math.hypot(dx, dz);
-    const step = FLASHLIGHT_SPEED * dt;
-    if (dist <= step || dist < 0.05) {
-      fl.position.copy(fl.target);
-      fl.state = "pause";
-      fl.pauseTimer = ctx.randomRange(2.5, 5.0);
-    } else {
-      fl.position.x += (dx / dist) * step;
-      fl.position.z += (dz / dist) * step;
-    }
-  }
-  fl.spot.intensity = FLASHLIGHT_INTENSITY;
-  fl.spot.position.set(fl.position.x, FLASHLIGHT_HEIGHT, fl.position.z);
-  fl.spot.target.position.set(fl.position.x, 0, fl.position.z);
-}
-
   function buildLibrary() {
   const wallTex = getCachedTexture(textureCache.wall, "library", () => makeWallTexture("library"));
   const wallMaterial = new THREE.MeshStandardMaterial({
@@ -674,7 +514,14 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
     registerObstacle: ctx.registerObstacle,
     randomRange: ctx.randomRange,
     addWall,
-    buildGamingRoom,
+    collidesWithObstacle: ctx.collidesWithObstacle,
+    textures: {
+      getWallTexture: (id) => getCachedTexture(
+        textureCache.wall,
+        id,
+        () => makeWallTexture(id),
+      ),
+    },
     buildLibrary,
     buildTempleCourtyard,
     buildBloodmoonStreet,
@@ -684,6 +531,5 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
 
   return {
     buildWorld,
-    updateFlashlight,
   };
 }
