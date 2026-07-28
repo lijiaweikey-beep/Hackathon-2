@@ -11,7 +11,7 @@ export function createTempleLevel(context) {
   let target = null;
 
   function segmentPassesMoon(fromPosition, toPosition, radius) {
-    const moonPoint = context.temple.moonPoint;
+    const moonPoint = context.sceneData.moonPoint;
     const dx = toPosition.x - fromPosition.x;
     const dz = toPosition.z - fromPosition.z;
     const lengthSq = dx * dx + dz * dz;
@@ -30,7 +30,7 @@ export function createTempleLevel(context) {
   }
 
   function randomOutsideMoon(fromPosition = null, extraDistance = 0.8) {
-    const moonPoint = context.temple.moonPoint;
+    const moonPoint = context.sceneData.moonPoint;
     const minDistance = TEMPLE_MOON_RADIUS + extraDistance;
     let fallback = null;
 
@@ -52,7 +52,7 @@ export function createTempleLevel(context) {
   }
 
   function randomDisturbPoint() {
-    const moonPoint = context.temple.moonPoint;
+    const moonPoint = context.sceneData.moonPoint;
     for (let attempts = 0; attempts < 24; attempts += 1) {
       const angle = context.randomRange(0, Math.PI * 2);
       const radius = context.randomRange(
@@ -75,7 +75,7 @@ export function createTempleLevel(context) {
   }
 
   function getMoonInfluence(position) {
-    const moonPoint = context.temple.moonPoint;
+    const moonPoint = context.sceneData.moonPoint;
     const distance = Math.hypot(position.x - moonPoint.x, position.z - moonPoint.z);
     return THREE.MathUtils.clamp(
       (TEMPLE_MOON_RADIUS - distance) / TEMPLE_SHADOW_FADE,
@@ -88,9 +88,9 @@ export function createTempleLevel(context) {
     const clueIntensity = Math.min(intensity, TEMPLE_TRUE_SHADOW_MAX);
     npc.marked = true;
     npc.markIntensity = clueIntensity;
-    context.positionShadowCue(context.temple.shadowCue, npc);
+    context.positionShadowCue(context.sceneData.shadowCue, npc);
     context.setShadowCueIntensity(
-      context.temple.shadowCue,
+      context.sceneData.shadowCue,
       clueIntensity * getMoonInfluence(npc.group.position),
     );
   }
@@ -98,9 +98,9 @@ export function createTempleLevel(context) {
   function pulseClues(npc) {
     if (!npc.marked) return;
     const pulse = 0.5 + Math.sin(context.getTotalTime() * 3.2) * 0.5;
-    context.positionShadowCue(context.temple.shadowCue, npc);
+    context.positionShadowCue(context.sceneData.shadowCue, npc);
     context.setShadowCueIntensity(
-      context.temple.shadowCue,
+      context.sceneData.shadowCue,
       npc.markIntensity * getMoonInfluence(npc.group.position),
       0.78 + pulse * 0.12,
     );
@@ -175,7 +175,7 @@ export function createTempleLevel(context) {
     if (target?.marked) {
       pulseClues(target);
     } else {
-      context.setShadowCueIntensity(context.temple.shadowCue, 0);
+      context.setShadowCueIntensity(context.sceneData.shadowCue, 0);
     }
   }
 
@@ -188,7 +188,7 @@ export function createTempleLevel(context) {
       state: "wander",
       timer: context.randomRange(2.4, 4.2),
       waypoint: randomOutsideMoon(startPosition),
-      moonPoint: context.temple.moonPoint.clone(),
+      moonPoint: context.sceneData.moonPoint.clone(),
       revealProgress: 0,
       exposed: false,
       wanderRouteLeft: 2,
@@ -245,7 +245,7 @@ export function createTempleLevel(context) {
         script.exposed = false;
         target.marked = false;
         target.markIntensity = 0;
-        context.setShadowCueIntensity(context.temple.shadowCue, 0);
+        context.setShadowCueIntensity(context.sceneData.shadowCue, 0);
       }
       return;
     }
@@ -289,7 +289,7 @@ export function createTempleLevel(context) {
         return updateShadows();
       }
       if (action.type === "actorDissolved" && action.actor === target) {
-        context.setShadowCueIntensity(context.temple.shadowCue, 0);
+        context.setShadowCueIntensity(context.sceneData.shadowCue, 0);
       }
       return undefined;
     },

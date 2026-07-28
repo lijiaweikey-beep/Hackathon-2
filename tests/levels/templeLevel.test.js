@@ -8,7 +8,7 @@ function createFakeContext({ npcCount, moveReached = false }) {
     definition: { moonDecoyCount: 3 },
     npcCount,
     npcSpeed: 3,
-    temple: {
+    sceneData: {
       moonPoint: new THREE.Vector3(0, 0, 0.15),
       shadowCue: {},
     },
@@ -95,7 +95,7 @@ test("真苏轼在月光中庭显露竹柏影", () => {
   const context = createFakeContext({ npcCount: 2 });
   const level = createTempleLevel(context);
   level.start();
-  context.target.group.position.copy(context.temple.moonPoint);
+  context.target.group.position.copy(context.sceneData.moonPoint);
   context.target.script.state = "moonPause";
   context.target.script.timer = 0.5;
 

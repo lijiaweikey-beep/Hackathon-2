@@ -1,7 +1,13 @@
+import { renderSuShiShadowMarkHtml } from "../../entities/templeShadows.js";
+import { createTempleLevel } from "./createLevel.js";
+
 export default {
   id: "temple",
   order: 40,
-  legacy: true,
+  legacy: false,
+  createLevel: createTempleLevel,
+  decoyCount: 5,
+  moonDecoyCount: 3,
   sceneName: "承天寺夜游",
   emoji: "🌕",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 个苏轼影分身里找出真正吵醒怀民的苏轼`,
@@ -14,4 +20,9 @@ export default {
   success: "精准命中，怀民终于能回去睡觉了。",
   failure: "苏轼月下散步爽了，怀民彻底睡不着了",
   lighting: "night",
+  mechanicHintHtml: `
+    <div class="mechanic-hint-row"><span class="mechanic-hint-label">任务</span><span class="mechanic-hint-text">找出真正吵醒怀民的苏轼。</span></div>
+    <div class="mechanic-hint-row"><span class="mechanic-hint-label">机制</span><span class="mechanic-hint-text">苏轼只在月光中庭显影，假影也会短暂干扰。</span></div>
+    <div class="mechanic-hint-row"><span class="mechanic-hint-label">特征</span>${renderSuShiShadowMarkHtml()}<span class="mechanic-hint-text">真苏轼脚下是这组交错竹柏影。</span></div>
+  `,
 };

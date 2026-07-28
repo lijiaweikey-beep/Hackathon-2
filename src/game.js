@@ -22,13 +22,6 @@ import {
   ACTION_INTERVAL_MS,
   REVERSE_INPUT_LOCK_MS,
   REVERSE_INPUT_DOT_THRESHOLD,
-  TEMPLE_MOON_RADIUS,
-  TEMPLE_SHADOW_FADE,
-  TEMPLE_DECOY_SHADOW_STYLES,
-  TEMPLE_TRUE_SHADOW_MAX,
-  TEMPLE_TRUE_REVEAL_AT,
-  TEMPLE_TRUE_INITIAL_MOON_DELAY,
-  SU_SHI_SHADOW_PATTERN,
   REMOTE_POS_LERP,
   REMOTE_SNAP_DIST,
   REMOTE_STALE_MS,
@@ -80,7 +73,6 @@ import {
   setShadowCueIntensity,
   positionShadowCue,
   setTempleLocalShadow,
-  renderSuShiShadowMarkHtml,
   createSuShiShadowCue,
 } from "./entities/templeShadows.js";
 import {
@@ -204,8 +196,10 @@ let punchResetTimer = 0; // 停止出拳后重置计时
 let totalTime = 0;
 
 const levelRunner = createLevelRunner({
-  createContext: ({ scope }) => ({
+  createContext: ({ definition, scope }) => ({
+    definition,
     scope,
+    sceneData: levelState[definition.id],
     npcCount: getMatchNpcCount(),
     computers: levelState.computers,
     npcSpeed: NPC_SPEED,
@@ -223,6 +217,11 @@ const levelRunner = createLevelRunner({
     setLipstick,
     collidesWithObstacle,
     isFacingTarget,
+    getActors: () => [player, ...npcs].filter(Boolean),
+    getTotalTime: () => totalTime,
+    setTempleLocalShadow,
+    setShadowCueIntensity,
+    positionShadowCue,
     updateEnvironment: updateFlashlight,
   }),
   onError(error, definition) {
@@ -1454,30 +1453,10 @@ function spawnNpcs(level) {
     for (let i = 1; i < getMatchNpcCount(); i += 1) {
       addWanderNpc(i);
     }
-  } else {
-    const target = createNpc(0, { suShiTarget: true, templeClone: true });
-    const start = randomOpenPositionAwayFromTempleCenter();
-    target.group.position.set(start.x, 0, start.z);
-    target.script = {
-      state: "wander",
-      timer: randomRange(2.4, 4.2),
-      waypoint: randomOpenPositionOutsideTempleMoon(start),
-      moonPoint: levelState.temple.moonPoint.clone(),
-      revealProgress: 0,
-      exposed: false,
-      wanderRouteLeft: 2,
-      nextMoonDelay: randomRange(TEMPLE_TRUE_INITIAL_MOON_DELAY[0], TEMPLE_TRUE_INITIAL_MOON_DELAY[1]),
-    };
-    npcs.push(target);
-    scene.add(target.group);
-
-    for (let i = 1; i < getMatchNpcCount(); i += 1) {
-      addWanderNpc(i);
-    }
   }
 
   const decoyCount = level.decoyCount
-    ?? (level.id === "temple" ? 5 : level.id === "bloodmoon" ? 6 : 3);
+    ?? (level.id === "bloodmoon" ? 6 : 3);
   const wanderNpcs = npcs.filter(
     (npc) => !npc.levelManaged
       && !npc.isLover
@@ -1487,7 +1466,9 @@ function spawnNpcs(level) {
   );
   shuffleArray(wanderNpcs);
   for (let i = 0; i < Math.min(decoyCount, wanderNpcs.length); i += 1) {
-    initDecoy(wanderNpcs[i], level.id === "temple" && i < 3);
+    const npc = wanderNpcs[i];
+    initDecoy(npc);
+    levelRunner.handleAction({ type: "configureDecoy", npc, index: i });
   }
 
   if (level.id === "bloodmoon") {
@@ -1986,14 +1967,11 @@ function shuffleArray(arr) {
   }
 }
 
-function initDecoy(npc, moonDisturber = false) {
+function initDecoy(npc) {
   npc.isDecoy = true;
   npc.deoyState = "wander"; // "wander" | "confuse" | "moonApproach" | "moonPause"
   npc.decoyTimer = randomRange(1.5, 3.5); // 当前状态剩余时间
   npc.decoyDir = new THREE.Vector2(); // 替身移动方向
-  npc.isMoonDisturber = moonDisturber;
-  npc.moonDisturbTimer = moonDisturber ? randomRange(12, 18) : 0;
-  npc.moonDisturbWaypoint = null;
   pickDecoyDir(npc);
 }
 
@@ -2003,46 +1981,7 @@ function pickDecoyDir(npc) {
 }
 
 function updateDecoy(npc, dt) {
-  if (npc.isMoonDisturber && levelState?.level?.id === "temple") {
-    if (npc.deoyState !== "moonApproach" && npc.deoyState !== "moonPause") {
-      npc.moonDisturbTimer -= dt;
-      if (npc.moonDisturbTimer <= 0) {
-        if (Math.random() < 0.65) {
-          npc.deoyState = "moonApproach";
-          npc.decoyTimer = randomRange(4.0, 6.0);
-          npc.moonDisturbWaypoint = randomTempleDisturbPoint();
-        } else {
-          npc.moonDisturbTimer = randomRange(12, 18);
-        }
-      }
-    }
-
-    if (npc.deoyState === "moonApproach") {
-      npc.walking = true;
-      const reached = moveNpcToward(npc, npc.moonDisturbWaypoint, NPC_SPEED * 0.92, dt);
-      npc.decoyTimer -= dt;
-      if (reached || npc.decoyTimer <= 0) {
-        npc.deoyState = "moonPause";
-        npc.decoyTimer = randomRange(0.8, 1.4);
-      }
-      return;
-    }
-
-    if (npc.deoyState === "moonPause") {
-      npc.walking = false;
-      npc.decoyTimer -= dt;
-      faceNpcToward(npc, new THREE.Vector3(7.1, 0, -10.4));
-      if (npc.decoyTimer <= 0) {
-        npc.deoyState = "wander";
-        npc.decoyTimer = randomRange(1.0, 2.5);
-        npc.moonDisturbTimer = randomRange(12, 18);
-        npc.moonDisturbWaypoint = null;
-        npc.wanderTimer = randomRange(0.5, 1.5);
-        npc.pauseTimer = randomRange(0.2, 0.8);
-      }
-      return;
-    }
-  }
+  if (levelRunner.handleAction({ type: "updateDecoy", npc, deltaSeconds: dt })) return;
 
   npc.decoyTimer -= dt;
 
@@ -2135,107 +2074,7 @@ function randomOpenPosition() {
   return pos;
 }
 
-function randomOpenPositionAwayFromTempleCenter() {
-  const moonPoint = levelState?.temple?.moonPoint ?? new THREE.Vector3();
-  const minDistance = TEMPLE_MOON_RADIUS + 1.2;
-  let fallback = null;
-
-  for (let tries = 0; tries < 60; tries += 1) {
-    const pos = randomOpenPosition();
-    const distance = Math.hypot(pos.x - moonPoint.x, pos.z - moonPoint.z);
-    if (!fallback || distance > Math.hypot(fallback.x - moonPoint.x, fallback.z - moonPoint.z)) {
-      fallback = pos;
-    }
-    if (distance >= minDistance) return pos;
-  }
-
-  return fallback ?? randomOpenPosition();
-}
-
-function randomOpenPositionOutsideTempleMoon(fromPosition = null) {
-  const moonPoint = levelState?.temple?.moonPoint ?? new THREE.Vector3();
-  const minDistance = TEMPLE_MOON_RADIUS + 0.8;
-  let fallback = null;
-
-  for (let tries = 0; tries < 60; tries += 1) {
-    const pos = randomOpenPosition();
-    const distance = Math.hypot(pos.x - moonPoint.x, pos.z - moonPoint.z);
-    if (!fallback || distance > Math.hypot(fallback.x - moonPoint.x, fallback.z - moonPoint.z)) {
-      fallback = pos;
-    }
-    if (distance < minDistance) continue;
-    if (fromPosition && segmentPassesTempleMoon(fromPosition, pos, TEMPLE_MOON_RADIUS * 0.82)) continue;
-    return pos;
-  }
-
-  return fallback ?? randomOpenPositionAwayFromTempleCenter();
-}
-
-function segmentPassesTempleMoon(fromPosition, toPosition, radius) {
-  const moonPoint = levelState?.temple?.moonPoint;
-  if (!moonPoint) return false;
-  const ax = fromPosition.x;
-  const az = fromPosition.z;
-  const bx = toPosition.x;
-  const bz = toPosition.z;
-  const dx = bx - ax;
-  const dz = bz - az;
-  const lengthSq = dx * dx + dz * dz;
-  if (lengthSq <= 0.0001) return Math.hypot(ax - moonPoint.x, az - moonPoint.z) < radius;
-  const t = THREE.MathUtils.clamp(((moonPoint.x - ax) * dx + (moonPoint.z - az) * dz) / lengthSq, 0, 1);
-  const closestX = ax + dx * t;
-  const closestZ = az + dz * t;
-  return Math.hypot(closestX - moonPoint.x, closestZ - moonPoint.z) < radius;
-}
-
-function randomTempleDisturbPoint() {
-  const moonPoint = levelState?.temple?.moonPoint ?? new THREE.Vector3();
-  for (let tries = 0; tries < 24; tries += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = randomRange(TEMPLE_MOON_RADIUS * 0.48, TEMPLE_MOON_RADIUS * 0.86);
-    const pos = new THREE.Vector3(
-      moonPoint.x + Math.sin(angle) * radius,
-      0,
-      moonPoint.z + Math.cos(angle) * radius,
-    );
-    if (!collidesWithObstacle(pos)) return pos;
-  }
-  return moonPoint.clone().add(new THREE.Vector3(randomRange(-2.8, 2.8), 0, randomRange(-2.8, 2.8)));
-}
-
-
-
 /* ---- bloodmoon mode (from zjy) ---- */
-
-
-function getTempleMoonInfluence(position) {
-  const moonPoint = levelState?.temple?.moonPoint;
-  if (!moonPoint) return 0;
-  const distance = Math.hypot(position.x - moonPoint.x, position.z - moonPoint.z);
-  return THREE.MathUtils.clamp((TEMPLE_MOON_RADIUS - distance) / TEMPLE_SHADOW_FADE, 0, 1);
-}
-
-
-function updateTempleShadows() {
-  if (levelState?.level?.id !== "temple") return;
-  const actors = [player, ...npcs].filter(Boolean);
-
-  actors.forEach((actor) => {
-    const influence = getTempleMoonInfluence(actor.group.position);
-    const pulse = 0.9 + Math.sin(totalTime * 2.4 + (actor.id ?? 0)) * 0.08;
-    const strength = actor.isSuShiTarget ? 0.86 : actor.isDecoy ? 0.84 : 0.8;
-    setTempleLocalShadow(actor, influence, strength, pulse);
-  });
-
-  const target = npcs.find((npc) => npc.isSuShiTarget);
-  if (target?.marked) {
-    pulseSuShiClues(target);
-  } else if (levelState?.temple?.shadowCue) {
-    setShadowCueIntensity(levelState.temple.shadowCue, 0);
-  }
-}
-
-
 
 
 function initBloodmoonNpc(npc) {
@@ -2979,114 +2818,9 @@ function updateNpcs(dt) {
       animateActor(npc, dt, npc.walking);
     });
     separateActors();
+    levelRunner.handleAction({ type: "afterNpcUpdate" });
     return;
   }
-
-  updateTempleTarget(dt);
-
-  npcs.forEach((npc) => {
-    if (!npc.alive) return;
-    if (npc.isLover || npc.isSuShiTarget) return;
-    if (npc.isDecoy) {
-      updateDecoy(npc, dt);
-    } else {
-      updateWander(npc, dt);
-    }
-    animateActor(npc, dt, npc.walking);
-  });
-
-  separateActors();
-  updateTempleShadows();
-}
-
-function updateTempleTarget(dt) {
-  const target = npcs.find((npc) => npc.isSuShiTarget);
-  if (!target || !target.alive || !target.script) return;
-  const script = target.script;
-
-  if (target.marked) pulseSuShiClues(target);
-
-  if (script.state === "seekMoon") {
-    target.walking = true;
-    const reached = moveNpcToward(target, script.moonPoint, NPC_SPEED * 0.96, dt);
-    if (reached) {
-      script.state = "moonPause";
-      script.timer = randomRange(1.6, 2.1);
-      script.revealProgress = 0;
-      script.exposed = false;
-    }
-    animateActor(target, dt, target.walking);
-    return;
-  }
-
-  if (script.state === "moonPause") {
-    target.walking = false;
-    script.timer -= dt;
-    faceNpcToward(target, new THREE.Vector3(7.1, 0, -10.4));
-
-    if (script.timer <= TEMPLE_TRUE_REVEAL_AT || script.exposed) {
-      script.exposed = true;
-      script.revealProgress = Math.min(1, script.revealProgress + dt * 0.65);
-      setSuShiClues(target, script.revealProgress);
-    }
-
-    if (script.timer <= 0) {
-      script.state = "wander";
-      script.timer = randomRange(2.4, 4.2);
-      script.waypoint = randomOpenPositionOutsideTempleMoon(target.group.position);
-      script.wanderRouteLeft = Math.random() < 0.5 ? 1 : 2;
-      script.nextMoonDelay = randomRange(10, 15);
-      script.revealProgress = 0;
-      script.exposed = false;
-      target.marked = false;
-      target.markIntensity = 0;
-      if (levelState?.temple?.shadowCue) {
-        setShadowCueIntensity(levelState.temple.shadowCue, 0);
-      }
-    }
-    animateActor(target, dt, false);
-    return;
-  }
-
-  if (script.state === "wander") {
-    target.walking = true;
-    const reached = moveNpcToward(target, script.waypoint, NPC_SPEED * 1.02, dt);
-    script.timer -= dt;
-    script.nextMoonDelay = Math.max(0, script.nextMoonDelay - dt);
-    if (reached || script.timer <= 0) {
-      if (script.wanderRouteLeft > 0 || script.nextMoonDelay > 0) {
-        if (reached) script.wanderRouteLeft = Math.max(0, script.wanderRouteLeft - 1);
-        script.timer = randomRange(2.4, 4.2);
-        script.waypoint = script.nextMoonDelay > 0
-          ? randomOpenPositionOutsideTempleMoon(target.group.position)
-          : randomOpenPosition();
-      } else {
-        script.state = "seekMoon";
-        script.waypoint = script.moonPoint.clone();
-      }
-    }
-    animateActor(target, dt, true);
-  }
-}
-
-function setSuShiClues(npc, intensity) {
-  const clueIntensity = npc.isSuShiTarget ? Math.min(intensity, TEMPLE_TRUE_SHADOW_MAX) : intensity;
-  npc.marked = true;
-  npc.markIntensity = npc.isSuShiTarget ? clueIntensity : Math.max(npc.markIntensity, clueIntensity);
-  const cue = levelState?.temple?.shadowCue;
-  if (!cue) return;
-  positionShadowCue(cue, npc);
-  setShadowCueIntensity(cue, npc.markIntensity * getTempleMoonInfluence(npc.group.position));
-}
-
-function pulseSuShiClues(npc) {
-  if (!npc.marked) return;
-  const cue = levelState?.temple?.shadowCue;
-  if (!cue) return;
-  const pulse = 0.5 + Math.sin(totalTime * 3.2) * 0.5;
-  positionShadowCue(cue, npc);
-  const courtyardInfluence = getTempleMoonInfluence(npc.group.position);
-  setShadowCueIntensity(cue, npc.markIntensity * courtyardInfluence, 0.78 + pulse * 0.12);
 }
 
 function updateWander(npc, dt) {
@@ -3442,9 +3176,7 @@ function dissolveActor(actor) {
   if (!actor?.group || actor.group.visible === false) return;
   actor.alive = false;
   actor.group.visible = false;
-  if (actor.isSuShiTarget && levelState?.temple?.shadowCue) {
-    setShadowCueIntensity(levelState.temple.shadowCue, 0);
-  }
+  levelRunner.handleAction({ type: "actorDissolved", actor });
   if (actor.isBloodmoonTarget && levelState?.bloodmoon?.targetCue) {
     setBloodmoonClawIntensity(levelState.bloodmoon.targetCue, 0);
   }
@@ -3553,8 +3285,10 @@ function finishRound(won, failMessage) {
 function updateHud() {
   const duel = isDuelLevel();
   const isBloodmoon = !duel && levelState.level.id === "bloodmoon";
-  const isTemple = !duel && levelState.level.id === "temple";
   const bloodmoonState = levelState.bloodmoon;
+  const mechanicHintHtml = levelState.level.mechanicHintHtml ?? "";
+  const bloodmoonMechanicVisible = isBloodmoon
+    && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing");
   const duelPlaying = duel && (gameStatus === "playing" || gameStatus === "paused");
   if (ui.hud) ui.hud.classList.toggle("is-duel-play", duelPlaying);
 
@@ -3597,7 +3331,7 @@ function updateHud() {
   } else {
     ui.clueBar.textContent = "🔍 " + (levelState.level.hudClue || levelState.level.clue);
   }
-  ui.clueBar?.classList.toggle("hidden", isTemple);
+  ui.clueBar?.classList.toggle("hidden", Boolean(mechanicHintHtml));
 
   if (ui.attackIcon) ui.attackIcon.textContent = isBloodmoon ? "爪" : "拳";
   ui.hud?.classList.toggle("bloodmoon-mode", isBloodmoon);
@@ -3606,23 +3340,15 @@ function updateHud() {
   ui.clueBar?.classList.toggle("bloodmoon", isBloodmoon);
   ui.attemptChip?.classList.toggle("bloodmoon", isBloodmoon);
   if (ui.mechanicHint) {
-    ui.mechanicHint.classList.toggle(
-      "visible",
-      isTemple || (isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing")),
-    );
-    ui.mechanicHint.innerHTML = isTemple
-      ? `
-      <div class="mechanic-hint-row"><span class="mechanic-hint-label">任务</span><span class="mechanic-hint-text">找出真正吵醒怀民的苏轼。</span></div>
-      <div class="mechanic-hint-row"><span class="mechanic-hint-label">机制</span><span class="mechanic-hint-text">苏轼只在月光中庭显影，假影也会短暂干扰。</span></div>
-      <div class="mechanic-hint-row"><span class="mechanic-hint-label">特征</span>${renderSuShiShadowMarkHtml()}<span class="mechanic-hint-text">真苏轼脚下是这组交错竹柏影。</span></div>
-    `
-      : isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing")
+    ui.mechanicHint.classList.toggle("visible", Boolean(mechanicHintHtml) || bloodmoonMechanicVisible);
+    ui.mechanicHint.innerHTML = mechanicHintHtml
+      || (bloodmoonMechanicVisible
         ? `
         <div class="mechanic-hint-row"><span class="mechanic-hint-label">台词</span><span class="mechanic-hint-text">认不出自己的人，都会留在月光外。</span></div>
         <div class="mechanic-hint-row"><span class="mechanic-hint-label">机制</span><span class="mechanic-hint-text">找到自己，进入任意绿色区域。</span></div>
         <div class="mechanic-hint-row"><span class="mechanic-hint-label">处决</span><span class="mechanic-hint-text">倒计时结束时，绿区外全部秒杀。</span></div>
       `
-        : "";
+        : "");
   }
 
   updateGatherBanner();
