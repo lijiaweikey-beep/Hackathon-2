@@ -1,4 +1,5 @@
 import { createResourceScope } from "../core/resourceScope.js";
+import { isLevelAction } from "./actions.js";
 import { validateLevelDefinition } from "./levelContract.js";
 
 const INSTANCE_METHODS = ["start", "update", "handleAction", "dispose"];
@@ -44,7 +45,12 @@ export function createLevelRunner({ createContext, onError = () => {} }) {
         const context = createContext({ definition, scope });
         const instance = definition.createLevel(context);
         validateLevelInstance(instance, definition);
-        active = { definition, instance, scope };
+        active = {
+          definition,
+          instance,
+          scope,
+          actions: new Set(definition.actions ?? []),
+        };
         return instance;
       } catch (error) {
         scope.dispose();
@@ -69,6 +75,10 @@ export function createLevelRunner({ createContext, onError = () => {} }) {
 
     handleAction(action) {
       if (!active) return undefined;
+      if (!isLevelAction(action?.type)) {
+        throw new Error(`未知关卡动作：${action?.type ?? "空动作"}`);
+      }
+      if (!active.actions.has(action.type)) return undefined;
       try {
         return active.instance.handleAction(action);
       } catch (error) {

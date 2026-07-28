@@ -1,3 +1,5 @@
+import { isLevelAction } from "./actions.js";
+
 const REQUIRED_FIELDS = ["id", "sceneName", "order"];
 
 export function validateLevelDefinition(definition, source = "未知关卡") {
@@ -13,6 +15,24 @@ export function validateLevelDefinition(definition, source = "未知关卡") {
 
   if (!definition.legacy && typeof definition.createLevel !== "function") {
     throw new Error(`关卡必须提供 createLevel：${source}`);
+  }
+
+  if (definition.actions != null && !Array.isArray(definition.actions)) {
+    throw new TypeError(`关卡 actions 必须是数组：${source}`);
+  }
+  for (const action of definition.actions ?? []) {
+    if (!isLevelAction(action)) {
+      throw new Error(`关卡声明了未知动作 ${action}：${source}`);
+    }
+  }
+
+  if (definition.extensions != null && typeof definition.extensions !== "object") {
+    throw new TypeError(`关卡 extensions 必须是对象：${source}`);
+  }
+  for (const [name, extension] of Object.entries(definition.extensions ?? {})) {
+    if (typeof extension !== "function") {
+      throw new TypeError(`关卡扩展必须是函数 ${name}：${source}`);
+    }
   }
 
   return definition;

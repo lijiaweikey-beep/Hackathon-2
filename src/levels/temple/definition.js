@@ -6,6 +6,7 @@ export default {
   order: 40,
   legacy: false,
   createLevel: createTempleLevel,
+  actions: ["configureDecoy", "updateDecoy", "afterNpcUpdate", "actorDissolved"],
   decoyCount: 5,
   moonDecoyCount: 3,
   playerVariant: "temple",

@@ -20,3 +20,25 @@ test("兼容关卡可以暂时不提供创建函数", () => {
   const definition = { id: "legacy", sceneName: "旧关卡", order: 1, legacy: true };
   assert.equal(validateLevelDefinition(definition, "legacy"), definition);
 });
+
+test("关卡只能声明受支持的动作和扩展函数", () => {
+  const createWorld = () => {};
+  const definition = {
+    id: "custom",
+    sceneName: "自定义",
+    order: 1,
+    createLevel() {},
+    actions: ["getHudState"],
+    extensions: { createWorld },
+  };
+
+  assert.equal(validateLevelDefinition(definition, "custom"), definition);
+  assert.throws(
+    () => validateLevelDefinition({ ...definition, actions: ["getHudSate"] }, "custom"),
+    /未知动作/,
+  );
+  assert.throws(
+    () => validateLevelDefinition({ ...definition, extensions: { createWorld: true } }, "custom"),
+    /扩展必须是函数/,
+  );
+});

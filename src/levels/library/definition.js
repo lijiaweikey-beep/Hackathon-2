@@ -5,6 +5,7 @@ export default {
   order: 20,
   legacy: false,
   createLevel: createLibraryLevel,
+  actions: ["findHitTarget"],
   decoyCount: 4,
   sceneName: "图书馆",
   emoji: "📚",

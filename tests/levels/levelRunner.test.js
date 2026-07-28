@@ -71,6 +71,7 @@ test("关卡动作可以向主循环返回结果", () => {
     createContext: ({ scope }) => ({ scope }),
   });
   const definition = createDefinition("action", []);
+  definition.actions = ["getHudState"];
   definition.createLevel = () => ({
     start() {},
     update() {},
@@ -80,7 +81,28 @@ test("关卡动作可以向主循环返回结果", () => {
 
   runner.load(definition);
 
-  assert.deepEqual(runner.handleAction({ type: "inspect" }), { received: "inspect" });
+  assert.deepEqual(runner.handleAction({ type: "getHudState" }), { received: "getHudState" });
+});
+
+test("运行器跳过关卡未声明的动作并拒绝未知动作", () => {
+  const calls = [];
+  const runner = createLevelRunner({
+    createContext: ({ scope }) => ({ scope }),
+  });
+  const definition = createDefinition("actions", calls);
+  definition.actions = ["getHudState"];
+  definition.createLevel = () => ({
+    start() {},
+    update() {},
+    handleAction: (action) => calls.push(action.type),
+    dispose() {},
+  });
+
+  runner.load(definition);
+
+  assert.equal(runner.handleAction({ type: "beforeAttack" }), undefined);
+  assert.deepEqual(calls, []);
+  assert.throws(() => runner.handleAction({ type: "getHudSate" }), /未知关卡动作/);
 });
 
 test("关卡更新可以向主循环返回帧结果", () => {
