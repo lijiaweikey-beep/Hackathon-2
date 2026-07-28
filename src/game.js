@@ -43,7 +43,6 @@ import {
   sfxPunch,
   sfxHit,
   sfxWolfPunch,
-  sfxWolfHowl,
   sfxThunder,
   sfxMiss,
   sfxNpcHit,
@@ -91,7 +90,6 @@ const levelRunner = createLevelRunner({
     scope,
     sceneData: levelState.sceneData,
     npcCount: getMatchNpcCount(),
-    computers: levelState.computers,
     npcSpeed: NPC_SPEED,
     createNpc,
     addNpc(npc) {
@@ -314,7 +312,6 @@ function playLevelSound(name, delayMs = 0) {
     hit: sfxHit,
     miss: sfxMiss,
     npcHit: sfxNpcHit,
-    wolfHowl: sfxWolfHowl,
     wolfPunch: sfxWolfPunch,
   };
   const play = sounds[name];
@@ -499,7 +496,7 @@ function setupUi() {
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
     updateHud();
-    playLevelSound(levelState.level.startSound);
+    levelRunner.handleAction({ type: "beginPlay" });
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -697,7 +694,6 @@ function resetLevel(index, options = {}) {
       ? 9999
       : (level.timeLimit ?? ROUND_SECONDS),
     attempts: ATTEMPTS,
-    computers: [],
     startTime: 0,
     obstacles: [],
     flashlight: null,

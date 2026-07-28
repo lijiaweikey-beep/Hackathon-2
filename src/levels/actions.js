@@ -2,6 +2,7 @@ export const LEVEL_ACTIONS = Object.freeze([
   "actorDissolved",
   "afterNpcUpdate",
   "beforeAttack",
+  "beginPlay",
   "beginSpecialPhase",
   "configureDecoy",
   "findHitTarget",

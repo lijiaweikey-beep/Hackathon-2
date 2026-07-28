@@ -21,6 +21,7 @@ import {
 } from "../../entities/bloodmoonCues.js";
 import { getBossHitTransition, isInsideSafeZone } from "./rules.js";
 import { createBloodmoonViewModel } from "./viewModel.js";
+import { playBloodmoonIntro } from "./audio.js";
 
 const HUNT_INTRO_HTML = `
     <div class="hunt-intro-moon"></div>
@@ -46,6 +47,7 @@ export function createBloodmoonLevel(context) {
     positionBloodmoonCue,
     setBloodmoonClawIntensity,
   };
+  const audio = context.audio ?? { playIntro: playBloodmoonIntro };
   const resources = context.sceneData;
   const state = {
     mode: "phase1",
@@ -594,6 +596,10 @@ export function createBloodmoonLevel(context) {
   }
 
   function handleAction(action) {
+    if (action.type === "beginPlay") {
+      audio.playIntro();
+      return { handled: true };
+    }
     if (action.type === "beforeAttack") {
       return {
         blocked: ATTACK_BLOCKED_MODES.has(state.mode),

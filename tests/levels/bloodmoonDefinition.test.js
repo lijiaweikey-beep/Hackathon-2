@@ -10,6 +10,7 @@ test("血月关卡使用插件生命周期并声明玩法资源", () => {
   assert.equal(definition.resourceInitial, 100);
   assert.equal(typeof definition.extensions.createWorld, "function");
   assert.equal(typeof definition.extensions.createPlayer, "function");
-  assert.equal(definition.startSound, "wolfHowl");
+  assert.equal(definition.startSound, undefined);
+  assert.equal(definition.actions.includes("beginPlay"), true);
   assert.equal(definition.attackComboExpires, false);
 });

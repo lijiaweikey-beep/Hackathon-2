@@ -22,6 +22,7 @@ export function createWorldBuilder(ctx) {
 }
 
   function buildGamingRoom() {
+  const computers = [];
   const wallTex = getCachedTexture(textureCache.wall, "gaming", () => makeWallTexture("gaming"));
   const wallMaterial = new THREE.MeshStandardMaterial({
     map: wallTex,
@@ -84,7 +85,7 @@ export function createWorldBuilder(ctx) {
     chair.receiveShadow = true;
     ctx.getScene().add(chair);
 
-    ctx.getLevelState().computers.push(new THREE.Vector3(x, 0, z + (z > 0 ? 1.2 : -1.2)));
+    computers.push(new THREE.Vector3(x, 0, z + (z > 0 ? 1.2 : -1.2)));
   });
 
   setupGamingFlashlight();
@@ -105,6 +106,7 @@ export function createWorldBuilder(ctx) {
       ctx.getScene().add(quilt);
     });
   });
+  return { computers };
 }
 
 const FLASHLIGHT_COLOR = 0xfff0c8;

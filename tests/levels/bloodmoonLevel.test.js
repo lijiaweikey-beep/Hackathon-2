@@ -49,6 +49,7 @@ function createFakeContext({ npcCount = 4 } = {}) {
     npcSpeed: 3,
     created,
     overlays,
+    introSounds: 0,
     player,
     createNpc(id, flags) {
       const actor = createActor(id, flags);
@@ -90,6 +91,11 @@ function createFakeContext({ npcCount = 4 } = {}) {
       setBloodmoonClawIntensity() {},
       positionBloodmoonCue() {},
     },
+    audio: {
+      playIntro() {
+        context.introSounds += 1;
+      },
+    },
   };
   return context;
 }
@@ -103,6 +109,14 @@ test("血月插件生成引路人与剩余角色", () => {
   assert.deepEqual(context.created.map(({ id }) => id), [0, 1, 2, 3]);
   assert.equal(context.created[0].isLevelTarget, true);
   assert.equal(context.created[0].levelManaged, true);
+});
+
+test("进入正式游戏时由血月关卡播放开场音效", () => {
+  const context = createFakeContext();
+  const level = createBloodmoonLevel(context);
+
+  assert.deepEqual(level.handleAction({ type: "beginPlay" }), { handled: true });
+  assert.equal(context.introSounds, 1);
 });
 
 test("第一次命中首领进入猎杀演出", () => {

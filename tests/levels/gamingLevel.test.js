@@ -27,11 +27,13 @@ function createFakeContext({ npcCount }) {
   const context = {
     npcCount,
     npcSpeed: 3,
-    computers: [
-      createPosition(-2, 0, 1),
-      createPosition(0, 0, 1),
-      createPosition(2, 0, 1),
-    ],
+    sceneData: {
+      computers: [
+        createPosition(-2, 0, 1),
+        createPosition(0, 0, 1),
+        createPosition(2, 0, 1),
+      ],
+    },
     created: [],
     target: null,
     environmentUpdates: 0,

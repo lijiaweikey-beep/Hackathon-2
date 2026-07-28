@@ -1,8 +1,9 @@
 export function createGamingLevel(context) {
+  const computers = context.sceneData.computers;
   let target = null;
 
   function start() {
-    const computer = context.computers[2];
+    const computer = computers[2];
     target = context.createNpc(0, { gamingTarget: true, levelTarget: true });
     target.levelManaged = true;
     target.group.position.copy(computer);
@@ -31,7 +32,7 @@ export function createGamingLevel(context) {
     if (script.state === "play") {
       target.walking = false;
       script.timer -= deltaSeconds;
-      const computer = context.computers[script.computerIndex];
+      const computer = computers[script.computerIndex];
       const facingPoint = computer.clone();
       facingPoint.z += computer.z > 0 ? -1.1 : 1.1;
       context.faceNpcToward(target, facingPoint);
@@ -56,8 +57,8 @@ export function createGamingLevel(context) {
       );
       script.timer -= deltaSeconds;
       if (reached || script.timer <= 0) {
-        script.computerIndex = Math.floor(context.randomRange(0, context.computers.length));
-        script.waypoint = context.computers[script.computerIndex].clone();
+        script.computerIndex = Math.floor(context.randomRange(0, computers.length));
+        script.waypoint = computers[script.computerIndex].clone();
         script.state = "seek";
       }
       return;

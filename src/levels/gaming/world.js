@@ -1,3 +1,3 @@
 export function createWorld(world) {
-  world.buildGamingRoom();
+  return world.buildGamingRoom();
 }
