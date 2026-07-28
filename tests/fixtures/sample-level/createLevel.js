@@ -21,7 +21,7 @@ export function createSampleLevel(context) {
       }
       return undefined;
     },
-    destroy() {
+    dispose() {
       hideSampleIntro(context.ui);
       target = null;
     },

@@ -8,6 +8,10 @@ export default {
   sceneName: "样例关卡",
   order: 999,
   hidden: true,
+  cardStyle: {
+    accent: "#60a5fa",
+    glow: "rgba(96, 165, 250, 0.28)",
+  },
   createLevel: createSampleLevel,
   actions: ["beginPlay", "findHitTarget"],
   extensions: {

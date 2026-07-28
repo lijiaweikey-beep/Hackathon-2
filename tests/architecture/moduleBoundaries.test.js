@@ -155,3 +155,14 @@ test("注册中心以内联文本发现关卡样式", async () => {
     /glob\(["']\.\/\*\/styles\.css["'],\s*\{\s*eager:\s*true\s*\}\)/,
   );
 });
+
+test("独立玩法样例不依赖经典玩法系统", async () => {
+  const source = await readFile(
+    new URL("../fixtures/standalone-level/createExperience.js", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(
+    source,
+    /createActorSystem|createCombatSystem|createInputController|createGameUiController|actions\.js/,
+  );
+});
