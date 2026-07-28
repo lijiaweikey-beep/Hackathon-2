@@ -1,17 +1,12 @@
 import * as THREE from "three";
 import {
   DEFAULT_NPC_COUNT,
-  HIT_RANGE,
-  HIT_FACING_DOT,
   NPC_SPEED,
   ROUND_SECONDS,
   ATTEMPTS,
-  PUNCH_SWING,
   ACTION_INTERVAL_MS,
   REVERSE_INPUT_LOCK_MS,
   REVERSE_INPUT_DOT_THRESHOLD,
-  PUNCH_COOLDOWNS,
-  PUNCH_RESET_DELAY,
 } from "./config/constants.js";
 import { LEVELS, levelRegistry } from "./config/levels.js";
 import { canvas, ui } from "./ui/dom.js";
@@ -19,7 +14,6 @@ import { createLevelCardModel } from "./ui/levelCardModel.js";
 import { renderTargetPreview } from "./ui/targetPreview.js";
 import { renderTaskModal } from "./ui/taskModal.js";
 import { createLevelViewHost } from "./ui/createLevelViewHost.js";
-import { getFacingVector } from "./utils/math.js";
 import {
   createPlayer as createPlayerEntity,
   createNpc as createNpcEntity,
@@ -59,6 +53,7 @@ import { createLevelContext } from "./levels/createLevelContext.js";
 import { GAME_PHASES } from "./core/gamePhase.js";
 import { createGameSession } from "./runtime/createGameSession.js";
 import { createActorSystem } from "./systems/createActorSystem.js";
+import { createCombatSystem } from "./systems/createCombatSystem.js";
 
 let renderer;
 let scene;
@@ -71,12 +66,8 @@ let fx;
 let worldBuilder;
 let levelViewHost;
 let actorSystem;
+let combatSystem;
 
-let particles = [];
-let punchCooldown = 0;
-let punchCooldownMax = 0; // 当前冷却的最大值（用于计算进度）
-let punchTier = 0; // 0=第1拳(1s), 1+=后续(2s)
-let punchResetTimer = 0; // 停止出拳后重置计时
 let totalTime = 0;
 const session = createGameSession();
 
@@ -98,7 +89,7 @@ const levelRunner = createLevelRunner({
       getAll: () => actorSystem.getAll(),
       getNpcs: () => actorSystem.getNpcs(),
       getPlayer: () => player,
-      dissolve: dissolveNpc,
+      dissolve: (npc) => combatSystem.dissolveNpc(npc),
       compactDead: () => actorSystem.compactDead(),
       randomizePosition: (actor) => actorSystem.randomizePosition(actor),
       setPartsVisible: (actor, partKey, visible) => {
@@ -113,7 +104,7 @@ const levelRunner = createLevelRunner({
       isActorFacingTarget: (...args) => actorSystem.isActorFacingTarget(...args),
     },
     combat: {
-      isFacingTarget,
+      isFacingTarget: (...args) => combatSystem.isFacingTarget(...args),
       triggerShake,
       triggerHitstop,
       finishLevel: settleRound,
@@ -399,27 +390,6 @@ const acceptedInputDir = new THREE.Vector2();
 let acceptedInputAtMs = -Infinity;
 let lastActionAt = -Infinity;
 
-const scratchFacing = new THREE.Vector2();
-const pixelGeo = new THREE.BoxGeometry(0.13, 0.13, 0.13);
-
-/* ---- 粒子材质缓存（按颜色共享） ---- */
-const pixelMaterialCache = new Map();
-
-function getPixelMaterial(color) {
-  let mat = pixelMaterialCache.get(color);
-  if (!mat) {
-    mat = new THREE.MeshStandardMaterial({ color, roughness: 0.7, transparent: true, opacity: 1 });
-    pixelMaterialCache.set(color, mat);
-  }
-  return mat;
-}
-
-function isCachedPixelMaterial(mat) {
-  for (const cached of pixelMaterialCache.values()) {
-    if (cached === mat) return true;
-  }
-  return false;
-}
 
 function clearPendingRoundEndTimers() {
   if (settleTimer) {
@@ -430,7 +400,12 @@ function clearPendingRoundEndTimers() {
 
 
 export function boot() {
-  fx = createFxSystem({ ui, getPlayer: () => player });
+  fx = createFxSystem({
+    ui,
+    getPlayer: () => player,
+    getScene: () => scene,
+    randomRange,
+  });
   actorSystem = createActorSystem({
     getScene: () => scene,
     getPlayer: () => player,
@@ -451,7 +426,23 @@ export function boot() {
     },
     applyInputLock: applyReverseInputLock,
     getPlayerVelocity: () => playerInputVel,
-    updatePlayerTimers,
+    updatePlayerTimers: (deltaSeconds) => combatSystem.updateCooldown(deltaSeconds),
+  });
+  combatSystem = createCombatSystem({
+    session,
+    getPlayer: () => player,
+    getNpcs: () => actorSystem.getNpcs(),
+    dispatch: (action) => levelRunner.handleAction(action),
+    consumeActionInterval,
+    playSound: playLevelSound,
+    playPunch: sfxPunch,
+    playHit: sfxHit,
+    playMiss: sfxMiss,
+    triggerHitstop,
+    triggerShake,
+    settleRound,
+    refreshHud: updateHud,
+    dissolveActor: (actor) => fx.createPixelBurst(actor),
   });
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -535,7 +526,7 @@ function setupUi() {
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
   ui.attackButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();
-    triggerAttack();
+    combatSystem.triggerAttack();
   });
 }
 
@@ -566,7 +557,7 @@ function setupInput() {
     if (event.code === "KeyS" || event.code === "ArrowDown") setKeyAxis("y", -1);
     if (event.code === "KeyA" || event.code === "ArrowLeft") setKeyAxis("x", -1);
     if (event.code === "KeyD" || event.code === "ArrowRight") setKeyAxis("x", 1);
-    if (event.code === "Space" || event.code === "KeyJ") triggerAttack();
+    if (event.code === "Space" || event.code === "KeyJ") combatSystem.triggerAttack();
   });
 
   window.addEventListener("keyup", (event) => {
@@ -645,10 +636,7 @@ function resize() {
 function disposeScene() {
   levelRunner.dispose();
   if (!scene) return;
-  // 清理粒子（材质是共享缓存的，不 dispose）
-  particles.forEach((p) => {
-    scene.remove(p.mesh);
-  });
+  fx?.clearParticles();
 
   scene.traverse((obj) => {
     if (obj.geometry) obj.geometry.dispose();
@@ -657,7 +645,7 @@ function disposeScene() {
       mats.forEach((mat) => {
         // 不 dispose 缓存中的纹理（floor/wall texture cache 管理）
         if (mat.map && !isCachedTexture(mat.map)) mat.map.dispose();
-        if (!isCachedPixelMaterial(mat)) mat.dispose();
+        if (!fx?.isCachedPixelMaterial(mat)) mat.dispose();
       });
     }
   });
@@ -674,10 +662,7 @@ function resetLevel(index, options = {}) {
   scene = new THREE.Scene();
   scene.userData.cleanups = [];
   actorSystem.reset();
-  particles = [];
-  punchCooldown = 0;
-  punchTier = 0;
-  punchResetTimer = 0;
+  combatSystem.reset();
   totalTime = options.elapsed ?? 0;
   fx?.reset();
   playerInputVel.set(0, 0);
@@ -753,7 +738,7 @@ function tick() {
     const frameResult = levelRunner.update(dt);
     if (frameResult?.pauseWorld) {
       updateHud();
-      updateParticles(dt);
+      fx.updateParticles(dt);
       updateShake(dt);
       renderer.render(scene, camera);
       return;
@@ -776,7 +761,7 @@ function tick() {
     actorSystem.animateCheer(dt);
   }
 
-  updateParticles(dt);
+  fx.updateParticles(dt);
   updateShake(dt);
   renderer.render(scene, camera);
 }
@@ -799,158 +784,6 @@ function applyReverseInputLock(nextInput) {
 
   acceptedInputDir.copy(nextInput).normalize();
   acceptedInputAtMs = now;
-}
-
-function updatePlayerTimers(dt) {
-  if (punchCooldown > 0) punchCooldown = Math.max(0, punchCooldown - dt);
-  if (player.punchTimer > 0) player.punchTimer = Math.max(0, player.punchTimer - dt);
-  if (session.levelState.level.attackComboExpires !== false && punchResetTimer > 0) {
-    punchResetTimer -= dt;
-    if (punchResetTimer <= 0) punchTier = 0;
-  }
-}
-
-function triggerAttack() {
-  if (session.phase !== GAME_PHASES.PLAYING || punchCooldown > 0) return;
-  const attack = levelRunner.handleAction({ type: "beforeAttack" }) ?? {};
-  if (attack.blocked) return;
-  if (!consumeActionInterval()) return;
-  punchCooldownMax = attack.cooldown
-    ?? PUNCH_COOLDOWNS[Math.min(punchTier, PUNCH_COOLDOWNS.length - 1)];
-  punchCooldown = punchCooldownMax;
-  if (attack.resetCombo !== false) {
-    punchTier += 1;
-    punchResetTimer = PUNCH_RESET_DELAY;
-  }
-  player.punchDuration = attack.animationSeconds ?? PUNCH_SWING;
-  player.punchTimer = player.punchDuration;
-  if (attack.sound) {
-    playLevelSound(attack.sound);
-  } else {
-    sfxPunch();
-  }
-
-  const hit = findHitTarget();
-  if (!hit) return;
-  const levelHit = levelRunner.handleAction({ type: "hitTarget", hit });
-  if (levelHit?.handled) return;
-
-  if (hit.correct) {
-    if (hit.npcs) {
-      hit.npcs.forEach((npc) => dissolveNpc(npc));
-    } else {
-      dissolveNpc(hit.npc);
-    }
-    triggerHitstop(0.08);
-    triggerShake(0.35, 0.2);
-    sfxHit();
-    settleRound(true, null, 760);
-    return;
-  }
-
-  dissolveNpc(hit.npc);
-  triggerShake(0.12, 0.1);
-  sfxMiss();
-  session.levelState.attempts = Math.max(0, session.levelState.attempts - 1);
-  updateHud();
-  if (session.levelState.attempts <= 0) {
-    settleRound(false, null, 680);
-  }
-}
-
-function findHitTarget() {
-  const playerPos = player.group.position;
-  getFacingVector(player.group.rotation.y, scratchFacing);
-  const facing = scratchFacing;
-
-  const customHit = levelRunner.handleAction({
-    type: "findHitTarget",
-    playerPos,
-    facing,
-  });
-  if (customHit) return customHit;
-
-  let best = null;
-  let bestDistance = Infinity;
-  actorSystem.getNpcs().forEach((npc) => {
-    if (!npc.alive) return;
-    const toNpc = new THREE.Vector2(npc.group.position.x - playerPos.x, npc.group.position.z - playerPos.z);
-    const distance = toNpc.length();
-    if (distance > HIT_RANGE || !isFacingTarget(facing, toNpc)) return;
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = npc;
-    }
-  });
-
-  if (!best) return null;
-  return {
-    npc: best,
-    correct: best.isLevelTarget,
-  };
-}
-
-function isFacingTarget(facing, toTarget) {
-  if (toTarget.lengthSq() < 0.08) return true;
-  toTarget.normalize();
-  return facing.dot(toTarget) >= HIT_FACING_DOT;
-}
-
-function dissolveNpc(npc) {
-  if (!npc || !npc.alive) return;
-  dissolveActor(npc);
-}
-
-function dissolveActor(actor) {
-  if (!actor?.group || actor.group.visible === false) return;
-  actor.alive = false;
-  actor.group.visible = false;
-  levelRunner.handleAction({ type: "actorDissolved", actor });
-  createPixelBurst(actor);
-}
-
-function createPixelBurst(npc) {
-  const colors = npc.group.userData.colors ?? [0x4b5563, 0x9ca3af, 0xf0b88c, 0x1f2937, 0xe5e7eb];
-  for (let i = 0; i < 58; i += 1) {
-    const color = colors[i % colors.length];
-    const material = getPixelMaterial(color);
-    const cube = new THREE.Mesh(pixelGeo, material);
-    cube.position.set(
-      npc.group.position.x + randomRange(-0.28, 0.28),
-      randomRange(0.24, 1.74),
-      npc.group.position.z + randomRange(-0.28, 0.28),
-    );
-    cube.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    cube.castShadow = true;
-    scene.add(cube);
-    particles.push({
-      mesh: cube,
-      velocity: new THREE.Vector3(randomRange(-1.8, 1.8), randomRange(1.0, 2.8), randomRange(-1.8, 1.8)),
-      spin: new THREE.Vector3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)),
-      life: randomRange(0.8, 1.35),
-      maxLife: 1.35,
-    });
-  }
-}
-
-function updateParticles(dt) {
-  for (let i = particles.length - 1; i >= 0; i -= 1) {
-    const particle = particles[i];
-    particle.life -= dt;
-    particle.velocity.y -= dt * 2.6;
-    particle.mesh.position.addScaledVector(particle.velocity, dt);
-    particle.mesh.rotation.x += particle.spin.x * dt;
-    particle.mesh.rotation.y += particle.spin.y * dt;
-    particle.mesh.rotation.z += particle.spin.z * dt;
-    particle.mesh.material.opacity = Math.max(0, particle.life / particle.maxLife);
-    particle.mesh.scale.setScalar(0.65 + Math.max(0, particle.life / particle.maxLife) * 0.6);
-
-    if (particle.life <= 0) {
-      scene.remove(particle.mesh);
-      // 材质是共享缓存的，不 dispose
-      particles.splice(i, 1);
-    }
-  }
 }
 
 function finishRound(won, failMessage) {
@@ -1042,8 +875,8 @@ function updateHud() {
   }
 
   // 出拳冷却动画
-  if (punchCooldown > 0 && punchCooldownMax > 0) {
-    const progress = (punchCooldown / punchCooldownMax) * 100;
+  if (combatSystem.cooldown > 0 && combatSystem.cooldownMax > 0) {
+    const progress = (combatSystem.cooldown / combatSystem.cooldownMax) * 100;
     ui.cooldownOverlay.style.setProperty("--cd-progress", progress + "%");
     ui.cooldownOverlay.classList.add("active");
     ui.attackButton.classList.add("cooling");
