@@ -1,4 +1,4 @@
-import { TEMPLE_DECOY_SHADOW_STYLES } from "../../config/constants.js";
+import { TEMPLE_DECOY_SHADOW_STYLES } from "./constants.js";
 import {
   createNpc as createNpcEntity,
   createPlayer as createPlayerEntity,

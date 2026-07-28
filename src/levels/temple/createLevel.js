@@ -5,7 +5,7 @@ import {
   TEMPLE_TRUE_INITIAL_MOON_DELAY,
   TEMPLE_TRUE_REVEAL_AT,
   TEMPLE_TRUE_SHADOW_MAX,
-} from "../../config/constants.js";
+} from "./constants.js";
 import {
   positionShadowCue,
   setShadowCueIntensity,

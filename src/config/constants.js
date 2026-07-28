@@ -20,12 +20,6 @@ export const ACTION_INTERVAL_MS = 500;
 export const REVERSE_INPUT_LOCK_MS = 500;
 export const REVERSE_INPUT_DOT_THRESHOLD = -0.35;
 
-export const TEMPLE_MOON_RADIUS = 4.55;
-export const TEMPLE_SHADOW_FADE = 0.55;
-export const TEMPLE_DECOY_SHADOW_STYLES = ["fan", "moon", "window", "stone", "leaf", "willow"];
-export const TEMPLE_TRUE_SHADOW_MAX = 0.68;
-export const TEMPLE_TRUE_REVEAL_AT = 0.75;
-export const TEMPLE_TRUE_INITIAL_MOON_DELAY = [12, 16];
 export const SU_SHI_SHADOW_PATTERN = [
   { x: -0.58, z: -0.08, length: 1.9, width: 0.12, rz: -0.72, opacity: 0.38, accent: false },
   { x: -0.34, z: 0.22, length: 1.55, width: 0.1, rz: -0.28, opacity: 0.33, accent: false },

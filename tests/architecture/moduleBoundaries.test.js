@@ -75,3 +75,12 @@ test("共享运行时不读取关卡专属角色特征", async () => {
   const source = await readSource("game.js");
   assert.doesNotMatch(source, /isWerewolf|wolfCape|wolfParts/);
 });
+
+test("共享配置和场景构建器不包含承天寺专属实现", async () => {
+  const [constants, worldBuilder] = await Promise.all([
+    readSource("config/constants.js"),
+    readSource("world/createWorldBuilder.js"),
+  ]);
+  assert.doesNotMatch(constants, /TEMPLE_/);
+  assert.doesNotMatch(worldBuilder, /buildTempleCourtyard|addBambooCluster|addCypress/);
+});
