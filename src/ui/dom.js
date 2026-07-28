@@ -14,6 +14,7 @@ export const ui = {
   levelCards: document.querySelector("#levelCards"),
   extraLevelCards: document.querySelector("#extraLevelCards"),
   lifeTimeline: document.querySelector("#lifeTimeline"),
+  storyEnding: document.querySelector("#storyEnding"),
   taskModal: document.querySelector("#taskModal"),
   taskEmoji: document.querySelector("#taskEmoji"),
   taskTitle: document.querySelector("#taskTitle"),

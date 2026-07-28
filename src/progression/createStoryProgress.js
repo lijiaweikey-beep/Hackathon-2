@@ -19,6 +19,8 @@ export function createStoryProgress({
 
   return Object.freeze({
     isCompleted: (id) => completed.has(id),
+    isComplete: () => ordered.length > 0
+      && ordered.every(({ id }) => completed.has(id)),
     isUnlocked(id) {
       const index = ordered.findIndex((level) => level.id === id);
       return index === 0

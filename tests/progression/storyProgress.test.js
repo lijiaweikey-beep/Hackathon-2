@@ -41,3 +41,15 @@ test("人生进度清洗损坏存档和已经移除的关卡", () => {
   assert.equal(staleProgress.isUnlocked("age-21"), true);
   assert.equal(staleProgress.isUnlocked("missing"), false);
 });
+
+test("全部主线完成后人生进度进入完整通关状态", () => {
+  const progress = createStoryProgress({
+    levels,
+    storage: createMemoryStorage(),
+    key: "story",
+  });
+
+  assert.equal(progress.isComplete(), false);
+  levels.forEach(({ id }) => progress.complete(id));
+  assert.equal(progress.isComplete(), true);
+});

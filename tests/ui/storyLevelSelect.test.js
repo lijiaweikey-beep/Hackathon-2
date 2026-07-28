@@ -77,3 +77,44 @@ test("人生时间线锁定未开放关卡且番外始终可进入", () => {
   assert.equal(extraCards.length, 1);
   assert.equal(extraCards[0].disabled, false);
 });
+
+test("全部主线完成后选关页展示人生终章", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    createElement() {
+      return {
+        className: "",
+        dataset: {},
+        style: { setProperty() {} },
+        addEventListener() {},
+      };
+    },
+  };
+  const storyEnding = { hidden: true };
+  const ui = {
+    levelCards: createContainer([]),
+    extraLevelCards: createContainer([]),
+    storyEnding,
+    levelSelectModal: { classList: createClassList() },
+    taskModal: { classList: createClassList() },
+    resultModal: { classList: createClassList() },
+  };
+
+  try {
+    const controller = createGameUiController({
+      ui,
+      session: { levelState: { level: {} } },
+      levelRegistry: { visible: [], mainline: [], extra: [] },
+      storyProgress: {
+        isComplete: () => true,
+        isUnlocked: () => true,
+        isCompleted: () => true,
+      },
+    });
+    controller.showLevelSelect({ leaveLevel: false });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  assert.equal(storyEnding.hidden, false);
+});

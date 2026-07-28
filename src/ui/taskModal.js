@@ -13,6 +13,10 @@ export function createTaskModalModel({ level, npcCount }) {
       ? `${level.resourceLabel} <span id="taskAttempts">${level.resourceInitial}</span>`
       : `🥊 <span id="taskAttempts">${ATTEMPTS}</span> 次机会`,
     targetLabel: level.targetDesc,
+    briefingText: [
+      level.transition?.intro,
+      level.mission,
+    ].filter(Boolean).join("\n\n"),
   };
 }
 
@@ -28,7 +32,7 @@ export function renderTaskModal(ui, { level, npcCount }) {
   const model = createTaskModalModel({ level, npcCount });
   ui.taskEmoji.textContent = level.emoji;
   ui.taskTitle.textContent = level.sceneName;
-  ui.taskCopy.textContent = level.mission;
+  ui.taskCopy.textContent = model.briefingText;
   ui.taskClue.textContent = "🔍 " + level.clue;
   ui.taskNpcCount.textContent = model.npcCount;
   ui.taskTime.textContent = model.timeText;

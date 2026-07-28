@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import {
+  ACTOR_COLLISION_RADIUS,
   NPC_SPEED,
   PLAY_Z_MIN,
   PLAYER_LERP,

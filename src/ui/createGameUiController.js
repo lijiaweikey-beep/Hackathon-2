@@ -102,6 +102,9 @@ export function createGameUiController(dependencies) {
       (ui.extraLevelCards ?? ui.levelCards).appendChild(createLevelCard(level));
     });
     renderTimeline(mainline);
+    if (ui.storyEnding) {
+      ui.storyEnding.hidden = !(dependencies.storyProgress?.isComplete?.() ?? false);
+    }
     if (ui.npcCountInput) ui.npcCountInput.disabled = false;
   }
 
