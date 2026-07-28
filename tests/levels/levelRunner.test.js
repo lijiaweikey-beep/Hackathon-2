@@ -65,3 +65,20 @@ test("关卡更新异常会报告错误并销毁关卡", () => {
   assert.deepEqual(errors, [["更新失败", "broken"]]);
   assert.equal(runner.activeDefinition, null);
 });
+
+test("关卡动作可以向主循环返回结果", () => {
+  const runner = createLevelRunner({
+    createContext: ({ scope }) => ({ scope }),
+  });
+  const definition = createDefinition("action", []);
+  definition.createLevel = () => ({
+    start() {},
+    update() {},
+    handleAction: (action) => ({ received: action.type }),
+    dispose() {},
+  });
+
+  runner.load(definition);
+
+  assert.deepEqual(runner.handleAction({ type: "inspect" }), { received: "inspect" });
+});

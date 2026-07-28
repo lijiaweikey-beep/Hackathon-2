@@ -67,11 +67,12 @@ export function createLevelRunner({ createContext, onError = () => {} }) {
     },
 
     handleAction(action) {
-      if (!active) return;
+      if (!active) return undefined;
       try {
-        active.instance.handleAction(action);
+        return active.instance.handleAction(action);
       } catch (error) {
         fail(error, active.definition);
+        return undefined;
       }
     },
 
