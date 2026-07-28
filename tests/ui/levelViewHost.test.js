@@ -59,12 +59,14 @@ test("关卡界面宿主动态管理弹层、主题和动作", () => {
     preventDefault() {},
   });
   host.setTheme("custom");
+  host.setStyles(".custom-intro { color: red; }");
 
   assert.equal(overlay.className, "custom-intro");
   assert.equal(overlay.classList.contains("visible"), true);
   assert.equal(overlay.attributes["aria-live"], "assertive");
   assert.deepEqual(actions, [{ type: "beginSpecialPhase" }]);
   assert.equal(themed[0].dataset.levelTheme, "custom");
+  assert.equal(root.children[1].textContent, ".custom-intro { color: red; }");
 
   host.clear();
   assert.equal(root.children.length, 0);

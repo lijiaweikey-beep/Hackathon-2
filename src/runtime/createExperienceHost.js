@@ -1,3 +1,6 @@
+import { createScopedInput } from "../systems/createScopedInput.js";
+import { createLevelSurface } from "../ui/createLevelSurface.js";
+
 function freezeGroup(value) {
   return Object.freeze({ ...(value ?? {}) });
 }
@@ -41,5 +44,49 @@ export function createExperienceHost({
     flow: freezeGroup(flow),
     storage,
     random: Object.freeze({ range: randomRange }),
+  });
+}
+
+export function createStandaloneExperienceHost({
+  definition,
+  scope,
+  createSurface = createLevelSurface,
+  createInput = createScopedInput,
+  documentTarget,
+  parent,
+  windowTarget,
+  canvas,
+  onInput,
+  time,
+  rendering,
+  audio,
+  flow,
+  storageBackend,
+  randomRange,
+}) {
+  const surface = createSurface({
+    documentTarget,
+    parent,
+    levelId: definition.id,
+    scope,
+  });
+  surface.setStyles(definition.styleText ?? "");
+  const input = createInput({
+    scope,
+    windowTarget,
+    canvas,
+    emit: onInput,
+  });
+  return createExperienceHost({
+    definition,
+    scope,
+    time,
+    rendering,
+    surface,
+    input,
+    audio,
+    flow,
+    storageBackend,
+    randomRange,
   });
 }

@@ -48,3 +48,38 @@ test("回合结算统一生成结果并通知界面", () => {
   assert.equal(session.result.attemptsLeft, 1);
   assert.equal(resultCalls.length, 1);
 });
+
+test("独立玩法没有经典玩家对象也可以失败结算", () => {
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "standalone" },
+      startTime: 0,
+      attempts: 0,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult(result) {
+      this.result = result;
+    },
+  };
+  const settlement = createRoundSettlement({
+    session,
+    getPlayer: () => null,
+    hasScene: () => true,
+    getTotalTime: () => 3,
+    getResultStats: () => ({ attemptsLeft: 0 }),
+    calculateRating: () => ({ grade: "C", rating: 0 }),
+    showResult: () => {},
+    saveBestScore: () => {},
+    playWin: () => {},
+    playLose: () => {},
+  });
+
+  settlement.finish(false, "失败", { attemptsLeft: 7 });
+
+  assert.equal(session.phase, GAME_PHASES.RESULT);
+  assert.equal(session.result.failMessage, "失败");
+  assert.equal(session.result.attemptsLeft, 7);
+});

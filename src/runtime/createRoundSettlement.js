@@ -10,7 +10,7 @@ export function createRoundSettlement(dependencies) {
     pendingTimer = null;
   }
 
-  function finish(won, failMessage) {
+  function finish(won, failMessage, resultOverride) {
     const { session } = dependencies;
     if ([GAME_PHASES.RESULT, GAME_PHASES.LEVEL_SELECT].includes(session.phase)) return;
     if (!session.levelState?.level || !dependencies.hasScene()) return;
@@ -21,9 +21,9 @@ export function createRoundSettlement(dependencies) {
     if (session.phase !== GAME_PHASES.SETTLING) return;
 
     const player = dependencies.getPlayer();
-    player.cheer = won;
+    if (player) player.cheer = won;
     if (won) dependencies.playWin(); else dependencies.playLose();
-    const resultResource = dependencies.getResultStats();
+    const resultResource = resultOverride ?? dependencies.getResultStats();
     const timeUsed = Math.round(
       dependencies.getTotalTime() - session.levelState.startTime,
     );
@@ -49,7 +49,8 @@ export function createRoundSettlement(dependencies) {
       });
       return;
     }
-    const data = player.group.userData;
+    const data = player?.group?.userData;
+    if (!data) return;
     data.visual.position.y = 0;
     data.leftArm.rotation.z = 0.9;
     data.rightArm.rotation.z = -0.9;

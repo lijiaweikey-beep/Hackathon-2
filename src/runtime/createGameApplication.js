@@ -1,9 +1,5 @@
 import * as THREE from "three";
-import {
-  NPC_SPEED,
-  ROUND_SECONDS,
-  ATTEMPTS,
-} from "../config/constants.js";
+import { NPC_SPEED, ROUND_SECONDS, ATTEMPTS } from "../config/constants.js";
 import { LEVELS, levelRegistry } from "../config/levels.js";
 import { canvas, ui } from "../ui/dom.js";
 import { createLevelViewHost } from "../ui/createLevelViewHost.js";
@@ -15,24 +11,16 @@ import {
 import { setBlackEye, setLipstick } from "../entities/marks.js";
 import { saveBestScore } from "../utils/storage.js";
 import { calcRating } from "../utils/format.js";
-import {
-  sfxPunch,
-  sfxHit,
-  sfxWolfPunch,
-  sfxThunder,
-  sfxMiss,
-  sfxNpcHit,
-  sfxWin,
-  sfxLose,
-  resumeAudioOnInteraction,
-} from "../systems/AudioSystem.js";
 import { createFxSystem } from "../systems/FxSystem.js";
 import { isCachedTexture } from "../world/textures.js";
-import { createLevelRunner } from "../levels/levelRunner.js";
-import { createLevelContext } from "../levels/createLevelContext.js";
 import { GAME_PHASES } from "../core/gamePhase.js";
+import { createClassicLevelRunner } from "./createClassicLevelRunner.js";
 import { createGameSession } from "./createGameSession.js";
 import { createGameLoop } from "./createGameLoop.js";
+import { createGameAudio } from "./createGameAudio.js";
+import { createClassicGameExperience } from "./createClassicGameExperience.js";
+import { createStandaloneExperienceHost } from "./createExperienceHost.js";
+import { createExperienceManager } from "./createExperienceManager.js";
 import { createRenderingSystem } from "./createRenderingSystem.js";
 import { createRoundSettlement } from "./createRoundSettlement.js";
 import { createWorldRuntime } from "./createWorldRuntime.js";
@@ -52,65 +40,33 @@ let inputController;
 let rendering;
 let settlement;
 let worldRuntime;
+let experienceManager;
 
 let totalTime = 0;
 const session = createGameSession();
+const audio = createGameAudio();
 
-const levelRunner = createLevelRunner({
-  createContext: ({ definition, scope }) => createLevelContext({
-    definition,
-    scope,
-    sceneData: session.levelState.sceneData,
-    time: {
-      getStatus: () => session.phase,
-      getTotal: () => totalTime,
-    },
-    actors: {
-      npcCount: getMatchNpcCount(),
-      npcSpeed: NPC_SPEED,
-      createNpc,
-      addNpc: (npc) => actorSystem.addNpc(npc),
-      addWanderNpc: (id) => actorSystem.addWanderNpc(id),
-      getAll: () => actorSystem.getAll(),
-      getNpcs: () => actorSystem.getNpcs(),
-      getPlayer: () => player,
-      dissolve: (npc) => combatSystem.dissolveNpc(npc),
-      compactDead: () => actorSystem.compactDead(),
-      randomizePosition: (actor) => actorSystem.randomizePosition(actor),
-      setPartsVisible: (actor, partKey, visible) => {
-        actorSystem.setPartsVisible(actor, partKey, visible);
-      },
-    },
-    movement: {
-      randomOpenPosition: () => actorSystem.randomOpenPosition(),
-      faceNpcToward: (...args) => actorSystem.faceNpcToward(...args),
-      moveNpcToward: (...args) => actorSystem.moveNpcToward(...args),
-      collidesWithObstacle: (...args) => worldRuntime.collidesWithObstacle(...args),
-      isActorFacingTarget: (...args) => actorSystem.isActorFacingTarget(...args),
-    },
-    combat: {
-      isFacingTarget: (...args) => combatSystem.isFacingTarget(...args),
-      triggerShake,
-      triggerHitstop,
-      finishLevel: settleRound,
-    },
-    world: {},
-    ui: {
-      setBlackEye,
-      setLipstick,
-      showOverlay: (...args) => uiController.showOverlay(...args),
-      hideOverlay: (...args) => uiController.hideOverlay(...args),
-      flashHud: (...args) => uiController.flashHud(...args),
-      refreshHud: () => uiController.updateHud(),
-      resetPlayerInput: () => inputController.reset(),
-    },
-    audio: {
-      playSound: playLevelSound,
-    },
-    random: {
-      range: randomRange,
-    },
+const levelRunner = createClassicLevelRunner({
+  session,
+  getServices: () => ({
+    actorSystem,
+    combatSystem,
+    worldRuntime,
+    uiController,
+    inputController,
   }),
+  getTotalTime: () => totalTime,
+  getMatchNpcCount,
+  getPlayer: () => player,
+  createNpc,
+  triggerShake,
+  triggerHitstop,
+  settleRound,
+  playSound: audio.play,
+  randomRange,
+  npcSpeed: NPC_SPEED,
+  setBlackEye,
+  setLipstick,
   onError(error, definition) {
     console.error(`关卡运行失败：${definition.id}`, error);
   },
@@ -138,23 +94,6 @@ function triggerShake(intensity, duration) {
   fx.triggerShake(intensity, duration);
 }
 
-function playLevelSound(name, delayMs = 0) {
-  const sounds = {
-    thunder: sfxThunder,
-    hit: sfxHit,
-    miss: sfxMiss,
-    npcHit: sfxNpcHit,
-    wolfPunch: sfxWolfPunch,
-  };
-  const play = sounds[name];
-  if (!play) return;
-  if (delayMs > 0) {
-    window.setTimeout(play, delayMs);
-  } else {
-    play();
-  }
-}
-
 function updateShake(dt) {
   fx.updateShake(dt, rendering.camera);
 }
@@ -165,14 +104,89 @@ function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
 
 function leaveLevel() {
   settlement.clearPending();
-  disposeScene();
-  scene = null;
+  experienceManager?.dispose();
   session.reset();
 }
 
 function selectLevelById(id) {
   const index = levelRegistry.getIndexById(id);
   if (index >= 0) resetLevel(index);
+}
+
+function startExperience() {
+  if (session.phase !== GAME_PHASES.BRIEFING) return;
+  session.transition(GAME_PHASES.PLAYING);
+  session.levelState.startTime = totalTime;
+  experienceManager.start();
+}
+
+function pauseExperience() {
+  if (session.phase !== GAME_PHASES.PLAYING) return;
+  session.transition(GAME_PHASES.PAUSED);
+  experienceManager.pause();
+}
+
+function resumeExperience() {
+  if (session.phase !== GAME_PHASES.PAUSED) return;
+  session.transition(GAME_PHASES.PLAYING);
+  experienceManager.resume();
+}
+
+function createStandaloneHost({ definition, scope }) {
+  return createStandaloneExperienceHost({
+    definition,
+    scope,
+    documentTarget: document,
+    parent: ui.hud,
+    windowTarget: window,
+    canvas,
+    onInput: (action) => experienceManager.handleInput(action),
+    time: {
+      getPhase: () => session.phase,
+      getTotal: () => totalTime,
+    },
+    rendering: {
+      THREE,
+      canvas,
+      renderer: rendering.renderer,
+      createScene: rendering.createScene,
+      createCamera: rendering.createCamera,
+      render: rendering.render,
+      disposeScene: (targetScene) => rendering.disposeScene(targetScene),
+    },
+    audio: {
+      playSound: audio.play,
+      resume: audio.resume,
+    },
+    flow: {
+      start: startExperience,
+      pause: pauseExperience,
+      resume: resumeExperience,
+      finish: ({ won, failMessage, stats } = {}) =>
+        settlement.finish(Boolean(won), failMessage, stats),
+      leave: () => uiController.showLevelSelect(),
+    },
+    storageBackend: window.localStorage,
+    randomRange,
+  });
+}
+
+function createClassicRuntime(definition) {
+  return createClassicGameExperience({
+    session,
+    levelRunner,
+    actorSystem,
+    combatSystem,
+    fx,
+    uiController,
+    rendering,
+    getScene: () => scene,
+    getPlayer: () => player,
+    settlement,
+    updateShake,
+    mount: () => levelViewHost.setStyles(definition.styleText ?? ""),
+    dispose: disposeClassicScene,
+  });
 }
 
 export function boot() {
@@ -191,8 +205,8 @@ export function boot() {
     isActive: () => session.phase === GAME_PHASES.PLAYING,
     joystick: ui.joystick,
     joystickKnob: ui.joystickKnob,
-    primeAudio: resumeAudioOnInteraction,
-    onAttack: () => combatSystem.triggerAttack(),
+    primeAudio: audio.resume,
+    onAttack: () => experienceManager?.handleInput({ type: "primary" }),
   });
   fx = createFxSystem({
     ui,
@@ -226,10 +240,10 @@ export function boot() {
     getNpcs: () => actorSystem.getNpcs(),
     dispatch: (action) => levelRunner.handleAction(action),
     consumeActionInterval: () => inputController.consumeAction(),
-    playSound: playLevelSound,
-    playPunch: sfxPunch,
-    playHit: sfxHit,
-    playMiss: sfxMiss,
+    playSound: audio.play,
+    playPunch: audio.punch,
+    playHit: audio.hit,
+    playMiss: audio.miss,
     triggerHitstop,
     triggerShake,
     settleRound,
@@ -259,69 +273,48 @@ export function boot() {
     }),
     onSelectLevel: selectLevelById,
     onLeaveLevel: leaveLevel,
-    onStart() {
-      session.transition(GAME_PHASES.PLAYING);
-      session.levelState.startTime = totalTime;
-      uiController.updateHud();
-      levelRunner.handleAction({ type: "beginPlay" });
-    },
-    onPause: () => session.transition(GAME_PHASES.PAUSED),
-    onResume: () => session.transition(GAME_PHASES.PLAYING),
+    onStart: startExperience,
+    onPause: pauseExperience,
+    onResume: resumeExperience,
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
     },
-    onAttack: () => combatSystem.triggerAttack(),
+    onAttack: () => experienceManager?.handleInput({ type: "primary" }),
+  });
+  experienceManager = createExperienceManager({
+    createHost({ definition, scope }) {
+      return definition.extensions?.createExperience
+        ? createStandaloneHost({ definition, scope })
+        : { definition, scope };
+    },
+    createClassicExperience: createClassicRuntime,
+    onError(error, definition) {
+      console.error(`关卡体验运行失败：${definition.id}`, error);
+      uiController.showLevelSelect();
+    },
   });
   settlement = createRoundSettlement({
     session,
     getPlayer: () => player,
-    hasScene: () => Boolean(scene),
+    hasScene: () => Boolean(experienceManager.active),
     getTotalTime: () => totalTime,
-    getResultStats: () => levelRunner.handleAction({ type: "getResultStats" }),
+    getResultStats: () => experienceManager.getResultStats(),
     calculateRating: calcRating,
-    showResult: (result) => uiController.showResult(result),
+    showResult(result) {
+      if (!experienceManager.showResult(result)) uiController.showResult(result);
+    },
     saveBestScore,
-    playWin: sfxWin,
-    playLose: sfxLose,
+    playWin: audio.win,
+    playLose: audio.lose,
   });
   gameLoop = createGameLoop({
     session,
-    hasScene: () => Boolean(scene),
-    consumeHitstop: (deltaSeconds) => fx.consumeHitstop(deltaSeconds),
+    getExperience: () =>
+      experienceManager.active ? experienceManager : null,
     advanceTime: (deltaSeconds) => {
       totalTime += deltaSeconds;
     },
-    updateLevel: (deltaSeconds) => levelRunner.update(deltaSeconds),
-    updateTimer(deltaSeconds) {
-      if (session.levelState.level.timeLimit === null) return;
-      session.levelState.remaining = Math.max(
-        0,
-        session.levelState.remaining - deltaSeconds,
-      );
-      if (session.levelState.remaining <= 0) settlement.finish(false);
-    },
-    updatePlayerEffects(deltaSeconds) {
-      if (player.hitInvuln > 0) {
-        player.hitInvuln = Math.max(0, player.hitInvuln - deltaSeconds);
-      }
-      const userData = player.group?.userData;
-      if (userData?.damageFlash > 0) {
-        userData.damageFlash = Math.max(0, userData.damageFlash - deltaSeconds);
-      }
-      if (fx.damageFlashTimer > 0) {
-        fx.damageFlashTimer = Math.max(0, fx.damageFlashTimer - deltaSeconds);
-      }
-    },
-    updateActors(deltaSeconds) {
-      actorSystem.updatePlayer(deltaSeconds);
-      actorSystem.updateNpcs(deltaSeconds);
-    },
-    updateResultActors: (deltaSeconds) => actorSystem.animateCheer(deltaSeconds),
-    updateUi: () => uiController.updateHud(),
-    updateEffects: (deltaSeconds) => fx.updateParticles(deltaSeconds),
-    updateShake,
-    render: () => rendering.render(scene),
   });
 
   inputController.bind();
@@ -330,24 +323,21 @@ export function boot() {
   rendering.start((deltaSeconds) => gameLoop.tick(deltaSeconds));
 }
 
-function disposeScene() {
+function disposeClassicScene() {
   levelRunner.dispose();
   rendering?.disposeScene(scene, fx);
+  levelViewHost?.clear();
+  scene = null;
+  player = null;
 }
 
 
 function resetLevel(index, options = {}) {
   settlement.clearPending();
-  // 先清理旧场景资源
-  disposeScene();
+  experienceManager.dispose();
 
   const level = LEVELS[index];
-
-  scene = rendering.createScene();
-  actorSystem.reset();
-  combatSystem.reset();
   totalTime = options.elapsed ?? 0;
-  fx?.reset();
   inputController.reset();
   const nextLevelState = {
     level,
@@ -362,6 +352,22 @@ function resetLevel(index, options = {}) {
   session.transition(GAME_PHASES.BRIEFING);
   if (options.skipBriefing) session.transition(GAME_PHASES.PLAYING);
 
+  if (level.extensions?.createExperience) {
+    ui.levelSelectModal.classList.remove("visible");
+    ui.taskModal.classList.remove("visible");
+    experienceManager.load(level);
+    experienceManager.mount();
+    if (options.skipBriefing) {
+      session.levelState.startTime = totalTime - (options.elapsed ?? 0);
+      experienceManager.start();
+    }
+    return;
+  }
+
+  scene = rendering.createScene();
+  actorSystem.reset();
+  combatSystem.reset();
+  fx?.reset();
   worldRuntime.buildWorld(level);
 
   player = createPlayer();
@@ -369,11 +375,14 @@ function resetLevel(index, options = {}) {
   scene.add(player.group);
 
   actorSystem.spawnNpcs(level);
+  experienceManager.load(level);
+  experienceManager.mount();
 
   if (options.skipBriefing) {
     session.levelState.startTime = totalTime - (options.elapsed ?? 0);
     ui.levelSelectModal.classList.remove("visible");
     ui.taskModal.classList.remove("visible");
+    experienceManager.start();
   } else {
     uiController.showTask();
     return;

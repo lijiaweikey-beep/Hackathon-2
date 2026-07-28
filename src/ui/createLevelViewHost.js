@@ -1,5 +1,6 @@
 export function createLevelViewHost({ root, themedElements = [], onAction }) {
   const overlays = new Map();
+  let styleElement = null;
 
   function getOrCreateOverlay(key, options) {
     let overlay = overlays.get(key);
@@ -23,6 +24,14 @@ export function createLevelViewHost({ root, themedElements = [], onAction }) {
     });
   }
 
+  function setStyles(cssText = "") {
+    if (!styleElement) {
+      styleElement = root.ownerDocument.createElement("style");
+      root.appendChild(styleElement);
+    }
+    styleElement.textContent = cssText;
+  }
+
   return {
     showOverlay(key, options) {
       const overlay = getOrCreateOverlay(key, options);
@@ -39,10 +48,13 @@ export function createLevelViewHost({ root, themedElements = [], onAction }) {
     },
 
     setTheme,
+    setStyles,
 
     clear() {
       overlays.forEach((overlay) => overlay.remove());
       overlays.clear();
+      styleElement?.remove();
+      styleElement = null;
       setTheme();
     },
   };
