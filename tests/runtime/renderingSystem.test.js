@@ -47,11 +47,13 @@ test("渲染系统统一创建场景并驱动动画循环", () => {
     windowTarget,
   });
   const scene = rendering.createScene();
+  const customCamera = rendering.createCamera();
   rendering.start((deltaSeconds) => calls.push(["tick", deltaSeconds]));
-  rendering.render(scene);
+  rendering.render(scene, customCamera);
   rendering.renderer.callback();
 
   assert.deepEqual(scene.userData.cleanups, []);
+  assert.equal(calls.find(([type]) => type === "render")[2], customCamera);
   assert.deepEqual(calls.at(-1), ["tick", 0.016]);
   assert.equal(calls.some(([type]) => type === "render"), true);
 });

@@ -11,9 +11,31 @@ export function createRenderingSystem({
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const clock = new THREE.Clock();
-  const camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
-  camera.position.set(0, 19.5, 17.2);
-  camera.lookAt(0, 0, 0);
+
+  function createCamera({
+    left = -8,
+    right = 8,
+    top = 8,
+    bottom = -8,
+    near = 0.1,
+    far = 100,
+    position = [0, 19.5, 17.2],
+    lookAt = [0, 0, 0],
+  } = {}) {
+    const nextCamera = new THREE.OrthographicCamera(
+      left,
+      right,
+      top,
+      bottom,
+      near,
+      far,
+    );
+    nextCamera.position.set(...position);
+    nextCamera.lookAt(...lookAt);
+    return nextCamera;
+  }
+
+  const camera = createCamera();
 
   function createScene() {
     const scene = new THREE.Scene();
@@ -34,8 +56,8 @@ export function createRenderingSystem({
     renderer.setSize(width, height, false);
   }
 
-  function render(scene) {
-    renderer.render(scene, camera);
+  function render(scene, targetCamera = camera) {
+    renderer.render(scene, targetCamera);
   }
 
   function disposeScene(scene, fx) {
@@ -63,6 +85,7 @@ export function createRenderingSystem({
     renderer,
     camera,
     createScene,
+    createCamera,
     resize,
     render,
     disposeScene,
