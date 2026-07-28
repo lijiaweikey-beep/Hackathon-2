@@ -14,6 +14,15 @@ test("活动应用不导入休眠双人模式", async () => {
   assert.doesNotMatch(source, /modes\/duel|multiplayer/);
 });
 
+test("游戏入口只负责组装且保持精简", async () => {
+  const source = await readSource("game.js");
+  assert.ok(source.split("\n").length <= 250);
+  assert.doesNotMatch(
+    source,
+    /function updatePlayer|function updateNpcs|function triggerAttack|function updateHud/,
+  );
+});
+
 test("单人关卡注册中心不包含双人模式", async () => {
   const entries = await readdir(levelsRoot, { withFileTypes: true });
   const duelDirectory = entries.find((entry) => entry.isDirectory() && entry.name === "library-duel");
