@@ -21,6 +21,17 @@ test("非兼容关卡必须提供创建函数", () => {
   );
 });
 
+test("独立玩法关卡可以只提供体验创建函数", () => {
+  const definition = {
+    id: "standalone",
+    sceneName: "独立玩法",
+    order: 100,
+    extensions: { createExperience() {} },
+  };
+
+  assert.equal(validateLevelDefinition(definition, "standalone"), definition);
+});
+
 test("兼容关卡可以暂时不提供创建函数", () => {
   const definition = { id: "legacy", sceneName: "旧关卡", order: 1, legacy: true };
   assert.equal(validateLevelDefinition(definition, "legacy"), definition);

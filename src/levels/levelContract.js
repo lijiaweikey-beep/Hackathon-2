@@ -7,6 +7,7 @@ export const LEVEL_EXTENSIONS = Object.freeze([
   "createNpc",
   "createPreviewModel",
   "renderPreview",
+  "createExperience",
 ]);
 const levelExtensionSet = new Set(LEVEL_EXTENSIONS);
 
@@ -21,8 +22,11 @@ export function validateLevelDefinition(definition, source = "未知关卡") {
     }
   }
 
-  if (!definition.legacy && typeof definition.createLevel !== "function") {
-    throw new Error(`关卡必须提供 createLevel：${source}`);
+  const hasClassicFactory = typeof definition.createLevel === "function";
+  const hasExperienceFactory =
+    typeof definition.extensions?.createExperience === "function";
+  if (!definition.legacy && !hasClassicFactory && !hasExperienceFactory) {
+    throw new Error(`关卡必须提供 createLevel 或 createExperience：${source}`);
   }
 
   if (definition.actions != null && !Array.isArray(definition.actions)) {
