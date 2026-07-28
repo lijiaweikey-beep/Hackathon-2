@@ -1,0 +1,17 @@
+export default {
+  id: "bloodmoon",
+  order: 50,
+  legacy: true,
+  sceneName: "血月街区",
+  emoji: "🌕",
+  cardDesc: "为了你变成狼人，在雷暴里找出血月引路人",
+  mission: "血月升起，你收到一句求救：“别让我在血月里认不出你。”为了赶到对方身边，你主动踏进血月，变成狼人模样。找出伪装在人群里的血月引路人，击倒他，解除狼化。",
+  hudMission: "为了你，我变成狼人模样。找出血月引路人。",
+  clue: "电光照亮时，真正的血月引路人脚下会露出狼爪影",
+  hudClue: "电光照亮时，真正的血月引路人脚下会露出狼爪影。",
+  targetDesc: "血月引路人",
+  difficulty: 3,
+  success: "血月退潮，你终于把自己的影子从狼形里拽了回来。",
+  failure: "雷声盖过了那句求救，整条街都开始长出狼影。",
+  lighting: "bloodmoon",
+};

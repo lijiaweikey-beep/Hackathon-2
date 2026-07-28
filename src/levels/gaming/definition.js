@@ -1,0 +1,15 @@
+export default {
+  id: "gaming",
+  order: 10,
+  legacy: true,
+  sceneName: "凌晨三点",
+  emoji: "🌙",
+  cardDesc: "在人群中找到凌晨三点还在打游戏的人",
+  mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
+  clue: "目标特征：有明显黑眼圈",
+  targetDesc: "打游戏的人",
+  difficulty: 2,
+  success: "精准命中，宿舍终于安静了。",
+  failure: "这个人游戏打爽了，大家都被吵醒了",
+  lighting: "night",
+};
