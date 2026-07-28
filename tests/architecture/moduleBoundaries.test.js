@@ -70,3 +70,8 @@ test("共享运行时不包含关卡专属界面标识", async () => {
   const source = await readSource("game.js");
   assert.doesNotMatch(source, /bloodmoon|huntIntro|huntCard/);
 });
+
+test("共享运行时不读取关卡专属角色特征", async () => {
+  const source = await readSource("game.js");
+  assert.doesNotMatch(source, /isWerewolf|wolfCape|wolfParts/);
+});

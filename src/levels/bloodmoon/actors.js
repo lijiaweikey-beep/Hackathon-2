@@ -8,12 +8,15 @@ import {
   LOW_POLY_WOLF_PALETTE,
 } from "../../entities/palettes.js";
 import { decorateAsWerewolf, decorateAsWolfGuard } from "../../entities/werewolf.js";
+import { createBloodmoonAnimations } from "./animations.js";
 
 export function createPlayer() {
-  return createPlayerEntity({
+  const player = createPlayerEntity({
     createBody: () => createLowPolyPerson(LOW_POLY_WOLF_PALETTE),
     decorate: decorateAsWerewolf,
   });
+  player.animations = createBloodmoonAnimations();
+  return player;
 }
 
 export function createNpc(id, flags, randomRange) {

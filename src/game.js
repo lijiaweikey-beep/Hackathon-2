@@ -992,9 +992,14 @@ function animatePunchPose() {
   const t = player.punchTimer > 0
     ? Math.sin((player.punchTimer / (player.punchDuration ?? PUNCH_SWING)) * Math.PI)
     : 0;
-  const wolfBoost = player.isWerewolf ? 1.3 : 1;
-  userData.rightArm.rotation.x = -2.15 * t * wolfBoost;
-  userData.rightArm.rotation.z = userData.baseArmRotations.rightZ - 1.05 * t * wolfBoost;
+  const handled = player.animations?.attack?.(player, {
+    progress: t,
+    totalTime,
+  }) === true;
+  if (handled) return;
+
+  userData.rightArm.rotation.x = -2.15 * t;
+  userData.rightArm.rotation.z = userData.baseArmRotations.rightZ - 1.05 * t;
   userData.leftArm.rotation.z = userData.baseArmRotations.leftZ + 0.42 * t;
   const fx = Math.sin(player.group.rotation.y);
   const fz = Math.cos(player.group.rotation.y);
@@ -1003,10 +1008,6 @@ function animatePunchPose() {
   if (t <= 0) {
     userData.visual.position.x = 0;
     userData.visual.position.z = 0;
-  }
-  if (userData.wolfCape) {
-    userData.wolfCape.material.opacity = 0.24 + Math.abs(Math.sin(totalTime * 8)) * 0.16 + t * 0.22;
-    userData.wolfCape.rotation.z = Math.sin(totalTime * 5.2) * 0.08;
   }
 }
 
