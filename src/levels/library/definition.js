@@ -1,7 +1,11 @@
+import { createLibraryLevel } from "./createLevel.js";
+
 export default {
   id: "library",
   order: 20,
-  legacy: true,
+  legacy: false,
+  createLevel: createLibraryLevel,
+  decoyCount: 4,
   sceneName: "图书馆",
   emoji: "📚",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找到图书馆里亲嘴的情侣`,

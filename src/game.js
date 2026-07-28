@@ -4,7 +4,6 @@ import {
   WORLD_LIMIT,
   PLAY_Z_MIN,
   HIT_RANGE,
-  HIT_PAIR_RANGE,
   HIT_FACING_DOT,
   PLAYER_SPEED,
   NPC_SPEED,
@@ -221,6 +220,9 @@ const levelRunner = createLevelRunner({
     faceNpcToward,
     moveNpcToward,
     setBlackEye,
+    setLipstick,
+    collidesWithObstacle,
+    isFacingTarget,
     updateEnvironment: updateFlashlight,
   }),
   onError(error, definition) {
@@ -1314,7 +1316,6 @@ function resetLevel(index, options = {}) {
     remaining: duel || level.id === "bloodmoon" ? 9999 : ROUND_SECONDS,
     attempts: duel ? DUEL_PLAYER_HP : ATTEMPTS,
     computers: [],
-    pair: null,
     startTime: 0,
     obstacles: [],
     playerHp: options.playerHp ?? DUEL_PLAYER_HP,
@@ -1437,27 +1438,6 @@ function spawnNpcs(level) {
   if (!level.legacy) {
     levelRunner.load(level);
     levelRunner.start();
-  } else if (level.id === "library") {
-    const a = createNpc(0, { lover: true });
-    const b = createNpc(1, { lover: true });
-    a.group.position.set(-0.38, 0, -0.2);
-    b.group.position.set(0.38, 0, -0.2);
-    a.loverIndex = 0;
-    b.loverIndex = 1;
-    npcs.push(a, b);
-    scene.add(a.group, b.group);
-    levelState.pair = {
-      members: [a, b],
-      state: "kiss",
-      timer: 2.2,
-      kissCount: 0,
-      meetingPoint: new THREE.Vector3(0, 0, -0.2),
-      scatterPoints: [new THREE.Vector3(-3, 0, 2.5), new THREE.Vector3(3, 0, 1.6)],
-    };
-
-    for (let i = 2; i < getMatchNpcCount(); i += 1) {
-      addWanderNpc(i);
-    }
   } else if (level.id === "bloodmoon") {
     const target = createNpc(0, { bloodmoonTarget: true });
     const start = randomOpenPosition();
@@ -1497,7 +1477,7 @@ function spawnNpcs(level) {
   }
 
   const decoyCount = level.decoyCount
-    ?? (level.id === "temple" ? 5 : level.id === "library" ? 4 : level.id === "bloodmoon" ? 6 : 3);
+    ?? (level.id === "temple" ? 5 : level.id === "bloodmoon" ? 6 : 3);
   const wanderNpcs = npcs.filter(
     (npc) => !npc.levelManaged
       && !npc.isLover
@@ -3002,11 +2982,7 @@ function updateNpcs(dt) {
     return;
   }
 
-  if (levelState.level.id === "library") {
-    updateLovers(dt);
-  } else {
-    updateTempleTarget(dt);
-  }
+  updateTempleTarget(dt);
 
   npcs.forEach((npc) => {
     if (!npc.alive) return;
@@ -3021,66 +2997,6 @@ function updateNpcs(dt) {
 
   separateActors();
   updateTempleShadows();
-}
-
-function updateLovers(dt) {
-  const pair = levelState.pair;
-  if (!pair) return;
-  const [a, b] = pair.members;
-  if (!a.alive || !b.alive) return;
-
-  if (pair.state === "kiss") {
-    a.walking = false;
-    b.walking = false;
-    pair.timer -= dt;
-    faceNpcToward(a, b.group.position);
-    faceNpcToward(b, a.group.position);
-    const intensity = Math.min(1, a.markIntensity + dt * 0.32);
-    setLipstick(a, intensity);
-    setLipstick(b, intensity);
-    if (pair.timer <= 0) {
-      pair.kissCount += 1;
-      pair.state = "scatter";
-      pair.timer = randomRange(3.4, 4.8);
-      const angle = Math.random() * Math.PI * 2;
-      pair.scatterPoints = [
-        new THREE.Vector3(Math.cos(angle) * randomRange(3.2, 5.6), 0, Math.sin(angle) * randomRange(2.8, 5.4)),
-        new THREE.Vector3(Math.cos(angle + Math.PI) * randomRange(3.2, 5.6), 0, Math.sin(angle + Math.PI) * randomRange(2.8, 5.4)),
-      ];
-    }
-    animateActor(a, dt, false);
-    animateActor(b, dt, false);
-    return;
-  }
-
-  if (pair.state === "scatter") {
-    a.walking = true;
-    b.walking = true;
-    const aDone = moveNpcToward(a, pair.scatterPoints[0], NPC_SPEED * 1.15, dt);
-    const bDone = moveNpcToward(b, pair.scatterPoints[1], NPC_SPEED * 1.15, dt);
-    pair.timer -= dt;
-    if ((aDone && bDone) || pair.timer <= 0) {
-      pair.meetingPoint = randomMeetingPoint();
-      pair.state = "approach";
-    }
-    animateActor(a, dt, true);
-    animateActor(b, dt, true);
-    return;
-  }
-
-  if (pair.state === "approach") {
-    const offset = new THREE.Vector3(0.32, 0, 0);
-    a.walking = true;
-    b.walking = true;
-    const aDone = moveNpcToward(a, pair.meetingPoint.clone().sub(offset), NPC_SPEED * 1.05, dt);
-    const bDone = moveNpcToward(b, pair.meetingPoint.clone().add(offset), NPC_SPEED * 1.05, dt);
-    if (aDone && bDone) {
-      pair.state = "kiss";
-      pair.timer = randomRange(1.7, 2.6);
-    }
-    animateActor(a, dt, true);
-    animateActor(b, dt, true);
-  }
 }
 
 function updateTempleTarget(dt) {
@@ -3152,17 +3068,6 @@ function updateTempleTarget(dt) {
     animateActor(target, dt, true);
   }
 }
-
-function randomMeetingPoint() {
-  let point;
-  let tries = 0;
-  do {
-    point = new THREE.Vector3(randomRange(-5.5, 5.5), 0, randomRange(-4.5, 5.8));
-    tries += 1;
-  } while (tries < 30 && collidesWithObstacle(point));
-  return point;
-}
-
 
 function setSuShiClues(npc, intensity) {
   const clueIntensity = npc.isSuShiTarget ? Math.min(intensity, TEMPLE_TRUE_SHADOW_MAX) : intensity;
@@ -3321,7 +3226,7 @@ function separateActors() {
     for (let j = 0; j < nearby.length; j += 1) {
       const b = nearby[j];
       if (b === a || !b.alive) continue;
-      if (levelState.pair?.members.includes(a) && levelState.pair?.members.includes(b) && levelState.pair.state === "kiss") continue;
+      if (a.separationGroup && a.separationGroup === b.separationGroup) continue;
       pushApart(a.group.position, b.group.position, 0.62, 0.018);
     }
     pushApart(a.group.position, player.group.position, 0.72, 0.012);
@@ -3484,21 +3389,12 @@ function findHitTarget() {
   getFacingVector(player.group.rotation.y, scratchFacing);
   const facing = scratchFacing;
 
-  if (levelState.level.id === "library" && levelState.pair) {
-    const [a, b] = levelState.pair.members;
-    if (a.alive && b.alive) {
-      // 检测任一情侣在范围内即判定命中（强制双人判定）
-      const toA = new THREE.Vector2(a.group.position.x - playerPos.x, a.group.position.z - playerPos.z);
-      const toB = new THREE.Vector2(b.group.position.x - playerPos.x, b.group.position.z - playerPos.z);
-      const distA = toA.length();
-      const distB = toB.length();
-      const aInRange = distA <= HIT_PAIR_RANGE && isFacingTarget(facing, toA);
-      const bInRange = distB <= HIT_PAIR_RANGE && isFacingTarget(facing, toB);
-      if (aInRange || bInRange) {
-        return { correct: true, npcs: [a, b] };
-      }
-    }
-  }
+  const customHit = levelRunner.handleAction({
+    type: "findHitTarget",
+    playerPos,
+    facing,
+  });
+  if (customHit) return customHit;
 
   let best = null;
   let bestDistance = Infinity;
