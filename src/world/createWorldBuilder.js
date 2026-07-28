@@ -600,40 +600,45 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   }
 }
 
-  function getNightLightLevels(level) {
-  if (level.id === "gaming") {
-    return { hemi: 0.3, ambient: 0.04, dir: 0.42 };
-  }
-  return { hemi: 1.2, ambient: 0.35, dir: 1.3 };
-}
-
   function buildWorld(level) {
-  const worldVariant = level.worldVariant ?? level.id;
-  const isBloodmoonWorld = worldVariant === "bloodmoon";
-  const isNight = level.lighting === "night" || isBloodmoonWorld;
-  const nightLights = getNightLightLevels(level);
-  ctx.getScene().background = new THREE.Color(isBloodmoonWorld ? 0x21060b : isNight ? 0x0c1320 : 0xb9d6e7);
-  if (isNight && level.id === "gaming") {
-    ctx.getScene().fog = new THREE.Fog(0x0c1320, 42, 78);
-  } else {
-    ctx.getScene().fog = new THREE.Fog(isBloodmoonWorld ? 0x3b0710 : isNight ? 0x0c1320 : 0xc8e3f0, 16, isBloodmoonWorld ? 30 : 35);
-  }
+  const profile = level.worldProfile ?? {};
+  const isNight = level.lighting === "night";
+  const background = profile.background ?? (isNight ? 0x0c1320 : 0xb9d6e7);
+  const fog = profile.fog ?? {
+    color: isNight ? 0x0c1320 : 0xc8e3f0,
+    near: 16,
+    far: 35,
+  };
+  const hemisphere = profile.hemisphere ?? {
+    sky: isNight ? 0x3a4d6b : 0xffffff,
+    ground: isNight ? 0x0a0e16 : 0xa98f6b,
+    intensity: isNight ? 1.2 : 1.42,
+  };
+  const directional = profile.directional ?? {
+    color: isNight ? 0x9fc4ff : 0xfff7d6,
+    intensity: isNight ? 1.3 : 1.65,
+  };
+  const floorProfile = profile.floor ?? {};
+  ctx.getScene().background = new THREE.Color(background);
+  ctx.getScene().fog = new THREE.Fog(fog.color, fog.near, fog.far);
 
   const hemi = new THREE.HemisphereLight(
-    isBloodmoonWorld ? 0x6d1a25 : isNight ? 0x3a4d6b : 0xffffff,
-    isBloodmoonWorld ? 0x120406 : isNight ? 0x0a0e16 : 0xa98f6b,
-    isBloodmoonWorld ? 0.95 : isNight ? nightLights.hemi : 1.42,
+    hemisphere.sky,
+    hemisphere.ground,
+    hemisphere.intensity,
   );
   ctx.getScene().add(hemi);
 
-  if (isNight) {
-    const ambient = new THREE.AmbientLight(isBloodmoonWorld ? 0x6f1720 : 0x4466aa, isBloodmoonWorld ? 0.52 : nightLights.ambient);
+  const ambientProfile = profile.ambient
+    ?? (isNight ? { color: 0x4466aa, intensity: 0.35 } : null);
+  if (ambientProfile) {
+    const ambient = new THREE.AmbientLight(ambientProfile.color, ambientProfile.intensity);
     ctx.getScene().add(ambient);
   }
 
   const sun = new THREE.DirectionalLight(
-    isBloodmoonWorld ? 0xff6b6b : isNight ? 0x9fc4ff : 0xfff7d6,
-    isBloodmoonWorld ? 1.55 : isNight ? nightLights.dir : 1.65,
+    directional.color,
+    directional.intensity,
   );
   sun.position.set(-5, 12, 8);
   sun.castShadow = true;
@@ -644,13 +649,13 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   sun.shadow.camera.bottom = -16;
   ctx.getScene().add(sun);
 
-  const mapId = level.mapId || level.id;
+  const mapId = floorProfile.texture ?? level.id;
   const floorTex = getCachedTexture(textureCache.floor, mapId, () => makeFloorTexture(mapId));
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(28, 28),
     new THREE.MeshStandardMaterial({
       map: floorTex,
-      roughness: level.id === "gaming" ? 0.58 : 0.78,
+      roughness: floorProfile.roughness ?? 0.78,
       metalness: 0.02,
     }),
   );
@@ -658,15 +663,19 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
   floor.receiveShadow = true;
   ctx.getScene().add(floor);
 
-  if (level.id === "gaming") {
-    buildGamingRoom();
-  } else if (level.id === "library" || level.mapId === "library") {
-    buildLibrary();
-  } else if (worldVariant === "bloodmoon") {
-    buildBloodmoonStreet(sun);
-  } else {
-    buildTempleCourtyard();
-  }
+  level.extensions?.createWorld?.({
+    THREE,
+    scene: ctx.getScene(),
+    state: ctx.getLevelState(),
+    registerObstacle: ctx.registerObstacle,
+    randomRange: ctx.randomRange,
+    addWall,
+    buildGamingRoom,
+    buildLibrary,
+    buildTempleCourtyard,
+    buildBloodmoonStreet,
+    baseLight: sun,
+  });
 }
 
   return {

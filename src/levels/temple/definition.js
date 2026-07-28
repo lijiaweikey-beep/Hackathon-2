@@ -1,16 +1,26 @@
 import { renderSuShiShadowMarkHtml } from "../../entities/templeShadows.js";
+import { createNpc, createPlayer } from "./actors.js";
 import { createTempleLevel } from "./createLevel.js";
+import { createPreviewModel, renderPreview } from "./preview.js";
+import { createWorld } from "./world.js";
 
 export default {
   id: "temple",
   order: 40,
   legacy: false,
   createLevel: createTempleLevel,
+  extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
+  worldProfile: {
+    background: 0x0c1320,
+    fog: { color: 0x0c1320, near: 16, far: 35 },
+    hemisphere: { sky: 0x3a4d6b, ground: 0x0a0e16, intensity: 1.2 },
+    ambient: { color: 0x4466aa, intensity: 0.35 },
+    directional: { color: 0x9fc4ff, intensity: 1.3 },
+    floor: { texture: "temple", roughness: 0.78 },
+  },
   actions: ["configureDecoy", "updateDecoy", "afterNpcUpdate", "actorDissolved"],
   decoyCount: 5,
   moonDecoyCount: 3,
-  playerVariant: "temple",
-  npcVariant: "temple",
   sceneName: "承天寺夜游",
   emoji: "🌕",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 个苏轼影分身里找出真正吵醒怀民的苏轼`,

@@ -1,10 +1,17 @@
+import { createNpc, createPlayer } from "./actors.js";
 import { createLibraryLevel } from "./createLevel.js";
+import { createPreviewModel, renderPreview } from "./preview.js";
+import { createWorld } from "./world.js";
 
 export default {
   id: "library",
   order: 20,
   legacy: false,
   createLevel: createLibraryLevel,
+  extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
+  worldProfile: {
+    floor: { texture: "library", roughness: 0.78 },
+  },
   actions: ["findHitTarget"],
   decoyCount: 4,
   sceneName: "图书馆",

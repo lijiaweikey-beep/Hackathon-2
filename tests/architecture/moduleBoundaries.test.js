@@ -47,3 +47,21 @@ test("不同关卡目录之间不能互相导入", async () => {
     }
   }
 });
+
+test("共享运行时不按具体关卡标识或资源变体分派", async () => {
+  const sharedFiles = [
+    "game.js",
+    "entities/actors.js",
+    "ui/targetPreview.js",
+    "world/createWorldBuilder.js",
+  ];
+
+  for (const file of sharedFiles) {
+    const source = await readSource(file);
+    assert.doesNotMatch(
+      source,
+      /level(?:State\.level)?\.id\s*={2,3}|playerVariant|npcVariant|previewVariant|worldVariant|attackVariant/,
+      `${file} 应通过关卡扩展契约工作`,
+    );
+  }
+});

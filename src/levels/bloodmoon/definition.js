@@ -1,11 +1,23 @@
 import { BLOODMOON_SANITY_MAX } from "../../config/constants.js";
+import { createNpc, createPlayer } from "./actors.js";
 import { createBloodmoonLevel } from "./createLevel.js";
+import { createPreviewModel, renderPreview } from "./preview.js";
+import { createWorld } from "./world.js";
 
 export default {
   id: "bloodmoon",
   order: 50,
   legacy: false,
   createLevel: createBloodmoonLevel,
+  extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
+  worldProfile: {
+    background: 0x21060b,
+    fog: { color: 0x3b0710, near: 16, far: 30 },
+    hemisphere: { sky: 0x6d1a25, ground: 0x120406, intensity: 0.95 },
+    ambient: { color: 0x6f1720, intensity: 0.52 },
+    directional: { color: 0xff6b6b, intensity: 1.55 },
+    floor: { texture: "bloodmoon", roughness: 0.78 },
+  },
   actions: [
     "beforeAttack",
     "hitTarget",
@@ -18,11 +30,9 @@ export default {
   timeLimit: null,
   resourceLabel: "理智",
   resourceInitial: BLOODMOON_SANITY_MAX,
-  playerVariant: "werewolf",
-  attackVariant: "wolf",
+  startSound: "wolfHowl",
+  attackComboExpires: false,
   decoyCount: 6,
-  previewVariant: "bloodmoon",
-  worldVariant: "bloodmoon",
   sceneName: "血月街区",
   emoji: "🌕",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找出血月引路人`,

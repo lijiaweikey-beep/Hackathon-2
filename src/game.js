@@ -253,11 +253,13 @@ function getWorldContext() {
 }
 
 function createPlayer() {
-  return createPlayerEntity(levelState?.level);
+  return levelState?.level.extensions?.createPlayer?.()
+    ?? createPlayerEntity();
 }
 
 function createNpc(id, flags) {
-  return createNpcEntity(id, flags, levelState?.level, randomRange);
+  return levelState?.level.extensions?.createNpc?.(id, flags, randomRange)
+    ?? createNpcEntity(id, flags, {}, randomRange);
 }
 
 function registerObstacle(x, z, halfW, halfD) {
@@ -329,6 +331,7 @@ function playLevelSound(name, delayMs = 0) {
     hit: sfxHit,
     miss: sfxMiss,
     npcHit: sfxNpcHit,
+    wolfHowl: sfxWolfHowl,
     wolfPunch: sfxWolfPunch,
   };
   const play = sounds[name];
@@ -513,7 +516,7 @@ function setupUi() {
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
     updateHud();
-    if (levelState.level.playerVariant === "werewolf") sfxWolfHowl();
+    playLevelSound(levelState.level.startSound);
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -1014,7 +1017,7 @@ function updatePlayer(dt) {
 
   if (punchCooldown > 0) punchCooldown = Math.max(0, punchCooldown - dt);
   if (player.punchTimer > 0) player.punchTimer = Math.max(0, player.punchTimer - dt);
-  if (levelState.level.attackVariant !== "wolf" && punchResetTimer > 0) {
+  if (levelState.level.attackComboExpires !== false && punchResetTimer > 0) {
     punchResetTimer -= dt;
     if (punchResetTimer <= 0) punchTier = 0;
   }

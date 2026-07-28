@@ -1,10 +1,22 @@
+import { createNpc, createPlayer } from "./actors.js";
 import { createGamingLevel } from "./createLevel.js";
+import { createPreviewModel, renderPreview } from "./preview.js";
+import { createWorld } from "./world.js";
 
 export default {
   id: "gaming",
   order: 10,
   legacy: false,
   createLevel: createGamingLevel,
+  extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
+  worldProfile: {
+    background: 0x0c1320,
+    fog: { color: 0x0c1320, near: 42, far: 78 },
+    hemisphere: { sky: 0x3a4d6b, ground: 0x0a0e16, intensity: 0.3 },
+    ambient: { color: 0x4466aa, intensity: 0.04 },
+    directional: { color: 0x9fc4ff, intensity: 0.42 },
+    floor: { texture: "gaming", roughness: 0.58 },
+  },
   decoyCount: 3,
   sceneName: "凌晨三点",
   emoji: "🌙",
