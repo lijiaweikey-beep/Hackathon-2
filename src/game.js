@@ -62,6 +62,7 @@ import {
   clampActorPosition as clampActorPositionInLevel,
 } from "./world/obstacles.js";
 import { createLevelRunner } from "./levels/levelRunner.js";
+import { createLevelContext } from "./levels/createLevelContext.js";
 
 let renderer;
 let scene;
@@ -85,7 +86,7 @@ let punchResetTimer = 0; // 停止出拳后重置计时
 let totalTime = 0;
 
 const levelRunner = createLevelRunner({
-  createContext: ({ definition, scope }) => ({
+  createContext: ({ definition, scope }) => createLevelContext({
     definition,
     scope,
     sceneData: levelState.sceneData,

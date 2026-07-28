@@ -41,4 +41,8 @@ test("关卡只能声明受支持的动作和扩展函数", () => {
     () => validateLevelDefinition({ ...definition, extensions: { createWorld: true } }, "custom"),
     /扩展必须是函数/,
   );
+  assert.throws(
+    () => validateLevelDefinition({ ...definition, extensions: { createWrold() {} } }, "custom"),
+    /未知扩展/,
+  );
 });
