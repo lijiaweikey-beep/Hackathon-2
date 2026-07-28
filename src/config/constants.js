@@ -2,7 +2,6 @@ export const DEFAULT_NPC_COUNT = 20;
 export const MIN_NPC_COUNT = 10;
 export const MAX_NPC_COUNT = 100;
 export const NPC_COUNT_STORAGE_KEY = "nightAction_npcCount";
-export const HOST_ROOM_KEY = "nightAction_hostRoom";
 export const BEST_SCORE_STORAGE_KEY = "nightAction_best";
 
 export const WORLD_LIMIT = 10.8;
@@ -15,15 +14,7 @@ export const NPC_SPEED = 3;
 export const ROUND_SECONDS = 90;
 export const ATTEMPTS = 3;
 
-export const DUEL_NPC_COUNT = 40;
-export const DUEL_PLAYER_HP = 5;
-export const DUEL_NPC_HP = 3;
 export const PUNCH_SWING = 0.32;
-export const NPC_PUNCH_INTERVAL = 10;
-export const NPC_PUNCH_RANGE = 1.65;
-export const NPC_PUNCH_SWING = 0.42;
-export const NPC_PUNCH_DAMAGE = 0.5;
-export const HIT_INVULN = 0.55;
 export const PLAYER_LERP = 0.88;
 export const ACTION_INTERVAL_MS = 500;
 export const REVERSE_INPUT_LOCK_MS = 500;
@@ -47,24 +38,7 @@ export const SU_SHI_SHADOW_PATTERN = [
   { x: 0.04, z: 0.0, length: 0.92, width: 0.055, rz: 0.74, opacity: 0.24, accent: true },
 ];
 
-export const REMOTE_POS_LERP = 14;
-export const REMOTE_SNAP_DIST = 2.2;
-export const REMOTE_STALE_MS = 900;
-export const DUEL_SPAWN_MIN_DIST = 4.2;
-export const DUEL_GATHER_INTERVAL = 90;
-export const DUEL_GATHER_PREVIEW = 30;
-export const DUEL_GATHER_WINDOW = 5;
-export const DUEL_GATHER_RADIUS = 2.2;
-export const DUEL_HERD_INTERVAL = 20;
-export const DUEL_HERD_DURATION = 2.8;
-export const GATHER_COLOR_PREVIEW = 0x15803d;
-export const GATHER_COLOR_URGENT = 0xb91c1c;
-export const GATHER_COLOR_SUCCESS = 0x14532d;
 export const ACTOR_COLLISION_RADIUS = 0.38;
-export const PVP_HIT_RANGE = HIT_RANGE + ACTOR_COLLISION_RADIUS * 2 + 0.25;
-export const PROXIMITY_BODY_LEN = ACTOR_COLLISION_RADIUS * 2;
-export const PROXIMITY_MIN_DIST = PROXIMITY_BODY_LEN * 2;
-export const PROXIMITY_MAX_DIST = PROXIMITY_BODY_LEN * 4;
 
 export const BLOODMOON_SANITY_MAX = 100;
 export const BLOODMOON_WOLF_COOLDOWN = 0.28;

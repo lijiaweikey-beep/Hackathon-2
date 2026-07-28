@@ -1,21 +1,9 @@
 import {
   ATTEMPTS,
-  DUEL_NPC_COUNT,
-  DUEL_PLAYER_HP,
   ROUND_SECONDS,
 } from "../config/constants.js";
-import { formatHearts } from "../utils/format.js";
 
-export function createTaskModalModel({ level, duel, npcCount }) {
-  if (duel) {
-    return {
-      npcCount: DUEL_NPC_COUNT,
-      timeText: "∞",
-      resourceHtml: `生命 <span id="taskAttempts" class="hearts-display">${formatHearts(DUEL_PLAYER_HP)}</span>`,
-      targetLabel: "对手",
-    };
-  }
-
+export function createTaskModalModel({ level, npcCount }) {
   return {
     npcCount,
     timeText: level.timeLimit === null
@@ -36,8 +24,8 @@ function updateTaskAttemptsChip(ui, resourceHtml) {
   ui.taskAttempts = document.querySelector("#taskAttempts");
 }
 
-export function renderTaskModal(ui, { level, duel, npcCount }) {
-  const model = createTaskModalModel({ level, duel, npcCount });
+export function renderTaskModal(ui, { level, npcCount }) {
+  const model = createTaskModalModel({ level, npcCount });
   ui.taskEmoji.textContent = level.emoji;
   ui.taskTitle.textContent = level.sceneName;
   ui.taskCopy.textContent = level.mission;

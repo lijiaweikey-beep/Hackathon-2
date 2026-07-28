@@ -1,4 +1,4 @@
-export const firebaseConfig = {
+export const duelFirebaseConfig = {
   apiKey: "AIzaSyBoejQvZ_A8pkoW4ok7lVYGhyBElQVY-mc",
   authDomain: "hackathon-2-6b4aa.firebaseapp.com",
   databaseURL: "https://hackathon-2-6b4aa-default-rtdb.asia-southeast1.firebasedatabase.app",

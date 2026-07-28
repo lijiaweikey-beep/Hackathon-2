@@ -1,12 +1,12 @@
 import * as THREE from "three";
-import { createSeededRng } from "../utils/rng.js";
+import { createSeededRng } from "../../utils/rng.js";
 import {
   DUEL_NPC_COUNT,
   DUEL_NPC_HP,
   DUEL_PLAYER_HP,
   NPC_PUNCH_INTERVAL,
   PVP_HIT_RANGE,
-} from "../config/constants.js";
+} from "./constants.js";
 
 export function buildDuelPuncherSet(worldSeed) {
   const rng = createSeededRng((worldSeed >>> 0) ^ 0x8f4e2c1b);

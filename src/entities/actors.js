@@ -4,7 +4,6 @@ import {
   LOW_POLY_PLAYER_PALETTE,
   LOW_POLY_NPC_PALETTES,
   LOW_POLY_WOLF_PALETTE,
-  LOW_POLY_REMOTE_PALETTE,
 } from "./palettes.js";
 import { createLowPolyPerson } from "./lowPolyPerson.js";
 import { createTemplePerson } from "./templePerson.js";
@@ -25,14 +24,6 @@ export function createPlayer(level = {}) {
   actor.punchTimer = 0;
   actor.cheer = false;
   return isWerewolf ? decorateAsWerewolf(actor) : actor;
-}
-
-export function createRemotePlayer() {
-  const actor = createLowPolyPerson(LOW_POLY_REMOTE_PALETTE);
-  actor.speed = PLAYER_SPEED;
-  actor.punchTimer = 0;
-  actor.cheer = false;
-  return actor;
 }
 
 export function createNpc(id, flags, level = {}, randomRange = defaultRandomRange) {

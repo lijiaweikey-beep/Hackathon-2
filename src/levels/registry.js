@@ -7,11 +7,3 @@ const discoveredModules = import.meta.glob("./*/definition.js", {
 
 export const levelRegistry = createLevelRegistry(Object.entries(discoveredModules));
 export const LEVELS = levelRegistry.all;
-
-export function getDuelLevelIndex() {
-  return LEVELS.findIndex((level) => level.duelMode);
-}
-
-export function isDuelLevel(level) {
-  return Boolean(level?.duelMode);
-}

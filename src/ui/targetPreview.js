@@ -1,8 +1,6 @@
 import * as THREE from "three";
 import {
-  LOW_POLY_PLAYER_PALETTE,
   LOW_POLY_NPC_PALETTES,
-  LOW_POLY_REMOTE_PALETTE,
 } from "../entities/palettes.js";
 import { createLowPolyPerson } from "../entities/lowPolyPerson.js";
 import { createTemplePerson } from "../entities/templePerson.js";
@@ -70,14 +68,6 @@ export function renderTargetPreview(canvas, level) {
     const npc = createNpcEntity(0, { gamingTarget: true }, level);
     setBlackEye(npc, 1);
     previewScene.add(npc.group);
-  } else if (level.duelMode) {
-    const local = createLowPolyPerson(LOW_POLY_PLAYER_PALETTE);
-    const remote = createLowPolyPerson(LOW_POLY_REMOTE_PALETTE);
-    local.group.position.set(-0.5, 0, 0);
-    remote.group.position.set(0.5, 0, 0);
-    local.group.rotation.y = 0.4;
-    remote.group.rotation.y = -0.4;
-    previewScene.add(local.group, remote.group);
   } else if (model.variant === "library") {
     const a = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
     const b = createLowPolyPerson(LOW_POLY_NPC_PALETTES[1]);

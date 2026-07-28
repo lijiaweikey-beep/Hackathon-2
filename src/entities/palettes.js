@@ -25,16 +25,6 @@ export const LOW_POLY_WOLF_PALETTE = {
   sock: 0xfca5a5,
 };
 
-export const LOW_POLY_REMOTE_PALETTE = {
-  jacket: 0xef4444,
-  jacketDark: 0xdc2626,
-  shorts: 0x1e3a5f,
-  shortsDark: 0x172e4a,
-  cap: 0xfbbf24,
-  capAccent: 0xef4444,
-  sock: 0xfca5a5,
-};
-
 export const LOW_POLY_TEMPLE_PALETTE = {
   jacket: 0xc8d4dc,
   jacketDark: 0x8796a4,

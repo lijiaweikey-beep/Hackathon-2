@@ -9,10 +9,10 @@ import {
   update,
   serverTimestamp,
 } from "firebase/database";
-import { HOST_ROOM_KEY } from "./config/constants.js";
-import { firebaseConfig, CLIENT_ID_KEY } from "./multiplayer/config.js";
+import { HOST_ROOM_KEY } from "./constants.js";
+import { CLIENT_ID_KEY, duelFirebaseConfig } from "./networkConfig.js";
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(duelFirebaseConfig);
 const db = getDatabase(app);
 
 let roomId = null;

@@ -3,7 +3,7 @@ import {
   DUEL_GATHER_INTERVAL,
   DUEL_GATHER_PREVIEW,
   DUEL_GATHER_WINDOW,
-} from "../../config/constants.js";
+} from "./constants.js";
 import { createSeededRng } from "../../utils/rng.js";
 
 export function formatDuelGatherCountdown(seconds) {

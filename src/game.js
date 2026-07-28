@@ -9,47 +9,18 @@ import {
   NPC_SPEED,
   ROUND_SECONDS,
   ATTEMPTS,
-  DUEL_NPC_COUNT,
-  DUEL_PLAYER_HP,
-  DUEL_NPC_HP,
   PUNCH_SWING,
-  NPC_PUNCH_INTERVAL,
-  NPC_PUNCH_RANGE,
-  NPC_PUNCH_SWING,
-  NPC_PUNCH_DAMAGE,
-  HIT_INVULN,
   PLAYER_LERP,
   ACTION_INTERVAL_MS,
   REVERSE_INPUT_LOCK_MS,
   REVERSE_INPUT_DOT_THRESHOLD,
-  REMOTE_POS_LERP,
-  REMOTE_SNAP_DIST,
-  REMOTE_STALE_MS,
-  DUEL_SPAWN_MIN_DIST,
-  DUEL_GATHER_INTERVAL,
-  DUEL_GATHER_PREVIEW,
-  DUEL_GATHER_WINDOW,
-  DUEL_GATHER_RADIUS,
-  DUEL_HERD_INTERVAL,
-  DUEL_HERD_DURATION,
-  GATHER_COLOR_PREVIEW,
-  GATHER_COLOR_URGENT,
-  GATHER_COLOR_SUCCESS,
   ACTOR_COLLISION_RADIUS,
-  PVP_HIT_RANGE,
-  PROXIMITY_MIN_DIST,
-  PROXIMITY_MAX_DIST,
   PUNCH_COOLDOWNS,
   PUNCH_RESET_DELAY,
   GRID_CELL,
   CAMERA_BASE_POS,
 } from "./config/constants.js";
-import {
-  LEVELS,
-  getDuelLevelIndex,
-  isDuelLevel as checkDuelLevel,
-  levelRegistry,
-} from "./config/levels.js";
+import { LEVELS, levelRegistry } from "./config/levels.js";
 import { canvas, ui } from "./ui/dom.js";
 import { createLevelCardModel } from "./ui/levelCardModel.js";
 import { renderTargetPreview } from "./ui/targetPreview.js";
@@ -68,11 +39,9 @@ import {
 } from "./entities/bloodmoonCues.js";
 import {
   createPlayer as createPlayerEntity,
-  createRemotePlayer,
   createNpc as createNpcEntity,
 } from "./entities/actors.js";
 import { setBlackEye, setLipstick } from "./entities/marks.js";
-import { createSeededRng } from "./utils/rng.js";
 import {
   clampNpcCount,
   loadMatchNpcCount,
@@ -80,11 +49,9 @@ import {
   saveBestScore,
   parseNpcCountRaw,
 } from "./utils/storage.js";
-import { formatHearts, calcRating } from "./utils/format.js";
+import { calcRating } from "./utils/format.js";
 import {
   sfxPunch,
-  sfxPunchHeavy,
-  sfxHurt,
   sfxHit,
   sfxWolfPunch,
   sfxWolfHowl,
@@ -95,21 +62,6 @@ import {
   sfxLose,
   resumeAudioOnInteraction,
 } from "./systems/AudioSystem.js";
-import {
-  initMultiplayer,
-  syncPosition,
-  syncPunch,
-  syncHp,
-  syncGameState,
-  syncGuestReady,
-  clearGuestReady,
-  clearRoundSignals,
-  getShareLink,
-  getIsHost,
-  isConnected,
-  leaveRoom as mpLeaveRoom,
-  clearStoredHostRoom,
-} from "./multiplayer.js";
 import { createWorldBuilder } from "./world/createWorldBuilder.js";
 import { createFxSystem } from "./systems/FxSystem.js";
 import { createLightningBolt } from "./world/lightning.js";
@@ -120,18 +72,6 @@ import {
   resolveObstacleCollisions as resolveObstacleCollisionsInLevel,
   clampActorPosition as clampActorPositionInLevel,
 } from "./world/obstacles.js";
-import {
-  buildDuelPuncherSet,
-  validatePvpHit,
-  collectDuelSnapshot as collectDuelSnapshotFromState,
-  buildGameStatePayload as buildGameStatePayloadFromState,
-} from "./multiplayer/duelSync.js";
-import {
-  formatDuelGatherCountdown,
-  generateDuelHerdDirection,
-  getDuelGatherHudHint as getDuelGatherHudHintFromState,
-  getDuelGatherUiState as buildDuelGatherUiState,
-} from "./modes/duel/rules.js";
 import { createLevelRunner } from "./levels/levelRunner.js";
 
 let renderer;
@@ -139,38 +79,12 @@ let scene;
 let camera;
 let clock;
 let player;
-let remotePlayer = null; // 对手角色
-let mpStatus = "none"; // "none" | "waiting" | "connected"
-let guestReady = false;
-let guestConfirmed = false;
-let stateRevision = 0;
-let lastRemoteStateRevision = -1;
-let duelRoundId = 0;
-let localEventSeq = 0;
-let lastRemotePunchId = null;
-let lastRemoteWinId = null;
 let settleTimer = null;
-let duelRng = null;
-let duelSeparateTick = 0;
-let duelHerdIndex = -1;
-const duelHerdDir = new THREE.Vector2(0, 1);
-let duelHerdActive = false;
-let duelGatherSpotIndex = -1;
-let duelGatherCheckedIndex = -1;
-let duelGatherMetWindow = false;
-let duelGatherMarker = null;
-let lastGuestSnapshotAt = 0;
-const duelGatherSpot = { x: 0, z: 0, radius: DUEL_GATHER_RADIUS };
-let gameMode = "solo";
 let matchNpcCount = DEFAULT_NPC_COUNT;
 let currentLevelIndex = 0;
 let levelState;
 let fx;
 let worldBuilder;
-
-function isDuelLevel(level = levelState?.level) {
-  return checkDuelLevel(level);
-}
 
 let npcs = [];
 let particles = [];
@@ -324,17 +238,6 @@ function bindNpcCountInput() {
   }
 }
 
-/* ---- 决斗 / 联机 ---- */
-function isDuelActive() {
-  if (!isDuelLevel()) return false;
-  if (!isConnected()) return true;
-  return ["briefing", "playing", "paused", "settling"].includes(gameStatus);
-}
-
-function isDuelRematchContext() {
-  return isDuelLevel(LEVELS[currentLevelIndex]) || (levelState && isDuelLevel(levelState.level));
-}
-
 function getWorldContext() {
   return {
     getScene: () => scene,
@@ -388,10 +291,6 @@ function triggerHitstop(duration) {
 
 function triggerShake(intensity, duration) {
   fx.triggerShake(intensity, duration);
-}
-
-function triggerDamageFx() {
-  fx.triggerDamageFx();
 }
 
 function setActorPartsVisible(actor, partKey, visible) {
@@ -450,37 +349,6 @@ function updateShake(dt) {
   fx.updateShake(dt, camera);
 }
 
-function collectDuelSnapshot() {
-  return collectDuelSnapshotFromState({
-    isDuelLevel,
-    levelState,
-    totalTime,
-    getIsHost,
-    player,
-    remotePlayer,
-    npcs,
-  });
-}
-
-function buildGameStatePayload(extra = {}) {
-  return buildGameStatePayloadFromState({
-    stateRevision,
-    gameMode,
-    gameStatus,
-    currentLevelIndex,
-    isDuelActive,
-    matchNpcCount,
-    duelRoundId,
-    levelState,
-    isDuelLevel,
-    collectSnapshot: collectDuelSnapshot,
-  }, extra);
-}
-
-function duelRandom() {
-  return duelRng ? duelRng() : Math.random();
-}
-
 function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
   if (gameStatus === "won" || gameStatus === "lost" || gameStatus === "settling") return;
   gameStatus = "settling";
@@ -491,102 +359,8 @@ function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
   }, delayMs);
 }
 
-
-function nextDuelRoundId() {
-  duelRoundId += 1;
-  lastRemotePunchId = null;
-  lastRemoteWinId = null;
-  if (isConnected()) clearRoundSignals();
-  return duelRoundId;
-}
-
-function nextLocalEventId(type) {
-  localEventSeq += 1;
-  return `${type}-${duelRoundId}-${localEventSeq}`;
-}
-
-function hasRoomInUrl() {
-  return Boolean(new URLSearchParams(window.location.search).get("room"));
-}
-
-/** 联机完成前，根据 URL / localStorage 判断是否为选手端 */
-function isMpGuestSession() {
-  if (isConnected()) return !getIsHost();
-  if (gameMode !== "duel" || !hasRoomInUrl()) return false;
-  const params = new URLSearchParams(window.location.search);
-  const room = params.get("room");
-  if (params.get("role") === "host") return false;
-  try {
-    if (localStorage.getItem(HOST_ROOM_KEY) === room) return false;
-  } catch { /* ignore */ }
-  return true;
-}
-
-function clearRoomFromUrl() {
-  const url = new URL(window.location);
-  url.searchParams.delete("room");
-  url.searchParams.delete("role");
-  window.history.replaceState({}, "", url);
-}
-
-function leaveDuelLobby() {
-  mpLeaveRoom();
-  clearStoredHostRoom();
-  clearRoomFromUrl();
-  duelRng = null;
-  if (settleTimer) {
-    window.clearTimeout(settleTimer);
-    settleTimer = null;
-  }
-  gameMode = "solo";
-  mpStatus = "none";
-  guestReady = false;
-  guestConfirmed = false;
-  duelRoundId = 0;
-  lastRemotePunchId = null;
-  lastRemoteWinId = null;
-  remotePlayer = null;
-  showLevelSelect();
-}
-
-function isInDuelLobby() {
-  return gameMode === "duel" && gameStatus === "levelSelect" && (isConnected() || hasRoomInUrl());
-}
-
-function canHostPickLevel() {
-  return !isConnected() || (getIsHost() && mpStatus === "connected");
-}
-
-function updateDuelLobbyUI() {
-  const inDuelLobby = isInDuelLobby();
-  const isGuest = isMpGuestSession();
-
-  if (ui.levelSelectPanel) {
-    ui.levelSelectPanel.classList.toggle("is-duel-lobby", inDuelLobby);
-  }
-  if (ui.duelLobbyPanel) ui.duelLobbyPanel.hidden = !inDuelLobby;
-  if (ui.soloModeStack) ui.soloModeStack.hidden = inDuelLobby;
-  if (ui.gameLogo) {
-    ui.gameLogo.textContent = inDuelLobby ? "⚔️ 图书馆决斗 ⚔️" : "梗哥的半生";
-  }
-
-  if (!inDuelLobby) return;
-
-  if (isGuest) {
-    if (ui.duelLobbyHint) ui.duelLobbyHint.hidden = true;
-    if (ui.mpShareBox) ui.mpShareBox.hidden = true;
-    if (ui.duelGuestWaiting) ui.duelGuestWaiting.hidden = false;
-  } else {
-    if (ui.duelLobbyHint) ui.duelLobbyHint.hidden = false;
-    if (ui.mpShareBox) ui.mpShareBox.hidden = false;
-    if (ui.duelGuestWaiting) ui.duelGuestWaiting.hidden = true;
-  }
-}
-
 function buildLevelCards() {
   ui.levelCards.innerHTML = "";
-  const mpGuest = isMpGuestSession();
-  const mpHostWaiting = isConnected() && getIsHost() && mpStatus !== "connected";
 
   levelRegistry.visible.forEach((level) => {
     const model = createLevelCardModel(level, {
@@ -595,12 +369,9 @@ function buildLevelCards() {
     const starsHtml = Array.from({ length: 3 }, (_, si) =>
       `<span class="level-star${si < level.difficulty ? " is-on" : ""}">★</span>`,
     ).join("");
-    const disabled = mpGuest || mpHostWaiting;
-
     const card = document.createElement("button");
-    card.className = `level-card level-card--${level.id}${disabled ? " disabled" : ""}`;
+    card.className = `level-card level-card--${level.id}`;
     card.type = "button";
-    card.disabled = disabled;
     card.dataset.level = level.id;
     card.innerHTML = `
       <div class="level-card-accent" aria-hidden="true"></div>
@@ -614,17 +385,10 @@ function buildLevelCards() {
       </div>
       <div class="level-card-go" aria-hidden="true"><span>›</span></div>
     `;
-    if (!disabled) {
-      card.addEventListener("click", () => selectLevelById(level.id));
-    }
+    card.addEventListener("click", () => selectLevelById(level.id));
     ui.levelCards.appendChild(card);
   });
-
-  if (mpGuest) {
-    ui.npcCountInput.disabled = true;
-  } else {
-    ui.npcCountInput.disabled = false;
-  }
+  ui.npcCountInput.disabled = false;
 }
 
 function showLevelSelect() {
@@ -632,19 +396,9 @@ function showLevelSelect() {
   disposeScene();
   scene = null;
   gameStatus = "levelSelect";
-  guestReady = false;
-  guestConfirmed = false;
-  if (!isConnected() && !hasRoomInUrl()) gameMode = "solo";
-  if (isConnected() && getIsHost()) {
-    clearGuestReady();
-    pushGameState({ phase: "lobby", levelIndex: null, started: false, mode: gameMode });
-  }
   syncNpcCountInput();
-  updateDuelLobbyUI();
-  if (!isInDuelLobby()) buildLevelCards();
-  updateMpUI();
-  if (ui.hud) ui.hud.classList.remove("is-duel-play", "gather-active", "bloodmoon-mode", "bloodmoon-hit", "bloodmoon-lightning");
-  if (ui.gatherBanner) ui.gatherBanner.classList.add("hidden");
+  buildLevelCards();
+  if (ui.hud) ui.hud.classList.remove("bloodmoon-mode", "bloodmoon-hit", "bloodmoon-lightning");
   ui.huntIntro?.classList.remove("visible");
   ui.huntCard?.classList.remove("visible");
   ui.attackButton?.classList.remove("bloodmoon");
@@ -656,361 +410,15 @@ function showLevelSelect() {
   ui.resultModal.classList.remove("visible");
 }
 
-function updateMpUI() {
-  if (gameMode === "duel") {
-    ui.mpCreateBtn.style.display = "none";
-    const isGuest = isMpGuestSession();
-
-    if (isGuest) {
-      const guestText = mpStatus === "connected"
-        ? "✅ 已加入房间，等待队长开始..."
-        : "🔗 正在加入房间...";
-      if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = guestText;
-    } else if (isConnected() || hasRoomInUrl()) {
-      if (isConnected()) ui.mpLinkInput.value = getShareLink();
-      if (mpStatus === "connected") {
-        ui.mpStatusText.textContent = "✅ 选手已加入，等待确认就绪";
-        ui.mpStatusText.style.color = "#4ade80";
-        if (ui.duelLobbyHint) {
-          ui.duelLobbyHint.textContent = "选手已加入，确认就绪后即可开始游戏";
-        }
-      } else {
-        ui.mpStatusText.textContent = isConnected() ? "🔗 等待选手加入" : "🔗 正在创建房间...";
-        ui.mpStatusText.style.color = "";
-        if (ui.duelLobbyHint) {
-          ui.duelLobbyHint.textContent = "把下方链接发给选手，选手打开即可加入";
-        }
-      }
-    }
-  } else if (isConnected()) {
-    ui.mpCreateBtn.style.display = "none";
-    ui.mpShareBox.hidden = false;
-    ui.mpLinkInput.value = getShareLink();
-    if (getIsHost()) {
-      ui.mpStatusText.textContent = mpStatus === "connected"
-        ? "✅ 选手已加入！请选择关卡"
-        : "🔗 等待选手加入...";
-    }
-  } else {
-    ui.mpCreateBtn.style.display = "";
-  }
-
-  updateDuelLobbyUI();
-}
-
-function pushGameState(extra = {}) {
-  if (!isConnected() || !getIsHost()) return;
-  stateRevision += 1;
-  syncGameState(buildGameStatePayload(extra));
-}
-
-function applyDuelSnapshot(snapshot, options = {}) {
-  if (!snapshot?.duelNpcs?.length) return;
-  levelState.worldSeed = snapshot.worldSeed ?? levelState.worldSeed;
-  duelRng = createSeededRng(levelState.worldSeed);
-  if (!levelState.duelPunchers) {
-    levelState.duelPunchers = buildDuelPuncherSet(levelState.worldSeed);
-  }
-
-  if (options.respawnNpcs) {
-    npcs.forEach((n) => scene.remove(n.group));
-    npcs = [];
-    spawnDuelNpcsFromSnapshot(snapshot);
-  } else {
-    snapshot.duelNpcs.forEach((data, i) => {
-      const npc = npcs[i];
-      if (!npc) return;
-      npc.group.position.set(data.x, 0, data.z);
-      clampToWorld(npc.group.position);
-      npc.hp = data.hp ?? DUEL_NPC_HP;
-      npc.alive = data.alive !== false;
-      npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
-      npc.punchTimer = data.punchTimer ?? 0;
-      npc.group.visible = npc.alive;
-    });
-  }
-
-  if (options.resyncTime && snapshot.elapsed != null && levelState.startTime != null) {
-    totalTime = levelState.startTime + snapshot.elapsed;
-  }
-
-  const myHp = getIsHost() ? snapshot.hostHp : snapshot.guestHp;
-  if (myHp != null && player) {
-    player.hp = myHp;
-    levelState.playerHp = myHp;
-    levelState.attempts = myHp;
-  }
-  const remoteHp = getIsHost() ? snapshot.guestHp : snapshot.hostHp;
-  if (remoteHp != null && remotePlayer) {
-    remotePlayer.hp = remoteHp;
-  }
-  updateHud();
-}
-
-function applyRemoteGameState(state) {
-  if (!state || getIsHost()) return;
-
-  if (state.revision != null && state.revision <= lastRemoteStateRevision) return;
-  if (state.revision != null) lastRemoteStateRevision = state.revision;
-
-  if (state.mode) gameMode = state.mode;
-
-  if (state.phase === "lobby" || state.levelIndex == null) {
-    if (gameStatus !== "levelSelect") showLevelSelect();
-    return;
-  }
-
-  const guestOnResult = gameStatus === "won" || gameStatus === "lost" || gameStatus === "settling";
-  if (
-    state.phase === "briefing" &&
-    !state.started &&
-    guestOnResult &&
-    state.levelIndex != null
-  ) {
-    const remoteRoundId = state.roundId ?? 0;
-    if (remoteRoundId !== duelRoundId) {
-      duelRoundId = remoteRoundId;
-      lastRemotePunchId = null;
-      lastRemoteWinId = null;
-    }
-    guestConfirmed = false;
-    if (settleTimer) {
-      window.clearTimeout(settleTimer);
-      settleTimer = null;
-    }
-    resetLevel(state.levelIndex, {
-      worldSeed: state.worldSeed,
-      duelSpawns: state.duelSpawns,
-      duelNpcs: state.duelNpcs,
-      elapsed: 0,
-      playerHp: state.guestHp ?? DUEL_PLAYER_HP,
-      skipBriefing: false,
-    });
-    updateMpUI();
-    updateTaskMpUI();
-    return;
-  }
-
-  if (state.npcCount != null && state.mode !== "duel") {
-    matchNpcCount = clampNpcCount(state.npcCount);
-    syncNpcCountInput();
-    saveMatchNpcCount(matchNpcCount);
-  }
-
-  const remoteRoundId = state.roundId ?? 0;
-  const roundChanged = remoteRoundId !== duelRoundId;
-  const levelChanged = state.levelIndex !== currentLevelIndex;
-  const midGameReconnect = state.started && scene && !levelChanged && !roundChanged;
-
-  if (state.mode === "duel" && roundChanged) {
-    duelRoundId = remoteRoundId;
-    lastRemotePunchId = null;
-    lastRemoteWinId = null;
-  }
-
-  if (levelChanged || (state.mode === "duel" && roundChanged)) {
-    guestConfirmed = false;
-    resetLevel(state.levelIndex, {
-      worldSeed: state.worldSeed,
-      duelSpawns: state.duelSpawns,
-      duelNpcs: state.duelNpcs,
-      elapsed: state.started ? state.elapsed : 0,
-      playerHp: state.guestHp,
-      skipBriefing: state.started,
-    });
-    updateMpUI();
-    updateTaskMpUI();
-  } else if (midGameReconnect && state.duelNpcs && state.syncSnapshot) {
-    applyDuelSnapshot(state, { respawnNpcs: false, resyncTime: true });
-  }
-
-  if (state.phase === "paused" && gameStatus === "playing") {
-    gameStatus = "paused";
-    ui.pauseModal.classList.add("visible");
-  } else if (state.phase === "playing" && gameStatus === "paused") {
-    gameStatus = "playing";
-    ui.pauseModal.classList.remove("visible");
-  }
-
-  if (state.started && gameStatus === "briefing") {
-    gameStatus = "playing";
-    levelState.startTime = totalTime - (state.elapsed ?? 0);
-    ui.taskModal.classList.remove("visible");
-    updateMpUI();
-  }
-}
-
-function updateTaskMpUI() {
-  if (!isConnected() || gameStatus !== "briefing") {
-    ui.taskMpHint.hidden = true;
-    ui.startButton.disabled = false;
-    ui.startButton.textContent = "开始行动";
-    return;
-  }
-
-  ui.taskMpHint.hidden = false;
-
-  if (getIsHost()) {
-    ui.startButton.textContent = isDuelActive() ? "开始游戏" : "开始行动";
-    ui.startButton.disabled = !guestReady;
-    ui.taskMpHint.textContent = guestReady
-      ? "✅ 选手已确认，点击「开始游戏」"
-      : "⏳ 等待选手阅读规则并点击「确认就绪」";
-  } else {
-    ui.startButton.textContent = guestConfirmed ? "已确认" : "确认就绪";
-    ui.startButton.disabled = guestConfirmed;
-    ui.taskMpHint.textContent = guestConfirmed
-      ? "✅ 已确认，等待队长开始..."
-      : "请阅读任务后点击「确认就绪」";
-  }
-}
-
-function createMpCallbacks() {
-  return {
-    onRemoteUpdate(data) {
-      if (remotePlayer) {
-        const tx = data.x ?? remotePlayer.targetX ?? remotePlayer.group.position.x;
-        const tz = data.z ?? remotePlayer.targetZ ?? remotePlayer.group.position.z;
-        const tr = data.rotation ?? remotePlayer.targetRot ?? remotePlayer.group.rotation.y;
-        remotePlayer.targetX = tx;
-        remotePlayer.targetZ = tz;
-        remotePlayer.targetRot = tr;
-        remotePlayer.netTime = performance.now();
-
-        if (!remotePlayer._netInit) {
-          remotePlayer.group.position.set(tx, 0, tz);
-          remotePlayer.group.rotation.y = tr;
-          remotePlayer._prevX = tx;
-          remotePlayer._prevZ = tz;
-          remotePlayer._netInit = true;
-        }
-        if (data.hp != null) {
-          remotePlayer.hp = data.hp;
-          if (isDuelActive() && data.hp <= 0 && gameStatus === "playing") {
-            dissolveActor(remotePlayer);
-            settleRound(true);
-          }
-        }
-      }
-    },
-    onRemotePunch(data) {
-      if (!data) return;
-      if (isDuelActive() && data.roundId !== duelRoundId) return;
-      if (data.punchId && data.punchId === lastRemotePunchId) return;
-      if (data.punchId) lastRemotePunchId = data.punchId;
-      if (remotePlayer) remotePlayer.punchTimer = PUNCH_SWING;
-      if (isDuelActive() && isConnected()) {
-        if (data.npcId != null) {
-          applyRemoteDuelNpcKill(data.npcId);
-          return;
-        }
-        // 联机 PvP：以被打方本地位置为准校验，不依赖攻击方的 attempt 标记
-        if (validatePvpHit(data, player)) {
-          applyPlayerDamage(1, "对手出拳");
-        }
-      }
-    },
-    onRemoteWin(data) {
-      if (isDuelActive()) return;
-      if (data?.winId && data.winId === lastRemoteWinId) return;
-      if (data?.winId) lastRemoteWinId = data.winId;
-      if (gameStatus === "playing") {
-        settleRound(false, "对手先命中目标！");
-      }
-    },
-    onGuestJoined() {
-      mpStatus = "connected";
-      updateDuelLobbyUI();
-      updateMpUI();
-      if (gameMode === "duel" && getIsHost() && gameStatus === "levelSelect") {
-        startDuelBriefing();
-      } else if (gameStatus !== "levelSelect") {
-        const now = performance.now();
-        if (gameStatus === "playing" && now - lastGuestSnapshotAt < 12000) return;
-        lastGuestSnapshotAt = now;
-        pushGameState({ includeSnapshot: true, syncSnapshot: true });
-      }
-    },
-    onRoomReady() {
-      mpStatus = "connected";
-      updateDuelLobbyUI();
-      updateMpUI();
-    },
-    onGuestReady() {
-      guestReady = true;
-      if (gameStatus === "briefing") updateTaskMpUI();
-    },
-    onGameState(state) {
-      applyRemoteGameState(state);
-    },
-    onRemoteLeft(who) {
-      mpStatus = "none";
-      const msg = who === "host" ? "房主已离开，房间已关闭" : "对手已离开";
-      if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = `⚠️ ${msg}`;
-      if (ui.mpStatusText) ui.mpStatusText.textContent = `⚠️ ${msg}`;
-      if (gameStatus === "playing" || gameStatus === "paused" || gameStatus === "briefing") {
-        settleRound(false, msg);
-      } else {
-        showLevelSelect();
-      }
-    },
-    onJoinFailed(reason) {
-      mpStatus = "none";
-      const msg = reason === "room_full"
-        ? "房间已满，请向房主索取新链接"
-        : reason === "room_not_found"
-          ? "房间不存在或已关闭"
-          : "加入房间失败，请刷新重试";
-      if (ui.duelGuestStatus) ui.duelGuestStatus.textContent = `❌ ${msg}`;
-      leaveDuelLobby();
-      if (ui.mpStatusText) ui.mpStatusText.textContent = `❌ ${msg}`;
-    },
-  };
-}
-
 function selectLevelById(id) {
   const index = levelRegistry.getIndexById(id);
   if (index >= 0) selectLevel(index);
 }
 
 function selectLevel(index) {
-  if (isConnected() && gameMode === "duel" && !isDuelLevel(LEVELS[index])) return;
-  if (isConnected() && !canHostPickLevel()) return;
-  if (getIsHost() || !isConnected()) {
-    commitNpcCountInput();
-  }
-  guestReady = false;
-  guestConfirmed = false;
-  if (isConnected() && getIsHost()) clearGuestReady();
-  if (isConnected() && getIsHost() && isDuelLevel(LEVELS[index])) nextDuelRoundId();
+  commitNpcCountInput();
   ui.levelSelectModal.classList.remove("visible");
   resetLevel(index);
-  if (isConnected() && getIsHost() && isDuelLevel(LEVELS[index])) {
-    pushGameState({
-      mode: gameMode,
-      phase: "briefing",
-      levelIndex: index,
-      npcCount: DUEL_NPC_COUNT,
-      roundId: duelRoundId,
-      started: false,
-      worldSeed: levelState.worldSeed,
-      duelSpawns: levelState.duelSpawns,
-    });
-  } else {
-    pushGameState({
-      mode: gameMode,
-      phase: "briefing",
-      levelIndex: index,
-      npcCount: isDuelLevel(LEVELS[index]) ? DUEL_NPC_COUNT : matchNpcCount,
-      roundId: duelRoundId,
-      started: false,
-    });
-  }
-}
-
-function startDuelBriefing() {
-  if (gameMode !== "duel" || !canHostPickLevel()) return;
-  selectLevel(getDuelLevelIndex());
 }
 
 const input = {
@@ -1077,13 +485,6 @@ export function boot() {
   setupUi();
   resize();
   window.addEventListener("resize", resize);
-  window.addEventListener("beforeunload", mpLeaveRoom);
-
-  if (hasRoomInUrl()) {
-    gameMode = "duel";
-    mpStatus = "waiting";
-    void initMultiplayer(createMpCallbacks());
-  }
 
   // 初始显示关卡选择，不直接加载关卡
   showLevelSelect();
@@ -1108,27 +509,10 @@ function setupUi() {
   ui.startButton.addEventListener("click", () => {
     if (gameStatus !== "briefing") return;
 
-    if (isConnected() && !getIsHost()) {
-      if (guestConfirmed) return;
-      guestConfirmed = true;
-      syncGuestReady(true);
-      updateTaskMpUI();
-      return;
-    }
-
-    if (isConnected() && getIsHost() && !guestReady) return;
-
     gameStatus = "playing";
     levelState.startTime = totalTime;
     ui.taskModal.classList.remove("visible");
     updateHud();
-    if (isDuelActive()) syncHp(player.hp);
-    pushGameState({
-      phase: "playing",
-      started: true,
-      roundId: duelRoundId,
-      duelSpawns: levelState.duelSpawns,
-    });
     if (levelState.level.playerVariant === "werewolf") sfxWolfHowl();
   });
 
@@ -1141,46 +525,26 @@ function setupUi() {
     if (gameStatus !== "playing") return;
     gameStatus = "paused";
     ui.pauseModal.classList.add("visible");
-    if (isConnected() && getIsHost()) pushGameState({ phase: "paused" });
   });
 
   ui.resumeButton.addEventListener("click", () => {
     if (gameStatus !== "paused") return;
     gameStatus = "playing";
     ui.pauseModal.classList.remove("visible");
-    if (isConnected() && getIsHost()) pushGameState({ phase: "playing", started: true });
   });
 
   ui.backFromPauseButton.addEventListener("click", () => {
     if (gameStatus !== "paused") return;
     ui.pauseModal.classList.remove("visible");
-    if (isConnected() && getIsHost()) {
-      pushGameState({ phase: "lobby", levelIndex: null, started: false });
-    }
     showLevelSelect();
   });
 
   ui.retryButton.addEventListener("click", () => {
-    if (isConnected() && !getIsHost()) return;
     if (settleTimer) {
       window.clearTimeout(settleTimer);
       settleTimer = null;
     }
-    if (isConnected() && getIsHost() && isDuelRematchContext()) {
-      nextDuelRoundId();
-    }
     resetLevel(currentLevelIndex);
-    if (isConnected() && getIsHost()) {
-      guestReady = false;
-      clearGuestReady();
-      pushGameState({
-        phase: "briefing",
-        started: false,
-        roundId: duelRoundId,
-        worldSeed: levelState.worldSeed,
-        duelSpawns: levelState.duelSpawns,
-      });
-    }
   });
   ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
   ui.huntCard.addEventListener("pointerdown", (event) => {
@@ -1193,27 +557,6 @@ function setupUi() {
     event.preventDefault();
     triggerAttack();
   });
-
-  // 多人联机按钮（创建房间 = 双人决斗模式）
-  ui.mpCreateBtn.addEventListener("click", () => {
-    if (isConnected()) return;
-    gameMode = "duel";
-    void initMultiplayer(createMpCallbacks());
-    mpStatus = "waiting";
-    ui.mpLinkInput.value = getShareLink();
-    updateDuelLobbyUI();
-    updateMpUI();
-  });
-
-  ui.mpCopyBtn.addEventListener("click", () => {
-    const link = getShareLink();
-    navigator.clipboard.writeText(link).then(() => {
-      ui.mpCopyBtn.textContent = "已复制!";
-      setTimeout(() => { ui.mpCopyBtn.textContent = "复制链接"; }, 1500);
-    });
-  });
-
-  ui.duelBackBtn?.addEventListener("click", () => leaveDuelLobby());
 }
 
 function setupInput() {
@@ -1322,7 +665,6 @@ function resize() {
 function disposeScene() {
   levelRunner.dispose();
   if (!scene) return;
-  removeGatherMarker();
   // 清理粒子（材质是共享缓存的，不 dispose）
   particles.forEach((p) => {
     scene.remove(p.mesh);
@@ -1363,70 +705,25 @@ function resetLevel(index, options = {}) {
   resetActionIntervalLock();
   gameStatus = options.skipBriefing ? "playing" : "briefing";
 
-  const duel = isDuelLevel(level);
-  const worldSeed = duel ? (options.worldSeed ?? Math.floor(Math.random() * 2147483647)) : null;
-  duelRng = duel ? createSeededRng(worldSeed) : null;
-
   levelState = {
     level,
-    remaining: duel || level.timeLimit === null
+    remaining: level.timeLimit === null
       ? 9999
       : (level.timeLimit ?? ROUND_SECONDS),
-    attempts: duel ? DUEL_PLAYER_HP : ATTEMPTS,
+    attempts: ATTEMPTS,
     computers: [],
     startTime: 0,
     obstacles: [],
-    playerHp: options.playerHp ?? DUEL_PLAYER_HP,
-    hitInvuln: 0,
-    worldSeed,
-    duelSpawns: null,
-    duelPunchers: duel ? buildDuelPuncherSet(worldSeed) : null,
     flashlight: null,
   };
 
   buildWorld(level);
 
-  if (duel) {
-    levelState.duelSpawns = options.duelSpawns ?? generateDuelSpawnPair(worldSeed);
-  }
-
-  duelSeparateTick = 0;
-  duelHerdIndex = -1;
-  duelHerdActive = false;
-  duelHerdDir.set(0, 1);
-  duelGatherSpotIndex = -1;
-  duelGatherCheckedIndex = -1;
-  duelGatherMetWindow = false;
-  removeGatherMarker();
-
   player = createPlayer();
-  player.hp = duel ? (options.playerHp ?? DUEL_PLAYER_HP) : ATTEMPTS;
-  player.hitInvuln = 0;
-  player.group.position.copy(duel ? duelActorSpawn(true) : randomOpenPosition());
+  player.group.position.copy(randomOpenPosition());
   scene.add(player.group);
-  if (duel && isConnected()) syncHp(player.hp);
 
-  remotePlayer = null;
-  if (isConnected()) {
-    remotePlayer = createRemotePlayer();
-    remotePlayer.hp = DUEL_PLAYER_HP;
-    const remoteSpawn = duel
-      ? duelActorSpawn(false)
-      : new THREE.Vector3(randomRange(-8.8, 8.8), 0, randomRange(PLAY_Z_MIN + 0.8, 7.8));
-    remotePlayer.group.position.copy(remoteSpawn);
-    remotePlayer.targetX = remoteSpawn.x;
-    remotePlayer.targetZ = remoteSpawn.z;
-    remotePlayer.targetRot = 0;
-    remotePlayer._netInit = false;
-    remotePlayer.netTime = performance.now();
-    scene.add(remotePlayer.group);
-  }
-
-  if (duel && options.duelNpcs?.length) {
-    spawnDuelNpcsFromSnapshot({ worldSeed: levelState.worldSeed, duelNpcs: options.duelNpcs });
-  } else {
-    spawnNpcs(level);
-  }
+  spawnNpcs(level);
 
   if (options.skipBriefing) {
     levelState.startTime = totalTime - (options.elapsed ?? 0);
@@ -1439,56 +736,19 @@ function resetLevel(index, options = {}) {
   updateHud();
 }
 
-function spawnPunchSwish(actor) {
-  if (!scene || !actor?.group) return;
-  const pos = actor.group.position;
-  const rot = actor.group.rotation.y;
-  const fx = Math.sin(rot);
-  const fz = Math.cos(rot);
-  for (let i = 0; i < 10; i += 1) {
-    const mat = getPixelMaterial(0xffe066);
-    const cube = new THREE.Mesh(pixelGeo, mat);
-    cube.position.set(
-      pos.x + fx * 0.62 + randomRange(-0.12, 0.12),
-      randomRange(0.75, 1.25),
-      pos.z + fz * 0.62 + randomRange(-0.12, 0.12),
-    );
-    scene.add(cube);
-    particles.push({
-      mesh: cube,
-      velocity: new THREE.Vector3(
-        fx * 3.2 + randomRange(-0.6, 0.6),
-        randomRange(0.1, 0.9),
-        fz * 3.2 + randomRange(-0.6, 0.6),
-      ),
-      spin: new THREE.Vector3(randomRange(-10, 10), randomRange(-10, 10), randomRange(-10, 10)),
-      life: 0.22,
-      maxLife: 0.22,
-    });
-  }
-}
-
 function showTask() {
   const level = levelState.level;
-  const duel = isDuelLevel(level);
   renderTaskModal(ui, {
     level,
-    duel,
     npcCount: getMatchNpcCount(),
   });
 
   renderTargetPreview(ui.targetPreviewCanvas, level);
-  updateTaskMpUI();
   updateHud();
 }
 
 
 function spawnNpcs(level) {
-  if (level.duelMode) {
-    spawnDuelNpcs();
-    return;
-  }
-
   if (!level.legacy) {
     levelRunner.load(level);
     levelRunner.start();
@@ -1522,355 +782,11 @@ function addWanderNpc(id) {
   return npc;
 }
 
-function spawnDuelNpcs() {
-  const punchers = levelState.duelPunchers ?? buildDuelPuncherSet(levelState.worldSeed);
-  for (let i = 0; i < DUEL_NPC_COUNT; i += 1) {
-    const npc = createNpc(i, { duelPunch: true });
-    const pos = randomOpenPosition();
-    npc.group.position.set(pos.x, 0, pos.z);
-    nudgeActorFromObstacles(npc);
-    npc.wanderTimer = randomRange(0.6, 2.2);
-    npc.pauseTimer = randomRange(0.2, 1.3);
-    npc.walking = false;
-    npc.hp = DUEL_NPC_HP;
-    npc.canPunch = punchers.has(i);
-    npc.punchDelay = NPC_PUNCH_INTERVAL * ((i % 12) / 12);
-    npc.punchTimer = 0;
-    npc.punchHitDone = false;
-    npcs.push(npc);
-    scene.add(npc.group);
-  }
-}
-
-function spawnDuelNpcsFromSnapshot(snapshot) {
-  duelRng = createSeededRng(snapshot.worldSeed ?? levelState.worldSeed);
-  const punchers = levelState.duelPunchers
-    ?? buildDuelPuncherSet(snapshot.worldSeed ?? levelState.worldSeed);
-  snapshot.duelNpcs.forEach((data, i) => {
-    const npc = createNpc(i, { duelPunch: true });
-    npc.group.position.set(data.x, 0, data.z);
-    npc.hp = data.hp ?? DUEL_NPC_HP;
-    npc.alive = data.alive !== false;
-    npc.canPunch = punchers.has(i);
-    npc.punchDelay = data.punchDelay ?? NPC_PUNCH_INTERVAL;
-    npc.punchTimer = data.punchTimer ?? 0;
-    npc.punchHitDone = false;
-    npc.wanderTimer = randomRange(0.6, 2.2);
-    npc.pauseTimer = randomRange(0.2, 1.3);
-    npc.walking = false;
-    if (!npc.alive) npc.group.visible = false;
-    npcs.push(npc);
-    scene.add(npc.group);
-  });
-}
-
-function generateDuelGatherSpot(cycleIndex, worldSeed) {
-  const rng = createSeededRng((worldSeed >>> 0) ^ Math.imul(cycleIndex + 1, 1597334677));
-  const probe = { group: { position: new THREE.Vector3() } };
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    probe.group.position.set(
-      rng() * 14 - 7,
-      0,
-      rng() * (7.2 - (PLAY_Z_MIN + 1.0)) + PLAY_Z_MIN + 1.0,
-    );
-    nudgeActorFromObstacles(probe);
-    if (!collidesWithObstacle(probe.group.position)) {
-      return {
-        x: probe.group.position.x,
-        z: probe.group.position.z,
-        radius: DUEL_GATHER_RADIUS,
-      };
-    }
-  }
-  return { x: 0, z: 2, radius: DUEL_GATHER_RADIUS };
-}
-
-function isPlayerInGatherCircle() {
-  if (!player?.group) return false;
-  const dx = player.group.position.x - duelGatherSpot.x;
-  const dz = player.group.position.z - duelGatherSpot.z;
-  return dx * dx + dz * dz <= duelGatherSpot.radius * duelGatherSpot.radius;
-}
-
-function ensureGatherMarker() {
-  if (duelGatherMarker || !scene) return;
-  const ringGeo = new THREE.RingGeometry(DUEL_GATHER_RADIUS * 0.82, DUEL_GATHER_RADIUS, 48);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: GATHER_COLOR_PREVIEW,
-    transparent: true,
-    opacity: 0.78,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  duelGatherMarker = new THREE.Mesh(ringGeo, ringMat);
-  duelGatherMarker.rotation.x = -Math.PI / 2;
-  duelGatherMarker.position.y = 0.04;
-
-  const fillGeo = new THREE.CircleGeometry(DUEL_GATHER_RADIUS * 0.8, 48);
-  const fillMat = new THREE.MeshBasicMaterial({
-    color: GATHER_COLOR_PREVIEW,
-    transparent: true,
-    opacity: 0.34,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  const fill = new THREE.Mesh(fillGeo, fillMat);
-  fill.rotation.x = -Math.PI / 2;
-  fill.position.y = -0.005;
-  duelGatherMarker.add(fill);
-  duelGatherMarker.userData.fill = fill;
-  scene.add(duelGatherMarker);
-}
-
-function removeGatherMarker() {
-  if (!duelGatherMarker) return;
-  if (scene) scene.remove(duelGatherMarker);
-  duelGatherMarker.geometry?.dispose();
-  duelGatherMarker.material?.dispose();
-  duelGatherMarker.userData.fill?.geometry?.dispose();
-  duelGatherMarker.userData.fill?.material?.dispose();
-  duelGatherMarker = null;
-}
-
-function getDuelGatherUiState() {
-  if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) return null;
-
-  const elapsed = Math.max(0, totalTime - levelState.startTime);
-  return buildDuelGatherUiState({
-    elapsed,
-    inCircle: isPlayerInGatherCircle(),
-  });
-}
-
-function getDuelGatherHudHint() {
-  return getDuelGatherHudHintFromState(getDuelGatherUiState());
-}
-
-function updateGatherBanner() {
-  if (!ui.gatherBanner) return;
-  const state = getDuelGatherUiState();
-  if (!state?.bannerVisible) {
-    ui.gatherBanner.classList.add("hidden");
-    ui.gatherBanner.classList.remove("preview", "urgent", "success", "upcoming");
-    if (ui.hud) ui.hud.classList.remove("gather-active");
-    return;
-  }
-
-  ui.gatherBanner.classList.remove("hidden", "preview", "urgent", "success", "upcoming");
-  ui.gatherBanner.classList.add(state.phase);
-  ui.gatherBannerTitle.textContent = state.title;
-  ui.gatherBannerCountdown.textContent = formatDuelGatherCountdown(state.seconds);
-  ui.gatherBannerHint.textContent = state.hint;
-  if (ui.hud) ui.hud.classList.add("gather-active");
-}
-
-function getDuelProximityState() {
-  if (
-    gameStatus !== "playing"
-    || !isDuelActive()
-    || !player?.group
-    || !remotePlayer?.group
-    || remotePlayer.hp <= 0
-    || remotePlayer.group.visible === false
-  ) {
-    return { active: false };
-  }
-
-  const dx = player.group.position.x - remotePlayer.group.position.x;
-  const dz = player.group.position.z - remotePlayer.group.position.z;
-  const dist = Math.hypot(dx, dz);
-
-  if (dist < PROXIMITY_MIN_DIST || dist > PROXIMITY_MAX_DIST) {
-    return { active: false, dist };
-  }
-
-  const t = 1 - (dist - PROXIMITY_MIN_DIST) / (PROXIMITY_MAX_DIST - PROXIMITY_MIN_DIST);
-  const strength = 0.35 + t * 0.65;
-
-  return { active: true, dist, strength };
-}
-
-function updateProximityHint() {
-  if (!ui.proximityPulse) return;
-  const state = getDuelProximityState();
-  if (!state.active) {
-    ui.proximityPulse.classList.add("hidden");
-    ui.proximityPulse.classList.remove("beating");
-    return;
-  }
-
-  ui.proximityPulse.classList.remove("hidden");
-  ui.proximityPulse.classList.add("beating");
-  const edgeGlow = 0.12 + state.strength * 0.38;
-  const beatDuration = 1.05 - state.strength * 0.42;
-  ui.proximityPulse.style.setProperty("--proximity-glow", edgeGlow.toFixed(3));
-  ui.proximityPulse.style.setProperty("--beat-duration", `${beatDuration.toFixed(2)}s`);
-}
-
-function updateDuelGather() {
-  if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) {
-    removeGatherMarker();
-    return;
-  }
-
-  const elapsed = Math.max(0, totalTime - levelState.startTime);
-  const gatherIndex = Math.floor(elapsed / DUEL_GATHER_INTERVAL);
-  const phaseInCycle = elapsed - gatherIndex * DUEL_GATHER_INTERVAL;
-  const timeToDeadline = DUEL_GATHER_INTERVAL - phaseInCycle;
-
-  if (gatherIndex !== duelGatherSpotIndex) {
-    if (duelGatherSpotIndex >= 0 && duelGatherCheckedIndex !== duelGatherSpotIndex) {
-      duelGatherCheckedIndex = duelGatherSpotIndex;
-      if (!duelGatherMetWindow && player.hp > 0) {
-        applyPlayerDamage(1, "未及时集合");
-      }
-    }
-    duelGatherSpotIndex = gatherIndex;
-    duelGatherMetWindow = false;
-    Object.assign(duelGatherSpot, generateDuelGatherSpot(gatherIndex, levelState.worldSeed));
-  }
-
-  const showMarker = timeToDeadline <= DUEL_GATHER_PREVIEW && timeToDeadline > 0;
-  const activeWindow = timeToDeadline <= DUEL_GATHER_WINDOW && timeToDeadline > 0;
-
-  if (showMarker) {
-    ensureGatherMarker();
-    duelGatherMarker.position.set(duelGatherSpot.x, 0.04, duelGatherSpot.z);
-    const urgent = activeWindow;
-    const inCircle = isPlayerInGatherCircle();
-    const ringColor = urgent
-      ? (inCircle ? GATHER_COLOR_SUCCESS : GATHER_COLOR_URGENT)
-      : GATHER_COLOR_PREVIEW;
-    duelGatherMarker.material.color.setHex(ringColor);
-    duelGatherMarker.userData.fill.material.color.setHex(ringColor);
-    const pulse = 0.68 + Math.sin(totalTime * (urgent ? 9 : 4)) * 0.12 + (urgent ? 0.14 : 0);
-    duelGatherMarker.material.opacity = pulse;
-    duelGatherMarker.userData.fill.material.opacity = urgent ? 0.42 : 0.36;
-    duelGatherMarker.visible = true;
-  } else if (duelGatherMarker) {
-    duelGatherMarker.visible = false;
-  }
-
-  if (activeWindow && isPlayerInGatherCircle()) {
-    duelGatherMetWindow = true;
-  }
-}
-
-function updateDuelHerdState() {
-  if (gameStatus !== "playing" || !isDuelLevel() || levelState?.startTime == null) {
-    duelHerdActive = false;
-    return;
-  }
-
-  const elapsed = Math.max(0, totalTime - levelState.startTime);
-  if (elapsed < DUEL_HERD_INTERVAL) {
-    duelHerdActive = false;
-    return;
-  }
-
-  const cycleIndex = Math.floor(elapsed / DUEL_HERD_INTERVAL);
-  const phase = elapsed - cycleIndex * DUEL_HERD_INTERVAL;
-  duelHerdActive = phase < DUEL_HERD_DURATION;
-
-  if (cycleIndex !== duelHerdIndex) {
-    duelHerdIndex = cycleIndex;
-    duelHerdDir.copy(generateDuelHerdDirection(cycleIndex, levelState.worldSeed));
-    npcs.forEach((npc) => {
-      if (!npc.alive) return;
-      npc.pauseTimer = 0;
-      npc.wanderTimer = 1;
-      npc.velocity.set(0, 0);
-    });
-  }
-}
-
-function updateDuelNpcMovement(npc, dt) {
-  if (duelHerdActive) {
-    npc.walking = true;
-    const speed = NPC_SPEED * 1.45;
-    npc.group.position.x += duelHerdDir.x * speed * dt;
-    npc.group.position.z += duelHerdDir.y * speed * dt;
-    clampActorPosition(npc.group.position, duelHerdDir);
-    const targetRotation = Math.atan2(duelHerdDir.x, duelHerdDir.y);
-    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.12);
-    return;
-  }
-  updateWander(npc, dt);
-}
-
-function generateDuelSpawnPair(seed) {
-  const rng = createSeededRng((seed >>> 0) ^ 0x9e3779b9);
-  let host = new THREE.Vector3();
-  let guest = new THREE.Vector3();
-
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    host.set(rng() * 17.6 - 8.8, 0, rng() * (7.8 - (PLAY_Z_MIN + 0.8)) + PLAY_Z_MIN + 0.8);
-    guest.set(rng() * 17.6 - 8.8, 0, rng() * (7.8 - (PLAY_Z_MIN + 0.8)) + PLAY_Z_MIN + 0.8);
-    nudgeActorFromObstacles({ group: { position: host } });
-    nudgeActorFromObstacles({ group: { position: guest } });
-    if (host.distanceTo(guest) >= DUEL_SPAWN_MIN_DIST) {
-      return {
-        host: { x: host.x, z: host.z },
-        guest: { x: guest.x, z: guest.z },
-      };
-    }
-  }
-
-  host.set(-4.2, 0, randomRange(-3, 3));
-  guest.set(4.2, 0, randomRange(-3, 3));
-  nudgeActorFromObstacles({ group: { position: host } });
-  nudgeActorFromObstacles({ group: { position: guest } });
-  return {
-    host: { x: host.x, z: host.z },
-    guest: { x: guest.x, z: guest.z },
-  };
-}
-
-function duelActorSpawn(isLocalPlayer) {
-  const spawns = levelState?.duelSpawns;
-  if (!spawns) {
-    const side = isLocalPlayer ? -4.2 : 4.2;
-    const pos = new THREE.Vector3(side, 0, 0);
-    nudgeActorFromObstacles({ group: { position: pos } });
-    return pos;
-  }
-  const slot = isLocalPlayer
-    ? (getIsHost() ? spawns.host : spawns.guest)
-    : (getIsHost() ? spawns.guest : spawns.host);
-  return new THREE.Vector3(slot.x, 0, slot.z);
-}
-
-function updateDuelNpcPunch(npc, dt) {
-  if (!npc.canPunch) return;
-
-  if (npc.punchTimer > 0) {
-    npc.punchTimer = Math.max(0, npc.punchTimer - dt);
-    const punchT = 1 - npc.punchTimer / NPC_PUNCH_SWING;
-    if (!npc.punchHitDone && punchT > 0.42 && punchT < 0.72) {
-      npc.punchHitDone = true;
-      tryNpcPunchHit(npc);
-    }
-    if (npc.punchTimer <= 0) {
-      npc.punchDelay = NPC_PUNCH_INTERVAL;
-      npc.punchHitDone = false;
-    }
-    return;
-  }
-
-  npc.punchDelay -= dt;
-  if (npc.punchDelay <= 0) {
-    npc.punchTimer = NPC_PUNCH_SWING;
-    npc.punchHitDone = false;
-    npc.walking = false;
-    npc.pauseTimer = NPC_PUNCH_SWING;
-  }
-}
-
 function animateNpcPunchPose(npc) {
   const ud = npc.group.userData;
   if (!ud?.rightArm) return;
   if (npc.punchTimer > 0) {
-    const t = 1 - npc.punchTimer / NPC_PUNCH_SWING;
+    const t = 1 - npc.punchTimer / (npc.punchDuration ?? PUNCH_SWING);
     const swing = Math.sin(t * Math.PI);
     ud.rightArm.rotation.x = -1.5 * swing;
     ud.rightArm.rotation.z = ud.baseArmRotations.rightZ - 0.72 * swing;
@@ -1882,115 +798,6 @@ function animateNpcPunchPose(npc) {
     ud.rightArm.rotation.x = -1.15 * t;
     ud.rightArm.rotation.z = ud.baseArmRotations.rightZ - 0.48 * t;
   }
-}
-
-function tryNpcPunchHit(npc) {
-  const npcPos = npc.group.position;
-  const facing = getFacingVector(npc.group.rotation.y);
-  const targets = [player];
-  if (remotePlayer) targets.push(remotePlayer);
-
-  targets.forEach((actor) => {
-    if (!actor?.group || actor.hp <= 0) return;
-    const toTarget = new THREE.Vector2(
-      actor.group.position.x - npcPos.x,
-      actor.group.position.z - npcPos.z,
-    );
-    if (toTarget.length() > NPC_PUNCH_RANGE || !isFacingTarget(facing, toTarget)) return;
-    if (actor === player) {
-      applyPlayerDamage(NPC_PUNCH_DAMAGE, "NPC 出拳");
-    }
-  });
-}
-
-function applyPlayerDamage(amount, reason) {
-  if (gameStatus !== "playing" || !isDuelActive()) return;
-  if (player.hitInvuln > 0 || player.hp <= 0) return;
-
-  player.hitInvuln = HIT_INVULN;
-  player.hp = Math.max(0, player.hp - amount);
-  levelState.playerHp = player.hp;
-  levelState.attempts = player.hp;
-  updateHud();
-  triggerDamageFx();
-  triggerShake(0.28, 0.16);
-  sfxHurt();
-  syncHp(player.hp);
-
-  if (player.hp <= 0) {
-    dissolveActor(player);
-    settleRound(false, reason || "你被击败了");
-  }
-}
-
-function getActorDistance2D(a, b) {
-  if (!a?.group || !b?.group) return Infinity;
-  const dx = b.group.position.x - a.group.position.x;
-  const dz = b.group.position.z - a.group.position.z;
-  return Math.hypot(dx, dz);
-}
-
-function isRemoteInPunchRange(range = HIT_RANGE) {
-  if (!remotePlayer?.group || remotePlayer.hp <= 0 || remotePlayer.group.visible === false) {
-    return false;
-  }
-  return getActorDistance2D(player, remotePlayer) <= range;
-}
-
-function findDuelPunchTarget() {
-  const playerPos = player.group.position;
-  getFacingVector(player.group.rotation.y, scratchFacing);
-  let best = null;
-  let bestDistance = Infinity;
-
-  function testTarget(type, actor) {
-    if (!actor?.group || actor.group.visible === false) return;
-    if (type === "remote" && (actor.hp ?? 0) <= 0) return;
-    if (type === "npc" && !actor.alive) return;
-    scratchToPlayer.set(
-      actor.group.position.x - playerPos.x,
-      actor.group.position.z - playerPos.z,
-    );
-    const distance = scratchToPlayer.length();
-    if (distance > HIT_RANGE || !isFacingTarget(scratchFacing, scratchToPlayer)) return;
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = { type, actor };
-    }
-  }
-
-  testTarget("remote", remotePlayer);
-  npcs.forEach((npc) => testTarget("npc", npc));
-
-  return best;
-}
-
-function damageRemotePlayer() {
-  if (!remotePlayer?.group || remotePlayer.hp <= 0) return false;
-  if (isConnected()) return true;
-  remotePlayer.hp = Math.max(0, (remotePlayer.hp ?? DUEL_PLAYER_HP) - 1);
-
-  if (remotePlayer.hp <= 0) {
-    dissolveActor(remotePlayer);
-    settleRound(true);
-  }
-  return true;
-}
-
-function damageDuelNpc(npc) {
-  if (!npc?.alive) return false;
-  dissolveNpc(npc);
-  compactDeadNpcs();
-  return true;
-}
-
-function applyRemoteDuelNpcKill(npcId) {
-  if (!isDuelActive() || npcId == null) return false;
-  const npc = npcs.find((n) => n.id === npcId);
-  if (!npc?.alive) return false;
-  dissolveNpc(npc);
-  compactDeadNpcs();
-  return true;
 }
 
 /* ---- 替身 NPC 系统 ---- */
@@ -2078,11 +885,10 @@ function updateDecoy(npc, dt) {
 
 
 function pickWanderDirection(npc) {
-  const rng = isDuelLevel() && duelRng ? duelRng : Math.random;
-  const angle = rng() * Math.PI * 2;
-  const scale = isDuelLevel() && duelRng ? rng() * 0.6 + 0.55 : randomRange(0.55, 1.15);
+  const angle = Math.random() * Math.PI * 2;
+  const scale = randomRange(0.55, 1.15);
   npc.velocity.set(Math.sin(angle), Math.cos(angle)).multiplyScalar(scale);
-  npc.wanderTimer = isDuelLevel() && duelRng ? rng() * 2 + 1 : randomRange(1.0, 3.0);
+  npc.wanderTimer = randomRange(1.0, 3.0);
   npc.stuckTimer = 0;
 }
 
@@ -2147,7 +953,7 @@ function tick() {
       renderer.render(scene, camera);
       return;
     }
-    if (!isDuelActive() && levelState.level.timeLimit !== null) {
+    if (levelState.level.timeLimit !== null) {
       levelState.remaining = Math.max(0, levelState.remaining - dt);
       if (levelState.remaining <= 0) {
         finishRound(false);
@@ -2160,20 +966,9 @@ function tick() {
     if (fx.damageFlashTimer > 0) fx.damageFlashTimer = Math.max(0, fx.damageFlashTimer - dt);
     updatePlayer(dt);
     updateNpcs(dt);
-    updateProximityHint();
     updateHud();
-
-    // 同步本地玩家位置到 Firebase
-    if (isConnected()) {
-      syncPosition(player.group.position.x, player.group.position.z, player.group.rotation.y);
-    }
   } else if (gameStatus === "won") {
     animateCheer(dt);
-  }
-
-  // 更新对手角色动画
-  if (remotePlayer) {
-    updateRemotePlayerAnim(dt);
   }
 
   updateParticles(dt);
@@ -2206,7 +1001,6 @@ function updatePlayer(dt) {
   if (scratchVec2.lengthSq() > 1) scratchVec2.normalize();
   applyReverseInputLock(scratchVec2);
 
-  // 玩家移动方向加入 lerp 延迟，不立即响应
   playerInputVel.lerp(scratchVec2, 1 - Math.pow(1 - PLAYER_LERP, dt * 60));
 
   const moving = playerInputVel.lengthSq() > 0.0004;
@@ -2260,85 +1054,7 @@ function animateCheer(dt) {
   player.group.rotation.y += dt * 1.8;
 }
 
-function updateRemotePlayerAnim(dt) {
-  if (!remotePlayer || !remotePlayer.group.userData) return;
-  const ud = remotePlayer.group.userData;
-
-  if (remotePlayer.targetX != null) {
-    const pos = remotePlayer.group.position;
-    const dx = remotePlayer.targetX - pos.x;
-    const dz = remotePlayer.targetZ - pos.z;
-    const distSq = dx * dx + dz * dz;
-    const stale = performance.now() - (remotePlayer.netTime ?? 0) > REMOTE_STALE_MS;
-    const snap = stale || distSq > REMOTE_SNAP_DIST * REMOTE_SNAP_DIST;
-    if (snap) {
-      pos.x = remotePlayer.targetX;
-      pos.z = remotePlayer.targetZ;
-      remotePlayer.group.rotation.y = remotePlayer.targetRot;
-    } else {
-      const t = Math.min(1, dt * REMOTE_POS_LERP);
-      pos.x += dx * t;
-      pos.z += dz * t;
-      remotePlayer.group.rotation.y = lerpAngle(
-        remotePlayer.group.rotation.y,
-        remotePlayer.targetRot,
-        t,
-      );
-    }
-  }
-
-  // 检测对手是否在移动（对比上一帧位置）
-  const pos = remotePlayer.group.position;
-  const prevX = remotePlayer._prevX ?? pos.x;
-  const prevZ = remotePlayer._prevZ ?? pos.z;
-  const dx = pos.x - prevX;
-  const dz = pos.z - prevZ;
-  const moving = (dx * dx + dz * dz) > 0.0001;
-  remotePlayer._prevX = pos.x;
-  remotePlayer._prevZ = pos.z;
-
-  // 走路动画
-  remotePlayer.walkCycle = (remotePlayer.walkCycle ?? 0) + dt * (moving ? 8.5 : 2);
-  const walk = moving ? Math.sin(remotePlayer.walkCycle) : 0;
-  if (ud.visual) ud.visual.position.y = moving ? Math.abs(walk) * 0.06 : 0;
-  if (ud.leftLeg) ud.leftLeg.rotation.x = walk * 0.55;
-  if (ud.rightLeg) ud.rightLeg.rotation.x = -walk * 0.55;
-
-  // 出拳动画
-  if (remotePlayer.punchTimer > 0) {
-    remotePlayer.punchTimer = Math.max(0, remotePlayer.punchTimer - dt);
-    const t = Math.sin((remotePlayer.punchTimer / PUNCH_SWING) * Math.PI);
-    if (ud.rightArm) {
-      ud.rightArm.rotation.x = -2.15 * t;
-      ud.rightArm.rotation.z = (ud.baseArmRotations?.rightZ ?? -0.38) - 1.05 * t;
-    }
-    if (ud.leftArm) {
-      ud.leftArm.rotation.z = (ud.baseArmRotations?.leftZ ?? 0.38) + 0.42 * t;
-    }
-  } else if (ud.leftArm && ud.rightArm && ud.baseArmRotations) {
-    ud.leftArm.rotation.x = -walk * 0.28;
-    ud.rightArm.rotation.x = walk * 0.28;
-    ud.leftArm.rotation.z = ud.baseArmRotations.leftZ + (moving ? -Math.abs(walk) * 0.08 : 0);
-    ud.rightArm.rotation.z = ud.baseArmRotations.rightZ + (moving ? Math.abs(walk) * 0.08 : 0);
-  }
-}
-
 function updateNpcs(dt) {
-  if (isDuelLevel()) {
-    updateDuelGather();
-    updateDuelHerdState();
-    npcs.forEach((npc) => {
-      if (!npc.alive) return;
-      updateDuelNpcMovement(npc, dt);
-      updateDuelNpcPunch(npc, dt);
-      animateActor(npc, dt, npc.walking);
-      animateNpcPunchPose(npc);
-    });
-    duelSeparateTick += 1;
-    if (duelSeparateTick % 2 === 0) separateDuelActors();
-    return;
-  }
-
   if (!levelState.level.legacy) {
     npcs.forEach((npc) => {
       if (!npc.alive) return;
@@ -2502,28 +1218,6 @@ function separateActors() {
   }
 }
 
-function separateDuelActors() {
-  buildSpatialGrid();
-
-  for (let i = 0; i < npcs.length; i += 1) {
-    const a = npcs[i];
-    if (!a.alive) continue;
-    const nearby = getNearbyNpcs(a.group.position);
-    for (let j = 0; j < nearby.length; j += 1) {
-      const b = nearby[j];
-      if (b === a || !b.alive) continue;
-      pushApart(a.group.position, b.group.position, 0.62, 0.018);
-    }
-    pushApart(a.group.position, player.group.position, 0.72, 0.012);
-    if (remotePlayer?.group) {
-      pushApart(a.group.position, remotePlayer.group.position, 0.72, 0.012);
-    }
-  }
-  if (remotePlayer?.group) {
-    pushApart(player.group.position, remotePlayer.group.position, 0.72, 0.012);
-  }
-}
-
 function pushApart(a, b, minDistance, strength) {
   const dx = a.x - b.x;
   const dz = a.z - b.z;
@@ -2543,9 +1237,7 @@ function pushApart(a, b, minDistance, strength) {
 
 function triggerAttack() {
   if (gameStatus !== "playing" || punchCooldown > 0) return;
-  const attack = isDuelActive()
-    ? {}
-    : (levelRunner.handleAction({ type: "beforeAttack" }) ?? {});
+  const attack = levelRunner.handleAction({ type: "beforeAttack" }) ?? {};
   if (attack.blocked) return;
   if (!consumeActionInterval()) return;
   punchCooldownMax = attack.cooldown
@@ -2557,52 +1249,10 @@ function triggerAttack() {
   }
   player.punchDuration = attack.animationSeconds ?? PUNCH_SWING;
   player.punchTimer = player.punchDuration;
-  if (isDuelActive()) {
-    sfxPunchHeavy();
-    spawnPunchSwish(player);
-    ui.attackButton.classList.add("punching");
-    window.setTimeout(() => ui.attackButton.classList.remove("punching"), 180);
-  } else if (attack.sound) {
+  if (attack.sound) {
     playLevelSound(attack.sound);
   } else {
     sfxPunch();
-  }
-
-  if (isDuelActive()) {
-    const punchTarget = findDuelPunchTarget();
-    let remoteHit = false;
-    let npcHit = false;
-
-    if (punchTarget?.type === "remote") {
-      remoteHit = !isConnected() ? damageRemotePlayer() : true;
-    } else if (punchTarget?.type === "npc") {
-      npcHit = damageDuelNpc(punchTarget.actor);
-    }
-
-    if (isConnected()) {
-      syncPunch(
-        player.group.position.x,
-        player.group.position.z,
-        player.group.rotation.y,
-        {
-          roundId: duelRoundId,
-          punchId: nextLocalEventId("punch"),
-          ...(npcHit ? { npcId: punchTarget.actor.id } : {}),
-        },
-      );
-    }
-
-    if (remoteHit || npcHit) {
-      triggerHitstop(npcHit ? 0.08 : 0.06);
-      triggerShake(npcHit ? 0.28 : 0.22, npcHit ? 0.16 : 0.14);
-      sfxHit();
-    }
-    return;
-  }
-
-  // 同步出拳事件给对手
-  if (isConnected()) {
-    syncPunch(player.group.position.x, player.group.position.z, player.group.rotation.y);
   }
 
   const hit = findHitTarget();
@@ -2619,13 +1269,6 @@ function triggerAttack() {
     triggerHitstop(0.08);
     triggerShake(0.35, 0.2);
     sfxHit();
-    if (isConnected()) {
-      syncWin({
-        time: Math.round(totalTime - levelState.startTime),
-        roundId: duelRoundId,
-        winId: nextLocalEventId("win"),
-      });
-    }
     settleRound(true, null, 760);
     return;
   }
@@ -2763,21 +1406,12 @@ function finishRound(won, failMessage) {
   player.cheer = won;
   if (won) sfxWin(); else sfxLose();
 
-  const duel = isDuelLevel(levelState.level);
-  const resultResource = duel
-    ? null
-    : levelRunner.handleAction({ type: "getResultStats" });
+  const resultResource = levelRunner.handleAction({ type: "getResultStats" });
   const timeUsed = Math.round(totalTime - levelState.startTime);
-  const attemptsLeft = duel
-    ? player.hp
-    : (resultResource?.attemptsLeft ?? levelState.attempts);
-  const rating = duel
-    ? { grade: won ? "S" : "F", rating: won ? 100 : 0 }
-    : calcRating(won, timeUsed, attemptsLeft);
+  const attemptsLeft = resultResource?.attemptsLeft ?? levelState.attempts;
+  const rating = calcRating(won, timeUsed, attemptsLeft);
 
-  ui.resultTitle.textContent = duel
-    ? (won ? "决斗胜利" : "决斗失败")
-    : (won ? "任务成功" : "任务失败");
+  ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
   ui.resultCopy.textContent = won
     ? levelState.level.success
     : (failMessage || levelState.level.failure);
@@ -2785,18 +1419,12 @@ function finishRound(won, failMessage) {
   ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
   ui.statTime.textContent = timeUsed + " 秒";
   if (ui.statAttemptsLabel) {
-    ui.statAttemptsLabel.textContent = duel
-      ? "❤️ 剩余生命"
-      : (resultResource?.label ?? "🥊 剩余出拳");
+    ui.statAttemptsLabel.textContent = resultResource?.label ?? "🥊 剩余出拳";
   }
-  ui.statAttempts.textContent = duel
-    ? (won ? "对手生命归零" : formatHearts(attemptsLeft))
-    : (resultResource?.value ?? `${attemptsLeft} 次`);
-  ui.statAttempts.classList.toggle("hearts-display", duel);
-
-  const guestWaitingForRetry = duel && isConnected() && !getIsHost();
-  ui.retryButton.disabled = guestWaitingForRetry;
-  ui.retryButton.textContent = guestWaitingForRetry ? "等待房主再来" : "再来一局";
+  ui.statAttempts.textContent = resultResource?.value ?? `${attemptsLeft} 次`;
+  ui.statAttempts.classList.remove("hearts-display");
+  ui.retryButton.disabled = false;
+  ui.retryButton.textContent = "再来一局";
 
   ui.resultModal.classList.add("visible");
   ui.taskModal.classList.remove("visible");
@@ -2817,44 +1445,20 @@ function finishRound(won, failMessage) {
 }
 
 function updateHud() {
-  const duel = isDuelLevel();
-  const levelHud = duel
-    ? null
-    : levelRunner.handleAction({ type: "getHudState" });
+  const levelHud = levelRunner.handleAction({ type: "getHudState" });
   const mechanicHintHtml = levelState.level.mechanicHintHtml ?? "";
   const levelMechanicVisible = Boolean(levelHud?.mechanicVisible);
   const bloodmoonTheme = levelHud?.theme === "bloodmoon";
-  const duelPlaying = duel && (gameStatus === "playing" || gameStatus === "paused");
-  if (ui.hud) ui.hud.classList.toggle("is-duel-play", duelPlaying);
-
   ui.sceneName.textContent = levelState.level.sceneName;
-  ui.missionText.textContent = duel
-    ? (levelState.level.hudMission || levelState.level.mission)
-    : (levelHud?.mission || levelState.level.hudMission || levelState.level.mission);
-  ui.timerText.textContent = duel
-    ? "∞"
-    : (levelHud?.timerText ?? Math.ceil(levelState.remaining).toString());
-  ui.attemptLabel.textContent = duel
-    ? "生命"
-    : (levelHud?.resourceLabel ?? "出拳");
-  if (duel) {
-    ui.attemptText.textContent = formatHearts(player.hp ?? levelState.playerHp);
-    ui.attemptText.classList.add("hearts-display");
-  } else {
-    ui.attemptText.textContent = levelHud?.resourceText ?? levelState.attempts.toString();
-    ui.attemptText.classList.remove("hearts-display");
-  }
-
-  if (duel) {
-    ui.clueBar.textContent = (() => {
-      const gatherHint = getDuelGatherHudHint();
-      const base = `生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_PLAYER_HP)}`;
-      return gatherHint ? `${gatherHint} · ${base}` : `⚔️ ${base} · 每 1.5 分钟需到集合圈报到`;
-    })();
-  } else {
-    ui.clueBar.textContent = levelHud?.clue
-      ?? ("🔍 " + (levelState.level.hudClue || levelState.level.clue));
-  }
+  ui.missionText.textContent = levelHud?.mission
+    || levelState.level.hudMission
+    || levelState.level.mission;
+  ui.timerText.textContent = levelHud?.timerText ?? Math.ceil(levelState.remaining).toString();
+  ui.attemptLabel.textContent = levelHud?.resourceLabel ?? "出拳";
+  ui.attemptText.textContent = levelHud?.resourceText ?? levelState.attempts.toString();
+  ui.attemptText.classList.remove("hearts-display");
+  ui.clueBar.textContent = levelHud?.clue
+    ?? ("🔍 " + (levelState.level.hudClue || levelState.level.clue));
   ui.clueBar?.classList.toggle(
     "hidden",
     Boolean(mechanicHintHtml) && !levelMechanicVisible,
@@ -2874,8 +1478,6 @@ function updateHud() {
     ui.mechanicHint.innerHTML = levelHud?.mechanicHtml || mechanicHintHtml;
   }
 
-  updateGatherBanner();
-
   // 出拳冷却动画
   if (punchCooldown > 0 && punchCooldownMax > 0) {
     const progress = (punchCooldown / punchCooldownMax) * 100;
@@ -2889,6 +1491,5 @@ function updateHud() {
 }
 
 function randomRange(min, max) {
-  const r = duelRng && isDuelLevel() ? duelRng() : Math.random();
-  return min + r * (max - min);
+  return min + Math.random() * (max - min);
 }

@@ -11,7 +11,6 @@ test("关卡可以声明无限时间和自定义资源", () => {
         resourceInitial: 100,
         targetDesc: "血月引路人",
       },
-      duel: false,
       npcCount: 36,
     }),
     {
