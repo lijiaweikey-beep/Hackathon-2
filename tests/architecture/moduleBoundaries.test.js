@@ -146,3 +146,12 @@ test("全局样式不包含具体关卡选择器", async () => {
   const styles = await readSource("styles.css");
   assert.doesNotMatch(styles, /gaming|library|temple|bloodmoon|hunt-/i);
 });
+
+test("注册中心以内联文本发现关卡样式", async () => {
+  const source = await readSource("levels/registry.js");
+  assert.match(source, /query:\s*["']\?inline["']/);
+  assert.doesNotMatch(
+    source,
+    /glob\(["']\.\/\*\/styles\.css["'],\s*\{\s*eager:\s*true\s*\}\)/,
+  );
+});

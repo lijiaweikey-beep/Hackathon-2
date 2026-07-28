@@ -23,6 +23,10 @@ export default {
   moonDecoyCount: 3,
   sceneName: "承天寺夜游",
   emoji: "🌕",
+  cardStyle: {
+    accent: "#fbbf24",
+    glow: "rgba(251, 191, 36, 0.28)",
+  },
   cardDesc: ({ npcCount }) => `在 ${npcCount} 个苏轼影分身里找出真正吵醒怀民的苏轼`,
   mission: "苏轼夜半叫醒张怀民，又把中庭所有人都变成苏轼的样子。先找到自己，再找出真正的苏轼。",
   hudMission: "观察月下显形线索，找出真正的苏轼。",

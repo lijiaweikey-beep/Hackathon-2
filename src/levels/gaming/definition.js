@@ -20,6 +20,10 @@ export default {
   decoyCount: 3,
   sceneName: "凌晨三点",
   emoji: "🌙",
+  cardStyle: {
+    accent: "#818cf8",
+    glow: "rgba(129, 140, 248, 0.28)",
+  },
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找到凌晨三点还在打游戏的人`,
   mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
   clue: "目标特征：有明显黑眼圈",

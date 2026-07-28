@@ -46,9 +46,12 @@ export function createGameUiController(dependencies) {
         `<span class="level-star${index < level.difficulty ? " is-on" : ""}">★</span>`,
       ).join("");
       const card = document.createElement("button");
-      card.className = `level-card level-card--${level.id}`;
+      card.className = "level-card";
       card.type = "button";
       card.dataset.level = level.id;
+      for (const [name, value] of Object.entries(level.cardStyle ?? {})) {
+        card.style.setProperty(`--card-${name}`, value);
+      }
       card.innerHTML = `
         <div class="level-card-accent" aria-hidden="true"></div>
         <div class="level-card-icon">${level.emoji}</div>

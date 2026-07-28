@@ -35,6 +35,10 @@ export default {
   decoyCount: 6,
   sceneName: "血月街区",
   emoji: "🌕",
+  cardStyle: {
+    accent: "#fb7185",
+    glow: "rgba(248, 113, 113, 0.28)",
+  },
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找出血月引路人`,
   mission: "血月升起，你收到一句求救：“别让我在血月里认不出你。”为了赶到对方身边，你主动踏进血月，变成狼人模样。找出伪装在人群里的血月引路人，击倒他，解除狼化。",
   hudMission: "为了你，我变成狼人模样。找出血月引路人。",
