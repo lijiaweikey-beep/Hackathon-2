@@ -1,3 +1,5 @@
+import { FEATURES } from "../config/features.js";
+
 export const canvas = document.querySelector("#gameCanvas");
 
 export const ui = {
@@ -67,3 +69,5 @@ export const ui = {
   attackButton: document.querySelector("#attackButton"),
   cooldownOverlay: document.querySelector("#cooldownOverlay"),
 };
+
+ui.mpCreateBtn.hidden = !FEATURES.duelEntryEnabled;
