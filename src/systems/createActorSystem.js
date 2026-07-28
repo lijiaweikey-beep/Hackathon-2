@@ -1,37 +1,40 @@
 import * as THREE from "three";
 import {
-  ACTOR_COLLISION_RADIUS,
-  GRID_CELL,
-  HIT_FACING_DOT,
   NPC_SPEED,
   PLAY_Z_MIN,
   PLAYER_LERP,
-  PUNCH_SWING,
   WORLD_LIMIT,
 } from "../config/constants.js";
 import {
   clampToWorld,
-  getFacingVector,
-  gridKey,
   lerpAngle,
 } from "../utils/math.js";
-
-const GRID_COLS = Math.ceil((WORLD_LIMIT * 2) / GRID_CELL) + 1;
+import { createActorAnimator } from "./createActorAnimator.js";
+import { createActorNavigation } from "./createActorNavigation.js";
+import { createActorSeparationSystem } from "./createActorSeparationSystem.js";
 
 export function createActorSystem(dependencies) {
   const scratch2 = new THREE.Vector2();
-  const facingScratch = new THREE.Vector2();
-  const scratch3 = new THREE.Vector3();
-  const nearby = [];
-  const spatialGrid = new Map();
   let npcs = [];
 
   const randomRange = dependencies.randomRange;
+  const animator = createActorAnimator({
+    getPlayer: dependencies.getPlayer,
+    getTotalTime: dependencies.getTotalTime,
+  });
+  const separation = createActorSeparationSystem({
+    getPlayer: dependencies.getPlayer,
+    getNpcs: () => npcs,
+    clampActorPosition: dependencies.clampActorPosition,
+  });
+  const navigation = createActorNavigation({
+    randomRange,
+    resolveObstacleCollisions: dependencies.resolveObstacleCollisions,
+  });
 
   function reset() {
     npcs = [];
-    spatialGrid.clear();
-    nearby.length = 0;
+    separation.reset();
   }
 
   function getNpcs() {
@@ -253,73 +256,6 @@ export function createActorSystem(dependencies) {
     }
   }
 
-  function animateActor(actor, deltaSeconds, moving) {
-    const userData = actor.group.userData;
-    actor.walkCycle = (actor.walkCycle ?? 0) + deltaSeconds * (moving ? 8.5 : 2);
-    const walk = moving ? Math.sin(actor.walkCycle) : 0;
-    userData.visual.position.y = moving
-      ? Math.abs(walk) * 0.06
-      : Math.sin(dependencies.getTotalTime() * 1.7 + (actor.id ?? 0)) * 0.012;
-    userData.leftLeg.rotation.x = walk * 0.55;
-    userData.rightLeg.rotation.x = -walk * 0.55;
-
-    const player = dependencies.getPlayer();
-    if (actor !== player || player.punchTimer <= 0) {
-      userData.leftArm.rotation.x = -walk * 0.28;
-      userData.rightArm.rotation.x = walk * 0.28;
-      userData.leftArm.rotation.z = userData.baseArmRotations.leftZ
-        + (moving ? -Math.abs(walk) * 0.08 : 0);
-      userData.rightArm.rotation.z = userData.baseArmRotations.rightZ
-        + (moving ? Math.abs(walk) * 0.08 : 0);
-    }
-    actor.animations?.update?.(actor, {
-      deltaSeconds,
-      moving,
-      totalTime: dependencies.getTotalTime(),
-    });
-  }
-
-  function animateNpcAttack(npc) {
-    const userData = npc.group.userData;
-    if (!userData?.rightArm) return;
-    if (npc.punchTimer > 0) {
-      const progress = 1 - npc.punchTimer / (npc.punchDuration ?? PUNCH_SWING);
-      const swing = Math.sin(progress * Math.PI);
-      userData.rightArm.rotation.x = -1.5 * swing;
-      userData.rightArm.rotation.z = userData.baseArmRotations.rightZ - 0.72 * swing;
-      userData.leftArm.rotation.z = userData.baseArmRotations.leftZ + 0.22 * swing;
-      return;
-    }
-    if (npc.attackTimer > 0) {
-      const progress = Math.sin((npc.attackTimer / 0.26) * Math.PI);
-      userData.rightArm.rotation.x = -1.15 * progress;
-      userData.rightArm.rotation.z = userData.baseArmRotations.rightZ - 0.48 * progress;
-    }
-  }
-
-  function animatePlayerAttack(player) {
-    const userData = player.group.userData;
-    const progress = player.punchTimer > 0
-      ? Math.sin((player.punchTimer / (player.punchDuration ?? PUNCH_SWING)) * Math.PI)
-      : 0;
-    if (player.animations?.attack?.(player, {
-      progress,
-      totalTime: dependencies.getTotalTime(),
-    }) === true) return;
-
-    userData.rightArm.rotation.x = -2.15 * progress;
-    userData.rightArm.rotation.z = userData.baseArmRotations.rightZ - 1.05 * progress;
-    userData.leftArm.rotation.z = userData.baseArmRotations.leftZ + 0.42 * progress;
-    const directionX = Math.sin(player.group.rotation.y);
-    const directionZ = Math.cos(player.group.rotation.y);
-    userData.visual.position.x = directionX * 0.18 * progress;
-    userData.visual.position.z = directionZ * 0.18 * progress;
-    if (progress <= 0) {
-      userData.visual.position.x = 0;
-      userData.visual.position.z = 0;
-    }
-  }
-
   function updatePlayer(deltaSeconds) {
     const player = dependencies.getPlayer();
     dependencies.readPlayerInput(scratch2);
@@ -339,62 +275,8 @@ export function createActorSystem(dependencies) {
       player.group.rotation.y = lerpAngle(player.group.rotation.y, rotation, 0.24);
     }
     dependencies.updatePlayerTimers(deltaSeconds);
-    animateActor(player, deltaSeconds, moving);
-    animatePlayerAttack(player);
-  }
-
-  function buildSpatialGrid() {
-    spatialGrid.clear();
-    npcs.forEach((npc) => {
-      if (!npc.alive) return;
-      const column = Math.floor((npc.group.position.x + WORLD_LIMIT) / GRID_CELL);
-      const row = Math.floor((npc.group.position.z + WORLD_LIMIT) / GRID_CELL);
-      const key = gridKey(column, row);
-      if (!spatialGrid.has(key)) spatialGrid.set(key, []);
-      spatialGrid.get(key).push(npc);
-    });
-  }
-
-  function getNearbyNpcs(position) {
-    const column = Math.floor((position.x + WORLD_LIMIT) / GRID_CELL);
-    const row = Math.floor((position.z + WORLD_LIMIT) / GRID_CELL);
-    nearby.length = 0;
-    for (let x = -1; x <= 1; x += 1) {
-      for (let z = -1; z <= 1; z += 1) {
-        const cell = spatialGrid.get(gridKey(column + x, row + z));
-        if (cell) nearby.push(...cell);
-      }
-    }
-    return nearby;
-  }
-
-  function pushApart(a, b, minDistance, strength) {
-    const deltaX = a.x - b.x;
-    const deltaZ = a.z - b.z;
-    const distanceSquared = deltaX * deltaX + deltaZ * deltaZ;
-    if (distanceSquared <= 0.0001 || distanceSquared >= minDistance * minDistance) return;
-    const distance = Math.sqrt(distanceSquared);
-    const push = (minDistance - distance) * strength;
-    a.x += (deltaX / distance) * push;
-    a.z += (deltaZ / distance) * push;
-    b.x -= (deltaX / distance) * push;
-    b.z -= (deltaZ / distance) * push;
-    dependencies.clampActorPosition(a);
-    dependencies.clampActorPosition(b);
-  }
-
-  function separateActors() {
-    buildSpatialGrid();
-    const player = dependencies.getPlayer();
-    npcs.forEach((actor) => {
-      if (!actor.alive) return;
-      getNearbyNpcs(actor.group.position).forEach((other) => {
-        if (other === actor || !other.alive) return;
-        if (actor.separationGroup && actor.separationGroup === other.separationGroup) return;
-        pushApart(actor.group.position, other.group.position, 0.62, 0.018);
-      });
-      pushApart(actor.group.position, player.group.position, 0.72, 0.012);
-    });
+    animator.animate(player, deltaSeconds, moving);
+    animator.animatePlayerAttack(player);
   }
 
   function updateNpcs(deltaSeconds) {
@@ -405,63 +287,11 @@ export function createActorSystem(dependencies) {
         if (npc.isDecoy) updateDecoy(npc, deltaSeconds);
         else updateWander(npc, deltaSeconds);
       }
-      animateActor(npc, deltaSeconds, npc.walking);
-      if (npc.attackResolveTimer != null) animateNpcAttack(npc);
+      animator.animate(npc, deltaSeconds, npc.walking);
+      if (npc.attackResolveTimer != null) animator.animateNpcAttack(npc);
     });
-    separateActors();
+    separation.separate();
     dependencies.dispatch({ type: "afterNpcUpdate", deltaSeconds });
-  }
-
-  function moveNpcToward(npc, waypoint, speed, deltaSeconds) {
-    scratch3.copy(waypoint).sub(npc.group.position);
-    scratch3.y = 0;
-    if (scratch3.length() < 0.14) {
-      npc.walking = false;
-      return true;
-    }
-    scratch3.normalize();
-    const previousX = npc.group.position.x;
-    const previousZ = npc.group.position.z;
-    scratch2.set(scratch3.x, scratch3.z);
-    npc.group.position.x += scratch3.x * speed * deltaSeconds;
-    npc.group.position.z += scratch3.z * speed * deltaSeconds;
-    const hitObstacle = dependencies.resolveObstacleCollisions(
-      npc.group.position,
-      ACTOR_COLLISION_RADIUS,
-      scratch2,
-    );
-    clampToWorld(npc.group.position);
-    const moved = Math.hypot(
-      npc.group.position.x - previousX,
-      npc.group.position.z - previousZ,
-    );
-    if (hitObstacle && moved < speed * deltaSeconds * 0.2 && waypoint) {
-      waypoint.x += randomRange(-1.2, 1.2);
-      waypoint.z += randomRange(-1.2, 1.2);
-      clampToWorld(waypoint);
-    }
-    const rotation = Math.atan2(scratch3.x, scratch3.z);
-    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, rotation, 0.12);
-    npc.walking = true;
-    return false;
-  }
-
-  function faceNpcToward(npc, targetPosition) {
-    scratch3.copy(targetPosition).sub(npc.group.position);
-    scratch3.y = 0;
-    if (scratch3.lengthSq() < 0.0001) return;
-    const rotation = Math.atan2(scratch3.x, scratch3.z);
-    npc.group.rotation.y = lerpAngle(npc.group.rotation.y, rotation, 0.18);
-  }
-
-  function isActorFacingTarget(actor, target, maxDistance) {
-    scratch2.set(
-      target.group.position.x - actor.group.position.x,
-      target.group.position.z - actor.group.position.z,
-    );
-    if (scratch2.length() > maxDistance) return false;
-    getFacingVector(actor.group.rotation.y, facingScratch);
-    return facingScratch.dot(scratch2.normalize()) >= HIT_FACING_DOT;
   }
 
   function setPartsVisible(actor, key, visible) {
@@ -479,17 +309,6 @@ export function createActorSystem(dependencies) {
     npcs = npcs.filter((npc) => npc.alive || npc.preserveWhenDead);
   }
 
-  function animateCheer(deltaSeconds) {
-    const player = dependencies.getPlayer();
-    const userData = player.group.userData;
-    userData.visual.position.y = Math.abs(
-      Math.sin(dependencies.getTotalTime() * 7.5),
-    ) * 0.45;
-    userData.leftArm.rotation.z = 2.45;
-    userData.rightArm.rotation.z = -2.45;
-    player.group.rotation.y += deltaSeconds * 1.8;
-  }
-
   return Object.freeze({
     reset,
     getNpcs,
@@ -499,14 +318,13 @@ export function createActorSystem(dependencies) {
     spawnNpcs,
     updatePlayer,
     updateNpcs,
-    moveNpcToward,
-    faceNpcToward,
+    moveNpcToward: (...args) => navigation.moveToward(...args),
+    faceNpcToward: (...args) => navigation.faceToward(...args),
     randomOpenPosition,
     randomizePosition,
-    isActorFacingTarget,
+    isActorFacingTarget: (...args) => navigation.isFacingTarget(...args),
     setPartsVisible,
     compactDead,
-    animateCheer,
-    gridColumns: GRID_COLS,
+    animateCheer: (deltaSeconds) => animator.animateCheer(deltaSeconds),
   });
 }

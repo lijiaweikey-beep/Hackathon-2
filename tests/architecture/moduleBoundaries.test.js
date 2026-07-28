@@ -23,6 +23,20 @@ test("游戏入口只负责组装且保持精简", async () => {
   );
 });
 
+test("共享运行时按单一职责控制模块体积", async () => {
+  const limits = new Map([
+    ["runtime/createGameApplication.js", 400],
+    ["systems/createActorSystem.js", 350],
+  ]);
+  for (const [file, maximumLines] of limits) {
+    const source = await readSource(file);
+    assert.ok(
+      source.split("\n").length <= maximumLines,
+      `${file} 不应超过 ${maximumLines} 行`,
+    );
+  }
+});
+
 test("单人关卡注册中心不包含双人模式", async () => {
   const entries = await readdir(levelsRoot, { withFileTypes: true });
   const duelDirectory = entries.find((entry) => entry.isDirectory() && entry.name === "library-duel");

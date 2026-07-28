@@ -26,39 +26,32 @@ import {
   sfxLose,
   resumeAudioOnInteraction,
 } from "../systems/AudioSystem.js";
-import { createWorldBuilder } from "../world/createWorldBuilder.js";
 import { createFxSystem } from "../systems/FxSystem.js";
-import { createLightningBolt } from "../world/lightning.js";
 import { isCachedTexture } from "../world/textures.js";
-import {
-  registerObstacle as registerObstacleInLevel,
-  collidesWithObstacle as collidesWithObstacleInLevel,
-  resolveObstacleCollisions as resolveObstacleCollisionsInLevel,
-  clampActorPosition as clampActorPositionInLevel,
-} from "../world/obstacles.js";
 import { createLevelRunner } from "../levels/levelRunner.js";
 import { createLevelContext } from "../levels/createLevelContext.js";
 import { GAME_PHASES } from "../core/gamePhase.js";
 import { createGameSession } from "./createGameSession.js";
 import { createGameLoop } from "./createGameLoop.js";
+import { createRenderingSystem } from "./createRenderingSystem.js";
+import { createRoundSettlement } from "./createRoundSettlement.js";
+import { createWorldRuntime } from "./createWorldRuntime.js";
 import { createActorSystem } from "../systems/createActorSystem.js";
 import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
 
-let renderer;
 let scene;
-let camera;
-let clock;
 let player;
-let settleTimer = null;
 let fx;
-let worldBuilder;
 let levelViewHost;
 let actorSystem;
 let combatSystem;
 let uiController;
 let gameLoop;
 let inputController;
+let rendering;
+let settlement;
+let worldRuntime;
 
 let totalTime = 0;
 const session = createGameSession();
@@ -92,7 +85,7 @@ const levelRunner = createLevelRunner({
       randomOpenPosition: () => actorSystem.randomOpenPosition(),
       faceNpcToward: (...args) => actorSystem.faceNpcToward(...args),
       moveNpcToward: (...args) => actorSystem.moveNpcToward(...args),
-      collidesWithObstacle,
+      collidesWithObstacle: (...args) => worldRuntime.collidesWithObstacle(...args),
       isActorFacingTarget: (...args) => actorSystem.isActorFacingTarget(...args),
     },
     combat: {
@@ -105,11 +98,11 @@ const levelRunner = createLevelRunner({
     ui: {
       setBlackEye,
       setLipstick,
-      showOverlay,
-      hideOverlay,
-      flashHud,
-      refreshHud: updateHud,
-      resetPlayerInput,
+      showOverlay: (...args) => uiController.showOverlay(...args),
+      hideOverlay: (...args) => uiController.hideOverlay(...args),
+      flashHud: (...args) => uiController.flashHud(...args),
+      refreshHud: () => uiController.updateHud(),
+      resetPlayerInput: () => inputController.reset(),
     },
     audio: {
       playSound: playLevelSound,
@@ -127,18 +120,6 @@ function getMatchNpcCount() {
   return uiController.getMatchNpcCount();
 }
 
-function getWorldContext() {
-  return {
-    getScene: () => scene,
-    getLevelState: () => session.levelState,
-    randomRange,
-    getMatchNpcCount,
-    collidesWithObstacle: (pos, radius) => collidesWithObstacleInLevel(session.levelState, pos, radius),
-    registerObstacle: (x, z, halfW, halfD) => registerObstacleInLevel(session.levelState, x, z, halfW, halfD),
-    createLightningBolt: (x, z, width, height, tilt) => createLightningBolt(x, z, width, height, tilt, randomRange),
-  };
-}
-
 function createPlayer() {
   return session.levelState?.level.extensions?.createPlayer?.()
     ?? createPlayerEntity();
@@ -149,45 +130,12 @@ function createNpc(id, flags) {
     ?? createNpcEntity(id, flags, {}, randomRange);
 }
 
-function registerObstacle(x, z, halfW, halfD) {
-  registerObstacleInLevel(session.levelState, x, z, halfW, halfD);
-}
-
-function collidesWithObstacle(pos, radius) {
-  return collidesWithObstacleInLevel(session.levelState, pos, radius);
-}
-
-function resolveObstacleCollisions(position, radius, velocity) {
-  return resolveObstacleCollisionsInLevel(session.levelState, position, radius, velocity);
-}
-
-function clampActorPosition(position, velocity) {
-  clampActorPositionInLevel(session.levelState, position, velocity);
-}
-
-function buildWorld(level) {
-  if (!worldBuilder) worldBuilder = createWorldBuilder(getWorldContext());
-  worldBuilder.buildWorld(level);
-}
-
 function triggerHitstop(duration) {
   fx.triggerHitstop(duration);
 }
 
 function triggerShake(intensity, duration) {
   fx.triggerShake(intensity, duration);
-}
-
-function showOverlay(kind, options) {
-  uiController.showOverlay(kind, options);
-}
-
-function hideOverlay(kind) {
-  uiController.hideOverlay(kind);
-}
-
-function flashHud(className, durationMs) {
-  uiController.flashHud(className, durationMs);
 }
 
 function playLevelSound(name, delayMs = 0) {
@@ -207,30 +155,16 @@ function playLevelSound(name, delayMs = 0) {
   }
 }
 
-function resetPlayerInput() {
-  inputController.reset();
-}
-
 function updateShake(dt) {
-  fx.updateShake(dt, camera);
+  fx.updateShake(dt, rendering.camera);
 }
 
 function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
-  if (session.phase !== GAME_PHASES.PLAYING) return;
-  session.transition(GAME_PHASES.SETTLING);
-  if (settleTimer) window.clearTimeout(settleTimer);
-  settleTimer = window.setTimeout(() => {
-    settleTimer = null;
-    finishRound(won, failMessage);
-  }, delayMs);
-}
-
-function showLevelSelect() {
-  uiController.showLevelSelect();
+  settlement.settle(won, failMessage, delayMs);
 }
 
 function leaveLevel() {
-  clearPendingRoundEndTimers();
+  settlement.clearPending();
   disposeScene();
   scene = null;
   session.reset();
@@ -241,15 +175,18 @@ function selectLevelById(id) {
   if (index >= 0) resetLevel(index);
 }
 
-function clearPendingRoundEndTimers() {
-  if (settleTimer) {
-    window.clearTimeout(settleTimer);
-    settleTimer = null;
-  }
-}
-
-
 export function boot() {
+  rendering = createRenderingSystem({
+    THREE,
+    canvas,
+    isCachedTexture,
+  });
+  worldRuntime = createWorldRuntime({
+    getScene: () => scene,
+    getLevelState: () => session.levelState,
+    getMatchNpcCount,
+    randomRange,
+  });
   inputController = createInputController({
     isActive: () => session.phase === GAME_PHASES.PLAYING,
     joystick: ui.joystick,
@@ -268,9 +205,9 @@ export function boot() {
     getPlayer: () => player,
     getLevel: () => session.levelState.level,
     createNpc,
-    collidesWithObstacle,
-    clampActorPosition,
-    resolveObstacleCollisions,
+    collidesWithObstacle: (...args) => worldRuntime.collidesWithObstacle(...args),
+    clampActorPosition: (...args) => worldRuntime.clampActorPosition(...args),
+    resolveObstacleCollisions: (...args) => worldRuntime.resolveObstacleCollisions(...args),
     dispatch: (action) => levelRunner.handleAction(action),
     startLevel(level) {
       levelRunner.load(level);
@@ -296,7 +233,7 @@ export function boot() {
     triggerHitstop,
     triggerShake,
     settleRound,
-    refreshHud: updateHud,
+    refreshHud: () => uiController.updateHud(),
     dissolveActor: (actor) => fx.createPixelBurst(actor),
   });
   levelViewHost = createLevelViewHost({
@@ -325,16 +262,28 @@ export function boot() {
     onStart() {
       session.transition(GAME_PHASES.PLAYING);
       session.levelState.startTime = totalTime;
-      updateHud();
+      uiController.updateHud();
       levelRunner.handleAction({ type: "beginPlay" });
     },
     onPause: () => session.transition(GAME_PHASES.PAUSED),
     onResume: () => session.transition(GAME_PHASES.PLAYING),
     onRetry() {
-      clearPendingRoundEndTimers();
+      settlement.clearPending();
       resetLevel(session.currentLevelIndex);
     },
     onAttack: () => combatSystem.triggerAttack(),
+  });
+  settlement = createRoundSettlement({
+    session,
+    getPlayer: () => player,
+    hasScene: () => Boolean(scene),
+    getTotalTime: () => totalTime,
+    getResultStats: () => levelRunner.handleAction({ type: "getResultStats" }),
+    calculateRating: calcRating,
+    showResult: (result) => uiController.showResult(result),
+    saveBestScore,
+    playWin: sfxWin,
+    playLose: sfxLose,
   });
   gameLoop = createGameLoop({
     session,
@@ -350,7 +299,7 @@ export function boot() {
         0,
         session.levelState.remaining - deltaSeconds,
       );
-      if (session.levelState.remaining <= 0) finishRound(false);
+      if (session.levelState.remaining <= 0) settlement.finish(false);
     },
     updatePlayerEffects(deltaSeconds) {
       if (player.hitInvuln > 0) {
@@ -369,75 +318,32 @@ export function boot() {
       actorSystem.updateNpcs(deltaSeconds);
     },
     updateResultActors: (deltaSeconds) => actorSystem.animateCheer(deltaSeconds),
-    updateUi: updateHud,
+    updateUi: () => uiController.updateHud(),
     updateEffects: (deltaSeconds) => fx.updateParticles(deltaSeconds),
     updateShake,
-    render: () => renderer.render(scene, camera),
+    render: () => rendering.render(scene),
   });
-
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-  clock = new THREE.Clock();
-  camera = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
-  camera.position.set(0, 19.5, 17.2);
-  camera.lookAt(0, 0, 0);
 
   inputController.bind();
   uiController.bind();
-  resize();
-  window.addEventListener("resize", resize);
-
-  // 初始显示关卡选择，不直接加载关卡
-  showLevelSelect();
-  renderer.setAnimationLoop(() => gameLoop.tick(clock.getDelta()));
-}
-
-function resize() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const aspect = width / height;
-  const viewHeight = height < 620 ? 14 : 15.5;
-
-  camera.left = (-viewHeight * aspect) / 2;
-  camera.right = (viewHeight * aspect) / 2;
-  camera.top = viewHeight / 2;
-  camera.bottom = -viewHeight / 2;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height, false);
+  uiController.showLevelSelect();
+  rendering.start((deltaSeconds) => gameLoop.tick(deltaSeconds));
 }
 
 function disposeScene() {
   levelRunner.dispose();
-  if (!scene) return;
-  fx?.clearParticles();
-
-  scene.traverse((obj) => {
-    if (obj.geometry) obj.geometry.dispose();
-    if (obj.material) {
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      mats.forEach((mat) => {
-        // 不 dispose 缓存中的纹理（floor/wall texture cache 管理）
-        if (mat.map && !isCachedTexture(mat.map)) mat.map.dispose();
-        if (!fx?.isCachedPixelMaterial(mat)) mat.dispose();
-      });
-    }
-  });
+  rendering?.disposeScene(scene, fx);
 }
 
 
 function resetLevel(index, options = {}) {
-  clearPendingRoundEndTimers();
+  settlement.clearPending();
   // 先清理旧场景资源
   disposeScene();
 
   const level = LEVELS[index];
 
-  scene = new THREE.Scene();
-  scene.userData.cleanups = [];
+  scene = rendering.createScene();
   actorSystem.reset();
   combatSystem.reset();
   totalTime = options.elapsed ?? 0;
@@ -456,7 +362,7 @@ function resetLevel(index, options = {}) {
   session.transition(GAME_PHASES.BRIEFING);
   if (options.skipBriefing) session.transition(GAME_PHASES.PLAYING);
 
-  buildWorld(level);
+  worldRuntime.buildWorld(level);
 
   player = createPlayer();
   player.group.position.copy(actorSystem.randomOpenPosition());
@@ -469,62 +375,9 @@ function resetLevel(index, options = {}) {
     ui.levelSelectModal.classList.remove("visible");
     ui.taskModal.classList.remove("visible");
   } else {
-    showTask();
+    uiController.showTask();
     return;
   }
-  updateHud();
-}
-
-function showTask() {
-  uiController.showTask();
-}
-
-
-function finishRound(won, failMessage) {
-  if ([GAME_PHASES.RESULT, GAME_PHASES.LEVEL_SELECT].includes(session.phase)) return;
-  if (!session.levelState?.level || !scene) return;
-  clearPendingRoundEndTimers();
-  if (session.phase === GAME_PHASES.PLAYING) {
-    session.transition(GAME_PHASES.SETTLING);
-  }
-  if (session.phase !== GAME_PHASES.SETTLING) return;
-  player.cheer = won;
-  if (won) sfxWin(); else sfxLose();
-
-  const resultResource = levelRunner.handleAction({ type: "getResultStats" });
-  const timeUsed = Math.round(totalTime - session.levelState.startTime);
-  const attemptsLeft = resultResource?.attemptsLeft ?? session.levelState.attempts;
-  const rating = calcRating(won, timeUsed, attemptsLeft);
-  session.setResult({ won, failMessage, timeUsed, attemptsLeft, rating });
-  session.transition(GAME_PHASES.RESULT);
-
-  uiController.showResult({
-    won,
-    failMessage,
-    resultResource,
-    timeUsed,
-    attemptsLeft,
-    rating,
-  });
-
-  // 保存最佳成绩
-  if (won) {
-    saveBestScore(session.levelState.level.id, {
-      grade: rating.grade,
-      rating: rating.rating,
-      time: timeUsed,
-    });
-  }
-
-  if (!won) {
-    const data = player.group.userData;
-    data.visual.position.y = 0;
-    data.leftArm.rotation.z = 0.9;
-    data.rightArm.rotation.z = -0.9;
-  }
-}
-
-function updateHud() {
   uiController.updateHud();
 }
 
