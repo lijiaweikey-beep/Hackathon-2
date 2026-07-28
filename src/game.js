@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import {
-  DEFAULT_NPC_COUNT,
   NPC_SPEED,
   ROUND_SECONDS,
   ATTEMPTS,
@@ -10,22 +9,14 @@ import {
 } from "./config/constants.js";
 import { LEVELS, levelRegistry } from "./config/levels.js";
 import { canvas, ui } from "./ui/dom.js";
-import { createLevelCardModel } from "./ui/levelCardModel.js";
-import { renderTargetPreview } from "./ui/targetPreview.js";
-import { renderTaskModal } from "./ui/taskModal.js";
 import { createLevelViewHost } from "./ui/createLevelViewHost.js";
+import { createGameUiController } from "./ui/createGameUiController.js";
 import {
   createPlayer as createPlayerEntity,
   createNpc as createNpcEntity,
 } from "./entities/actors.js";
 import { setBlackEye, setLipstick } from "./entities/marks.js";
-import {
-  clampNpcCount,
-  loadMatchNpcCount,
-  saveMatchNpcCount,
-  saveBestScore,
-  parseNpcCountRaw,
-} from "./utils/storage.js";
+import { saveBestScore } from "./utils/storage.js";
 import { calcRating } from "./utils/format.js";
 import {
   sfxPunch,
@@ -61,12 +52,12 @@ let camera;
 let clock;
 let player;
 let settleTimer = null;
-let matchNpcCount = DEFAULT_NPC_COUNT;
 let fx;
 let worldBuilder;
 let levelViewHost;
 let actorSystem;
 let combatSystem;
+let uiController;
 
 let totalTime = 0;
 const session = createGameSession();
@@ -131,94 +122,8 @@ const levelRunner = createLevelRunner({
   },
 });
 
-/* ---- NPC 人数设置 ---- */
 function getMatchNpcCount() {
-  return matchNpcCount;
-}
-
-function syncNpcCountInput() {
-  ui.npcCountInput.value = String(matchNpcCount);
-}
-
-function getNpcCountPreview() {
-  const parsed = parseNpcCountRaw(ui.npcCountInput.value);
-  if (parsed == null) return matchNpcCount;
-  return clampNpcCount(parsed);
-}
-
-function getNpcCountForDisplay() {
-  if (document.activeElement === ui.npcCountInput) {
-    return getNpcCountPreview();
-  }
-  return matchNpcCount;
-}
-
-function onNpcCountInput() {
-  buildLevelCards();
-}
-
-function commitNpcCountInput() {
-  const parsed = parseNpcCountRaw(ui.npcCountInput.value);
-  if (parsed == null) {
-    syncNpcCountInput();
-    buildLevelCards();
-    return;
-  }
-  const next = clampNpcCount(parsed);
-  if (next === matchNpcCount) {
-    syncNpcCountInput();
-    buildLevelCards();
-    return;
-  }
-  matchNpcCount = next;
-  syncNpcCountInput();
-  saveMatchNpcCount(matchNpcCount);
-  buildLevelCards();
-}
-
-function bindNpcCountInput() {
-  const input = ui.npcCountInput;
-  input.addEventListener("input", onNpcCountInput);
-  input.addEventListener("change", commitNpcCountInput);
-  input.addEventListener("blur", commitNpcCountInput);
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      input.blur();
-      return;
-    }
-    if (["e", "E", "+", "-", "."].includes(event.key)) {
-      event.preventDefault();
-    }
-  });
-  input.addEventListener("wheel", (event) => {
-    if (document.activeElement === input) event.preventDefault();
-  }, { passive: false });
-
-  // 箭头按钮事件
-  if (ui.npcCountUp) {
-    ui.npcCountUp.addEventListener("click", () => {
-      const next = clampNpcCount(matchNpcCount + 1);
-      if (next !== matchNpcCount) {
-        matchNpcCount = next;
-        syncNpcCountInput();
-        saveMatchNpcCount(matchNpcCount);
-        buildLevelCards();
-      }
-    });
-  }
-
-  if (ui.npcCountDown) {
-    ui.npcCountDown.addEventListener("click", () => {
-      const next = clampNpcCount(matchNpcCount - 1);
-      if (next !== matchNpcCount) {
-        matchNpcCount = next;
-        syncNpcCountInput();
-        saveMatchNpcCount(matchNpcCount);
-        buildLevelCards();
-      }
-    });
-  }
+  return uiController.getMatchNpcCount();
 }
 
 function getWorldContext() {
@@ -273,18 +178,15 @@ function triggerShake(intensity, duration) {
 }
 
 function showOverlay(kind, options) {
-  levelViewHost?.showOverlay(kind, options);
+  uiController.showOverlay(kind, options);
 }
 
 function hideOverlay(kind) {
-  levelViewHost?.hideOverlay(kind);
+  uiController.hideOverlay(kind);
 }
 
 function flashHud(className, durationMs) {
-  ui.hud.classList.remove(className);
-  void ui.hud.offsetWidth;
-  ui.hud.classList.add(className);
-  window.setTimeout(() => ui.hud.classList.remove(className), durationMs);
+  uiController.flashHud(className, durationMs);
 }
 
 function playLevelSound(name, delayMs = 0) {
@@ -323,60 +225,20 @@ function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
   }, delayMs);
 }
 
-function buildLevelCards() {
-  ui.levelCards.innerHTML = "";
-
-  levelRegistry.visible.forEach((level) => {
-    const model = createLevelCardModel(level, {
-      npcCount: getNpcCountForDisplay(),
-    });
-    const starsHtml = Array.from({ length: 3 }, (_, si) =>
-      `<span class="level-star${si < level.difficulty ? " is-on" : ""}">★</span>`,
-    ).join("");
-    const card = document.createElement("button");
-    card.className = `level-card level-card--${level.id}`;
-    card.type = "button";
-    card.dataset.level = level.id;
-    card.innerHTML = `
-      <div class="level-card-accent" aria-hidden="true"></div>
-      <div class="level-card-icon">${level.emoji}</div>
-      <div class="level-card-body">
-        <div class="level-card-name">${level.sceneName} <span class="level-card-difficulty ${model.difficulty.className}">${model.difficulty.label}</span></div>
-        <div class="level-card-desc">${model.description}</div>
-        <div class="level-card-meta">
-          <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${starsHtml}</span>
-        </div>
-      </div>
-      <div class="level-card-go" aria-hidden="true"><span>›</span></div>
-    `;
-    card.addEventListener("click", () => selectLevelById(level.id));
-    ui.levelCards.appendChild(card);
-  });
-  ui.npcCountInput.disabled = false;
+function showLevelSelect() {
+  uiController.showLevelSelect();
 }
 
-function showLevelSelect() {
+function leaveLevel() {
   clearPendingRoundEndTimers();
   disposeScene();
   scene = null;
   session.reset();
-  syncNpcCountInput();
-  buildLevelCards();
-  levelViewHost?.clear();
-  ui.levelSelectModal.classList.add("visible");
-  ui.taskModal.classList.remove("visible");
-  ui.resultModal.classList.remove("visible");
 }
 
 function selectLevelById(id) {
   const index = levelRegistry.getIndexById(id);
-  if (index >= 0) selectLevel(index);
-}
-
-function selectLevel(index) {
-  commitNpcCountInput();
-  ui.levelSelectModal.classList.remove("visible");
-  resetLevel(index);
+  if (index >= 0) resetLevel(index);
 }
 
 const input = {
@@ -444,6 +306,43 @@ export function boot() {
     refreshHud: updateHud,
     dissolveActor: (actor) => fx.createPixelBurst(actor),
   });
+  levelViewHost = createLevelViewHost({
+    root: ui.hud,
+    themedElements: [
+      ui.hud,
+      ui.attackButton,
+      ui.sceneName,
+      ui.clueBar,
+      ui.attemptChip,
+    ],
+    onAction: (action) => levelRunner.handleAction(action),
+  });
+  uiController = createGameUiController({
+    ui,
+    session,
+    levelRegistry,
+    levelViewHost,
+    getHudState: () => levelRunner.handleAction({ type: "getHudState" }),
+    getCooldown: () => ({
+      cooldown: combatSystem.cooldown,
+      cooldownMax: combatSystem.cooldownMax,
+    }),
+    onSelectLevel: selectLevelById,
+    onLeaveLevel: leaveLevel,
+    onStart() {
+      session.transition(GAME_PHASES.PLAYING);
+      session.levelState.startTime = totalTime;
+      updateHud();
+      levelRunner.handleAction({ type: "beginPlay" });
+    },
+    onPause: () => session.transition(GAME_PHASES.PAUSED),
+    onResume: () => session.transition(GAME_PHASES.PLAYING),
+    onRetry() {
+      clearPendingRoundEndTimers();
+      resetLevel(session.currentLevelIndex);
+    },
+    onAttack: () => combatSystem.triggerAttack(),
+  });
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -457,77 +356,13 @@ export function boot() {
   camera.lookAt(0, 0, 0);
 
   setupInput();
-  setupUi();
+  uiController.bind();
   resize();
   window.addEventListener("resize", resize);
 
   // 初始显示关卡选择，不直接加载关卡
   showLevelSelect();
   renderer.setAnimationLoop(tick);
-}
-
-function setupUi() {
-  levelViewHost = createLevelViewHost({
-    root: ui.hud,
-    themedElements: [
-      ui.hud,
-      ui.attackButton,
-      ui.sceneName,
-      ui.clueBar,
-      ui.attemptChip,
-    ],
-    onAction: (action) => levelRunner.handleAction(action),
-  });
-
-  matchNpcCount = loadMatchNpcCount();
-  syncNpcCountInput();
-  bindNpcCountInput();
-
-  ui.startButton.addEventListener("click", () => {
-    if (session.phase !== GAME_PHASES.BRIEFING) return;
-
-    session.transition(GAME_PHASES.PLAYING);
-    session.levelState.startTime = totalTime;
-    ui.taskModal.classList.remove("visible");
-    updateHud();
-    levelRunner.handleAction({ type: "beginPlay" });
-  });
-
-  ui.backFromTaskButton.addEventListener("click", () => {
-    if (session.phase !== GAME_PHASES.BRIEFING) return;
-    showLevelSelect();
-  });
-
-  ui.pauseButton.addEventListener("click", () => {
-    if (session.phase !== GAME_PHASES.PLAYING) return;
-    session.transition(GAME_PHASES.PAUSED);
-    ui.pauseModal.classList.add("visible");
-  });
-
-  ui.resumeButton.addEventListener("click", () => {
-    if (session.phase !== GAME_PHASES.PAUSED) return;
-    session.transition(GAME_PHASES.PLAYING);
-    ui.pauseModal.classList.remove("visible");
-  });
-
-  ui.backFromPauseButton.addEventListener("click", () => {
-    if (session.phase !== GAME_PHASES.PAUSED) return;
-    ui.pauseModal.classList.remove("visible");
-    showLevelSelect();
-  });
-
-  ui.retryButton.addEventListener("click", () => {
-    if (settleTimer) {
-      window.clearTimeout(settleTimer);
-      settleTimer = null;
-    }
-    resetLevel(session.currentLevelIndex);
-  });
-  ui.backToSelectButton.addEventListener("click", () => showLevelSelect());
-  ui.attackButton.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    combatSystem.triggerAttack();
-  });
 }
 
 function setupInput() {
@@ -700,14 +535,7 @@ function resetLevel(index, options = {}) {
 }
 
 function showTask() {
-  const level = session.levelState.level;
-  renderTaskModal(ui, {
-    level,
-    npcCount: getMatchNpcCount(),
-  });
-
-  renderTargetPreview(ui.targetPreviewCanvas, level);
-  updateHud();
+  uiController.showTask();
 }
 
 
@@ -804,24 +632,14 @@ function finishRound(won, failMessage) {
   session.setResult({ won, failMessage, timeUsed, attemptsLeft, rating });
   session.transition(GAME_PHASES.RESULT);
 
-  ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
-  ui.resultCopy.textContent = won
-    ? session.levelState.level.success
-    : (failMessage || session.levelState.level.failure);
-  ui.resultRating.textContent = rating.grade;
-  ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
-  ui.statTime.textContent = timeUsed + " 秒";
-  if (ui.statAttemptsLabel) {
-    ui.statAttemptsLabel.textContent = resultResource?.label ?? "🥊 剩余出拳";
-  }
-  ui.statAttempts.textContent = resultResource?.value ?? `${attemptsLeft} 次`;
-  ui.statAttempts.classList.remove("hearts-display");
-  ui.retryButton.disabled = false;
-  ui.retryButton.textContent = "再来一局";
-
-  ui.resultModal.classList.add("visible");
-  ui.taskModal.classList.remove("visible");
-  levelViewHost?.clear();
+  uiController.showResult({
+    won,
+    failMessage,
+    resultResource,
+    timeUsed,
+    attemptsLeft,
+    rating,
+  });
 
   // 保存最佳成绩
   if (won) {
@@ -841,49 +659,7 @@ function finishRound(won, failMessage) {
 }
 
 function updateHud() {
-  const levelHud = levelRunner.handleAction({ type: "getHudState" });
-  const mechanicHintHtml = session.levelState.level.mechanicHintHtml ?? "";
-  const levelMechanicVisible = Boolean(levelHud?.mechanicVisible);
-  levelViewHost?.setTheme(levelHud?.theme);
-  ui.sceneName.textContent = session.levelState.level.sceneName;
-  ui.missionText.textContent = levelHud?.mission
-    || session.levelState.level.hudMission
-    || session.levelState.level.mission;
-  ui.timerText.textContent = levelHud?.timerText
-    ?? Math.ceil(session.levelState.remaining).toString();
-  ui.attemptLabel.textContent = levelHud?.resourceLabel ?? "出拳";
-  ui.attemptText.textContent = levelHud?.resourceText
-    ?? session.levelState.attempts.toString();
-  ui.attemptText.classList.remove("hearts-display");
-  ui.clueBar.textContent = levelHud?.clue
-    ?? ("🔍 " + (
-      session.levelState.level.hudClue
-      || session.levelState.level.clue
-    ));
-  ui.clueBar?.classList.toggle(
-    "hidden",
-    Boolean(mechanicHintHtml) && !levelMechanicVisible,
-  );
-
-  if (ui.attackIcon) ui.attackIcon.textContent = levelHud?.attackIcon ?? "拳";
-  if (ui.mechanicHint) {
-    ui.mechanicHint.classList.toggle(
-      "visible",
-      Boolean(mechanicHintHtml) || levelMechanicVisible,
-    );
-    ui.mechanicHint.innerHTML = levelHud?.mechanicHtml || mechanicHintHtml;
-  }
-
-  // 出拳冷却动画
-  if (combatSystem.cooldown > 0 && combatSystem.cooldownMax > 0) {
-    const progress = (combatSystem.cooldown / combatSystem.cooldownMax) * 100;
-    ui.cooldownOverlay.style.setProperty("--cd-progress", progress + "%");
-    ui.cooldownOverlay.classList.add("active");
-    ui.attackButton.classList.add("cooling");
-  } else {
-    ui.cooldownOverlay.classList.remove("active");
-    ui.attackButton.classList.remove("cooling");
-  }
+  uiController.updateHud();
 }
 
 function randomRange(min, max) {
