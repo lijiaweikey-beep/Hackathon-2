@@ -1,7 +1,19 @@
+import { BLOODMOON_SANITY_MAX } from "../../config/constants.js";
+import { createBloodmoonLevel } from "./createLevel.js";
+
 export default {
   id: "bloodmoon",
   order: 50,
-  legacy: true,
+  legacy: false,
+  createLevel: createBloodmoonLevel,
+  timeLimit: null,
+  resourceLabel: "理智",
+  resourceInitial: BLOODMOON_SANITY_MAX,
+  playerVariant: "werewolf",
+  attackVariant: "wolf",
+  decoyCount: 6,
+  previewVariant: "bloodmoon",
+  worldVariant: "bloodmoon",
   sceneName: "血月街区",
   emoji: "🌕",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找出血月引路人`,

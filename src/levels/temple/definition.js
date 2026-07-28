@@ -8,6 +8,8 @@ export default {
   createLevel: createTempleLevel,
   decoyCount: 5,
   moonDecoyCount: 3,
+  playerVariant: "temple",
+  npcVariant: "temple",
   sceneName: "承天寺夜游",
   emoji: "🌕",
   cardDesc: ({ npcCount }) => `在 ${npcCount} 个苏轼影分身里找出真正吵醒怀民的苏轼`,

@@ -46,16 +46,28 @@ function clearPreviewActors() {
   }
 }
 
+export function createTargetPreviewModel(level) {
+  const variant = level.previewVariant ?? level.id;
+  return {
+    variant,
+    background: variant === "bloodmoon"
+      ? 0x21060b
+      : level.lighting === "night"
+        ? 0x0c1424
+        : 0xd0dce8,
+  };
+}
+
 export function renderTargetPreview(canvas, level) {
   if (!canvas || !level) return;
   initPreviewRenderer(canvas);
   clearPreviewActors();
 
-  const bg = level.id === "bloodmoon" ? 0x21060b : level.lighting === "night" ? 0x0c1424 : 0xd0dce8;
-  previewScene.background = new THREE.Color(bg);
+  const model = createTargetPreviewModel(level);
+  previewScene.background = new THREE.Color(model.background);
 
-  if (level.id === "gaming") {
-    const npc = createNpcEntity(0, { gamingTarget: true }, level.id);
+  if (model.variant === "gaming") {
+    const npc = createNpcEntity(0, { gamingTarget: true }, level);
     setBlackEye(npc, 1);
     previewScene.add(npc.group);
   } else if (level.duelMode) {
@@ -66,7 +78,7 @@ export function renderTargetPreview(canvas, level) {
     local.group.rotation.y = 0.4;
     remote.group.rotation.y = -0.4;
     previewScene.add(local.group, remote.group);
-  } else if (level.id === "library") {
+  } else if (model.variant === "library") {
     const a = createLowPolyPerson(LOW_POLY_NPC_PALETTES[0]);
     const b = createLowPolyPerson(LOW_POLY_NPC_PALETTES[1]);
     a.group.position.set(-0.32, 0, 0);
@@ -81,7 +93,7 @@ export function renderTargetPreview(canvas, level) {
       });
     });
     previewScene.add(a.group, b.group);
-  } else if (level.id === "bloodmoon") {
+  } else if (model.variant === "bloodmoon") {
     const cue = createBloodmoonClawCue(1);
     cue.position.set(0, 0.045, 0.16);
     previewScene.add(cue);
@@ -89,7 +101,7 @@ export function renderTargetPreview(canvas, level) {
     const npc = createLowPolyPerson(LOW_POLY_NPC_PALETTES[2]);
     npc.group.rotation.y = -0.35;
     previewScene.add(npc.group);
-  } else if (level.id === "temple") {
+  } else if (model.variant === "temple") {
     const cue = createSuShiShadowCue(1);
     cue.position.set(0, 0.045, 0.08);
     previewScene.add(cue);

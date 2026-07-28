@@ -608,31 +608,32 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
 }
 
   function buildWorld(level) {
-  const isBloodmoon = level.id === "bloodmoon";
-  const isNight = level.lighting === "night" || isBloodmoon;
+  const worldVariant = level.worldVariant ?? level.id;
+  const isBloodmoonWorld = worldVariant === "bloodmoon";
+  const isNight = level.lighting === "night" || isBloodmoonWorld;
   const nightLights = getNightLightLevels(level);
-  ctx.getScene().background = new THREE.Color(isBloodmoon ? 0x21060b : isNight ? 0x0c1320 : 0xb9d6e7);
+  ctx.getScene().background = new THREE.Color(isBloodmoonWorld ? 0x21060b : isNight ? 0x0c1320 : 0xb9d6e7);
   if (isNight && level.id === "gaming") {
     ctx.getScene().fog = new THREE.Fog(0x0c1320, 42, 78);
   } else {
-    ctx.getScene().fog = new THREE.Fog(isBloodmoon ? 0x3b0710 : isNight ? 0x0c1320 : 0xc8e3f0, 16, isBloodmoon ? 30 : 35);
+    ctx.getScene().fog = new THREE.Fog(isBloodmoonWorld ? 0x3b0710 : isNight ? 0x0c1320 : 0xc8e3f0, 16, isBloodmoonWorld ? 30 : 35);
   }
 
   const hemi = new THREE.HemisphereLight(
-    isBloodmoon ? 0x6d1a25 : isNight ? 0x3a4d6b : 0xffffff,
-    isBloodmoon ? 0x120406 : isNight ? 0x0a0e16 : 0xa98f6b,
-    isBloodmoon ? 0.95 : isNight ? nightLights.hemi : 1.42,
+    isBloodmoonWorld ? 0x6d1a25 : isNight ? 0x3a4d6b : 0xffffff,
+    isBloodmoonWorld ? 0x120406 : isNight ? 0x0a0e16 : 0xa98f6b,
+    isBloodmoonWorld ? 0.95 : isNight ? nightLights.hemi : 1.42,
   );
   ctx.getScene().add(hemi);
 
   if (isNight) {
-    const ambient = new THREE.AmbientLight(isBloodmoon ? 0x6f1720 : 0x4466aa, isBloodmoon ? 0.52 : nightLights.ambient);
+    const ambient = new THREE.AmbientLight(isBloodmoonWorld ? 0x6f1720 : 0x4466aa, isBloodmoonWorld ? 0.52 : nightLights.ambient);
     ctx.getScene().add(ambient);
   }
 
   const sun = new THREE.DirectionalLight(
-    isBloodmoon ? 0xff6b6b : isNight ? 0x9fc4ff : 0xfff7d6,
-    isBloodmoon ? 1.55 : isNight ? nightLights.dir : 1.65,
+    isBloodmoonWorld ? 0xff6b6b : isNight ? 0x9fc4ff : 0xfff7d6,
+    isBloodmoonWorld ? 1.55 : isNight ? nightLights.dir : 1.65,
   );
   sun.position.set(-5, 12, 8);
   sun.castShadow = true;
@@ -661,7 +662,7 @@ const FLASHLIGHT_SPOT_ANGLE = Math.atan(FLASHLIGHT_RADIUS / FLASHLIGHT_HEIGHT);
     buildGamingRoom();
   } else if (level.id === "library" || level.mapId === "library") {
     buildLibrary();
-  } else if (level.id === "bloodmoon") {
+  } else if (worldVariant === "bloodmoon") {
     buildBloodmoonStreet(sun);
   } else {
     buildTempleCourtyard();

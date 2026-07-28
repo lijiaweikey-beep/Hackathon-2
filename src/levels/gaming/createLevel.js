@@ -3,7 +3,7 @@ export function createGamingLevel(context) {
 
   function start() {
     const computer = context.computers[2];
-    target = context.createNpc(0, { gamingTarget: true });
+    target = context.createNpc(0, { gamingTarget: true, levelTarget: true });
     target.levelManaged = true;
     target.group.position.copy(computer);
     target.group.position.x += 0.2;

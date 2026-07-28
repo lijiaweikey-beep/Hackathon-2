@@ -5,8 +5,8 @@ export function createLibraryLevel(context) {
   let pair = null;
 
   function start() {
-    const a = context.createNpc(0, { lover: true });
-    const b = context.createNpc(1, { lover: true });
+    const a = context.createNpc(0, { lover: true, levelTarget: true });
+    const b = context.createNpc(1, { lover: true, levelTarget: true });
     const separationGroup = Symbol("library-lovers");
     a.levelManaged = true;
     b.levelManaged = true;

@@ -180,7 +180,11 @@ export function createTempleLevel(context) {
   }
 
   function start() {
-    target = context.createNpc(0, { suShiTarget: true, templeClone: true });
+    target = context.createNpc(0, {
+      suShiTarget: true,
+      templeClone: true,
+      levelTarget: true,
+    });
     target.levelManaged = true;
     const startPosition = randomOutsideMoon(null, 1.2);
     target.group.position.copy(startPosition);

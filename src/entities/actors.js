@@ -14,16 +14,17 @@ function defaultRandomRange(min, max) {
   return min + Math.random() * (max - min);
 }
 
-export function createPlayer(levelId) {
-  const isTemple = levelId === "temple";
-  const isBloodmoon = levelId === "bloodmoon";
+export function createPlayer(level = {}) {
+  const playerVariant = level.playerVariant;
+  const isTemple = playerVariant === "temple";
+  const isWerewolf = playerVariant === "werewolf";
   const actor = isTemple
     ? createTemplePerson("window", -1)
-    : createLowPolyPerson(isBloodmoon ? LOW_POLY_WOLF_PALETTE : LOW_POLY_PLAYER_PALETTE);
+    : createLowPolyPerson(isWerewolf ? LOW_POLY_WOLF_PALETTE : LOW_POLY_PLAYER_PALETTE);
   actor.speed = PLAYER_SPEED;
   actor.punchTimer = 0;
   actor.cheer = false;
-  return isBloodmoon ? decorateAsWerewolf(actor) : actor;
+  return isWerewolf ? decorateAsWerewolf(actor) : actor;
 }
 
 export function createRemotePlayer() {
@@ -34,8 +35,10 @@ export function createRemotePlayer() {
   return actor;
 }
 
-export function createNpc(id, flags, levelId, randomRange = defaultRandomRange) {
-  const isTemple = flags.templeClone || flags.suShiTarget || levelId === "temple";
+export function createNpc(id, flags, level = {}, randomRange = defaultRandomRange) {
+  const isTemple = flags.templeClone
+    || flags.suShiTarget
+    || level.npcVariant === "temple";
   const shadowStyle = flags.suShiTarget ? "bamboo" : TEMPLE_DECOY_SHADOW_STYLES[id % TEMPLE_DECOY_SHADOW_STYLES.length];
   let actor = isTemple
     ? createTemplePerson(shadowStyle, id)
@@ -45,8 +48,8 @@ export function createNpc(id, flags, levelId, randomRange = defaultRandomRange) 
   actor.isGamingTarget = Boolean(flags.gamingTarget);
   actor.isLover = Boolean(flags.lover);
   actor.isSuShiTarget = Boolean(flags.suShiTarget);
-  actor.isBloodmoonTarget = Boolean(flags.bloodmoonTarget);
   actor.isWolfGuard = Boolean(flags.wolfGuard);
+  actor.isLevelTarget = Boolean(flags.levelTarget);
   actor.alive = true;
   actor.marked = false;
   actor.markIntensity = 0;

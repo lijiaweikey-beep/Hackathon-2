@@ -39,20 +39,6 @@ import {
   PVP_HIT_RANGE,
   PROXIMITY_MIN_DIST,
   PROXIMITY_MAX_DIST,
-  BLOODMOON_SANITY_MAX,
-  BLOODMOON_WOLF_COOLDOWN,
-  BLOODMOON_NPC_HIT_RANGE,
-  BLOODMOON_NPC_HIT_DAMAGE,
-  BLOODMOON_LIGHTNING_INTERVAL,
-  BLOODMOON_CLUE_SECONDS,
-  BLOODMOON_DECOY_CUES,
-  BLOODMOON_HUNT_SECONDS,
-  BLOODMOON_PHASE2_HP_MAX,
-  BLOODMOON_SUMMON_COUNT,
-  BLOODMOON_SAFE_ZONE_COUNT,
-  BLOODMOON_GUARD_SPEED,
-  BLOODMOON_GUARD_DAMAGE,
-  BLOODMOON_HUNT_INTRO_SECONDS,
   PUNCH_COOLDOWNS,
   PUNCH_RESET_DELAY,
   GRID_CELL,
@@ -218,10 +204,29 @@ const levelRunner = createLevelRunner({
     collidesWithObstacle,
     isFacingTarget,
     getActors: () => [player, ...npcs].filter(Boolean),
+    getNpcs: () => npcs,
+    getPlayer: () => player,
+    getGameStatus: () => gameStatus,
     getTotalTime: () => totalTime,
+    dissolveNpc,
+    compactDeadNpcs,
+    randomizeActorPosition,
+    setActorPartsVisible,
+    showOverlay,
+    hideOverlay,
+    flashHud,
+    playLevelSound,
+    triggerShake,
+    triggerHitstop,
+    finishLevel: settleRound,
+    refreshHud: updateHud,
+    resetPlayerInput,
+    isActorFacingTarget,
     setTempleLocalShadow,
     setShadowCueIntensity,
     positionShadowCue,
+    setBloodmoonClawIntensity,
+    positionBloodmoonCue,
     updateEnvironment: updateFlashlight,
   }),
   onError(error, definition) {
@@ -345,11 +350,11 @@ function getWorldContext() {
 }
 
 function createPlayer() {
-  return createPlayerEntity(levelState?.level?.id);
+  return createPlayerEntity(levelState?.level);
 }
 
 function createNpc(id, flags) {
-  return createNpcEntity(id, flags, levelState?.level?.id, randomRange);
+  return createNpcEntity(id, flags, levelState?.level, randomRange);
 }
 
 function registerObstacle(x, z, halfW, halfD) {
@@ -387,6 +392,58 @@ function triggerShake(intensity, duration) {
 
 function triggerDamageFx() {
   fx.triggerDamageFx();
+}
+
+function setActorPartsVisible(actor, partKey, visible) {
+  actor?.group?.userData?.[partKey]?.forEach((part) => {
+    part.visible = visible;
+  });
+}
+
+function getOverlay(kind) {
+  return kind === "huntIntro" ? ui.huntIntro : ui.huntCard;
+}
+
+function showOverlay(kind, html) {
+  const overlay = getOverlay(kind);
+  if (!overlay) return;
+  overlay.innerHTML = html;
+  overlay.classList.remove("visible");
+  void overlay.offsetWidth;
+  overlay.classList.add("visible");
+}
+
+function hideOverlay(kind) {
+  getOverlay(kind)?.classList.remove("visible");
+}
+
+function flashHud(className, durationMs) {
+  ui.hud.classList.remove(className);
+  void ui.hud.offsetWidth;
+  ui.hud.classList.add(className);
+  window.setTimeout(() => ui.hud.classList.remove(className), durationMs);
+}
+
+function playLevelSound(name, delayMs = 0) {
+  const sounds = {
+    thunder: sfxThunder,
+    hit: sfxHit,
+    miss: sfxMiss,
+    npcHit: sfxNpcHit,
+    wolfPunch: sfxWolfPunch,
+  };
+  const play = sounds[name];
+  if (!play) return;
+  if (delayMs > 0) {
+    window.setTimeout(play, delayMs);
+  } else {
+    play();
+  }
+}
+
+function resetPlayerInput() {
+  playerInputVel.set(0, 0);
+  resetActionIntervalLock();
 }
 
 function updateShake(dt) {
@@ -1072,7 +1129,7 @@ function setupUi() {
       roundId: duelRoundId,
       duelSpawns: levelState.duelSpawns,
     });
-    if (levelState.level.id === "bloodmoon") sfxWolfHowl();
+    if (levelState.level.playerVariant === "werewolf") sfxWolfHowl();
   });
 
   ui.backFromTaskButton.addEventListener("click", () => {
@@ -1130,7 +1187,7 @@ function setupUi() {
     const button = event.target.closest?.("[data-hunt-start]");
     if (!button) return;
     event.preventDefault();
-    beginBloodmoonHuntCountdown();
+    levelRunner.handleAction({ type: "beginSpecialPhase" });
   });
   ui.attackButton.addEventListener("pointerdown", (event) => {
     event.preventDefault();
@@ -1312,7 +1369,9 @@ function resetLevel(index, options = {}) {
 
   levelState = {
     level,
-    remaining: duel || level.id === "bloodmoon" ? 9999 : ROUND_SECONDS,
+    remaining: duel || level.timeLimit === null
+      ? 9999
+      : (level.timeLimit ?? ROUND_SECONDS),
     attempts: duel ? DUEL_PLAYER_HP : ATTEMPTS,
     computers: [],
     startTime: 0,
@@ -1322,10 +1381,6 @@ function resetLevel(index, options = {}) {
     worldSeed,
     duelSpawns: null,
     duelPunchers: duel ? buildDuelPuncherSet(worldSeed) : null,
-    sanity: BLOODMOON_SANITY_MAX,
-    playerInvuln: 0,
-    hostility: 1,
-    bloodmoon: null,
     flashlight: null,
   };
 
@@ -1437,31 +1492,12 @@ function spawnNpcs(level) {
   if (!level.legacy) {
     levelRunner.load(level);
     levelRunner.start();
-  } else if (level.id === "bloodmoon") {
-    const target = createNpc(0, { bloodmoonTarget: true });
-    const start = randomOpenPosition();
-    target.group.position.set(start.x, 0, start.z);
-    target.script = {
-      state: "wander",
-      timer: randomRange(2.2, 4.4),
-      waypoint: randomOpenPosition(),
-      cluePause: 0,
-    };
-    npcs.push(target);
-    scene.add(target.group);
-
-    for (let i = 1; i < getMatchNpcCount(); i += 1) {
-      addWanderNpc(i);
-    }
   }
 
-  const decoyCount = level.decoyCount
-    ?? (level.id === "bloodmoon" ? 6 : 3);
+  const decoyCount = level.decoyCount ?? 3;
   const wanderNpcs = npcs.filter(
     (npc) => !npc.levelManaged
-      && !npc.isLover
-      && !npc.isSuShiTarget
-      && !npc.isBloodmoonTarget
+      && !npc.isLevelTarget
       && npc.alive,
   );
   shuffleArray(wanderNpcs);
@@ -1471,9 +1507,6 @@ function spawnNpcs(level) {
     levelRunner.handleAction({ type: "configureDecoy", npc, index: i });
   }
 
-  if (level.id === "bloodmoon") {
-    npcs.forEach((npc) => initBloodmoonNpc(npc));
-  }
 }
 
 function addWanderNpc(id) {
@@ -1486,6 +1519,7 @@ function addWanderNpc(id) {
   npc.walking = false;
   npcs.push(npc);
   scene.add(npc.group);
+  return npc;
 }
 
 function spawnDuelNpcs() {
@@ -2074,483 +2108,11 @@ function randomOpenPosition() {
   return pos;
 }
 
-/* ---- bloodmoon mode (from zjy) ---- */
-
-
-function initBloodmoonNpc(npc) {
-  npc.alertTimer = randomRange(0.4, 2.6);
-  npc.attackTimer = 0;
-  npc.attackResolveTimer = 0;
-  npc.attackCooldown = randomRange(0.7, 1.7);
-  npc.hostility = npc.isBloodmoonTarget ? 1.15 : randomRange(0.82, 1.12);
-}
-
-
-
-function updateBloodmoonStorm(dt) {
-  const state = levelState.bloodmoon;
-  if (!state) return;
-  if (state.mode === "hunt") {
-    state.lightningFlash = Math.max(0, state.lightningFlash - dt * 3.5);
-    if (state.lightningLight) state.lightningLight.intensity = state.lightningFlash * 5.5;
-    return;
-  }
-
-  state.lightningTimer -= dt;
-  state.lightningFlash = Math.max(0, state.lightningFlash - dt * 4.8);
-  state.clueTimer = Math.max(0, state.clueTimer - dt);
-
-  if (state.lightningTimer <= 0) {
-    state.lightningTimer = randomRange(BLOODMOON_LIGHTNING_INTERVAL[0], BLOODMOON_LIGHTNING_INTERVAL[1]);
-    state.lightningFlash = 1;
-    state.clueTimer = BLOODMOON_CLUE_SECONDS;
-    state.revealCount = Math.min(3, (state.revealCount ?? 0) + 1);
-    triggerShake(0.42, 0.32);
-    ui.hud.classList.remove("bloodmoon-lightning");
-    void ui.hud.offsetWidth;
-    ui.hud.classList.add("bloodmoon-lightning");
-    window.setTimeout(() => ui.hud.classList.remove("bloodmoon-lightning"), 360);
-    window.setTimeout(() => sfxThunder(), randomRange(180, 420));
-
-    const target = npcs.find((npc) => npc.isBloodmoonTarget && npc.alive);
-    if (target?.script) {
-      target.script.cluePause = BLOODMOON_CLUE_SECONDS;
-      target.script.timer = Math.max(target.script.timer, BLOODMOON_CLUE_SECONDS);
-    }
-    assignBloodmoonDecoyCues();
-  }
-
-  const flash = state.lightningFlash;
-  const strobe = flash > 0 ? flash * (0.75 + Math.abs(Math.sin(totalTime * 44)) * 0.65) : 0;
-  if (state.lightningLight) state.lightningLight.intensity = strobe * 9.5;
-  if (state.baseLight) {
-    state.baseLight.color.set(strobe > 0.08 ? 0xf8fbff : 0xff6b6b);
-    state.baseLight.intensity = 1.55 + strobe * 4.8;
-  }
-  if (state.moonMaterial) {
-    state.moonMaterial.opacity = 0.78 + Math.sin(totalTime * 1.7) * 0.08 + strobe * 0.2;
-  }
-  state.lightningBolts?.forEach((bolt, index) => {
-    const visible = strobe > 0.08 && (index === 0 || Math.sin(totalTime * 37 + index) > -0.25);
-    bolt.visible = visible;
-    bolt.userData.segments?.forEach((seg) => {
-      seg.material.opacity = visible ? Math.min(1, (seg.geometry.parameters.width < 0.1 ? 0.92 : 0.26) * strobe) : 0;
-    });
-  });
-}
-
-function handleBloodmoonBossHit(boss) {
-  const state = levelState.bloodmoon;
-  if (!state || state.mode === "hunt") return;
-  triggerHitstop(0.08);
-  triggerShake(0.42, 0.22);
-  sfxHit();
-
-  if (state.mode === "phase1") {
-    state.mode = "phase2";
-    startBloodmoonHunt(boss);
-    return;
-  }
-
-  state.bossHp = Math.max(0, state.bossHp - 1);
-  if (state.bossHp <= 0) {
-    dissolveNpc(boss);
-    settleRound(true, null, 760);
-    return;
-  }
-  startBloodmoonHunt(boss);
-}
-
-function startBloodmoonHunt(boss) {
-  const state = levelState.bloodmoon;
-  if (!state) return;
-  state.mode = "huntIntro";
-  state.huntTimer = BLOODMOON_HUNT_SECONDS;
-  state.cutsceneTimer = BLOODMOON_HUNT_INTRO_SECONDS;
-  state.huntBriefingShown = false;
-  state.clueTimer = 0;
-  state.revealCount = 0;
-  state.huntBoss = boss;
-
-  if (boss) {
-    boss.group.visible = false;
-    boss.alive = false;
-  }
-  setBloodmoonClawIntensity(state.targetCue, 0);
-  state.decoyCues?.forEach((cue) => setBloodmoonClawIntensity(cue, 0));
-  hideBloodmoonSafeZones();
-  ui.huntCard?.classList.remove("visible");
-  showBloodmoonHuntIntro();
-  triggerShake(0.5, 0.34);
-}
-
-function showBloodmoonHuntIntro() {
-  if (!ui.huntIntro) return;
-  ui.huntIntro.innerHTML = `
-    <div class="hunt-intro-moon"></div>
-    <div class="hunt-intro-title">猎杀时刻</div>
-    <div class="hunt-intro-quote">“认不出自己的人，都会留在月光外。”</div>
-  `;
-  ui.huntIntro.classList.remove("visible");
-  void ui.huntIntro.offsetWidth;
-  ui.huntIntro.classList.add("visible");
-  ui.hud.classList.remove("bloodmoon-lightning");
-  void ui.hud.offsetWidth;
-  ui.hud.classList.add("bloodmoon-lightning");
-  window.setTimeout(() => ui.hud.classList.remove("bloodmoon-lightning"), 520);
-}
-
-function updateBloodmoonHuntIntro(dt) {
-  const state = levelState.bloodmoon;
-  if (!state || state.mode !== "huntIntro") return;
-  state.cutsceneTimer = Math.max(0, state.cutsceneTimer - dt);
-  if (state.cutsceneTimer > 0) return;
-  state.mode = "huntBriefing";
-  ui.huntIntro?.classList.remove("visible");
-  showBloodmoonHuntCard();
-}
-
-function beginBloodmoonHuntCountdown() {
-  const state = levelState.bloodmoon;
-  if (!state || state.mode !== "huntBriefing") return;
-  state.mode = "hunt";
-  state.huntTimer = BLOODMOON_HUNT_SECONDS;
-  state.huntBriefingShown = true;
-  ui.huntCard?.classList.remove("visible");
-  setPlayerWolfIdentity(false);
-
-  state.safeZones = pickBloodmoonSafeZones();
-  state.safeZoneVisuals.forEach((visual, index) => {
-    const safePos = state.safeZones[index];
-    if (!safePos) {
-      visual.mesh.visible = false;
-      visual.ring.visible = false;
-      return;
-    }
-    visual.mesh.position.set(safePos.x, 0.105, safePos.z);
-    visual.ring.position.set(safePos.x, 0.112, safePos.z);
-    visual.mesh.visible = true;
-    visual.ring.visible = true;
-    visual.mesh.material.opacity = 0.34;
-    visual.ring.material.opacity = 0.88;
-  });
-
-  randomizeActorPosition(player);
-  playerInputVel.set(0, 0);
-  resetActionIntervalLock();
-  npcs.forEach((npc) => {
-    if (!npc.alive && npc !== state.huntBoss) return;
-    if (npc === state.huntBoss) return;
-    randomizeActorPosition(npc);
-    npc.attackTimer = 0;
-    npc.attackCooldown = BLOODMOON_HUNT_SECONDS + 2;
-  });
-  triggerShake(0.5, 0.34);
-}
-
-function showBloodmoonHuntCard() {
-  if (!ui.huntCard) return;
-  ui.huntCard.innerHTML = `
-    <div class="hunt-card-title">血月引路人</div>
-    <div class="hunt-card-quote">“认不出自己的人，都会留在月光外。”</div>
-    <div class="hunt-card-rule">机制 1：关闭这张卡片后，玩家和所有 NPC 会立刻随机散落到地图任意位置。</div>
-    <div class="hunt-card-rule">机制 2：你的狼人耳朵、狼爪和披风会暂时消失，NPC 也会暂停攻击。</div>
-    <div class="hunt-card-rule">机制 3：你有 20 秒找到自己，并进入任意一个绿色安全区域。</div>
-    <div class="hunt-card-rule">处决：倒计时结束时，绿色区域外的所有生物都会被血月秒杀。</div>
-    <button class="hunt-card-button" type="button" data-hunt-start>关闭卡片，开始倒计时</button>
-  `;
-  ui.huntCard.classList.remove("visible");
-  void ui.huntCard.offsetWidth;
-  ui.huntCard.classList.add("visible");
-}
-
-function pickBloodmoonSafeZones() {
-  const zones = [];
-  for (let i = 0; i < BLOODMOON_SAFE_ZONE_COUNT; i += 1) {
-    let pos = null;
-    for (let tries = 0; tries < 50; tries += 1) {
-      const candidate = randomOpenPosition();
-      const farEnough = zones.every((zone) => candidate.distanceTo(zone) > stateSafeZoneSpacing());
-      if (farEnough) {
-        pos = candidate;
-        break;
-      }
-    }
-    zones.push(pos ?? randomOpenPosition());
-  }
-  return zones;
-}
-
-function stateSafeZoneSpacing() {
-  return levelState?.bloodmoon?.safeZoneRadius ? levelState.bloodmoon.safeZoneRadius * 2.35 : 5.5;
-}
-
 function randomizeActorPosition(actor) {
-  const pos = randomOpenPosition();
-  actor.group.position.set(pos.x, 0, pos.z);
+  const position = randomOpenPosition();
+  actor.group.position.set(position.x, 0, position.z);
   actor.velocity?.set?.(0, 0);
   actor.walking = false;
-}
-
-function updateBloodmoonHunt(dt) {
-  const state = levelState.bloodmoon;
-  if (!state || state.mode !== "hunt") return;
-  state.huntTimer = Math.max(0, state.huntTimer - dt);
-  state.cutsceneTimer = Math.max(0, (state.cutsceneTimer ?? 0) - dt);
-  const pulse = 0.65 + Math.abs(Math.sin(totalTime * 5.5)) * 0.35;
-  state.safeZoneVisuals?.forEach((visual, index) => {
-    if (!visual.mesh.visible) return;
-    visual.mesh.material.opacity = 0.22 + pulse * 0.18;
-    visual.ring.material.opacity = 0.64 + pulse * 0.28;
-    visual.ring.scale.setScalar(1 + Math.sin(totalTime * 6 + index) * 0.035);
-  });
-  if (state.huntTimer <= 0) resolveBloodmoonHunt();
-}
-
-function resolveBloodmoonHunt() {
-  const state = levelState.bloodmoon;
-  if (!state || state.mode !== "hunt" || gameStatus !== "playing") return;
-  const radius = state.safeZoneRadius;
-  const playerSafe = isInsideAnyBloodmoonSafeZone(player.group.position, radius);
-
-  if (!playerSafe) {
-    levelState.sanity = 0;
-    hideBloodmoonSafeZones();
-    setPlayerWolfIdentity(true);
-    triggerShake(0.55, 0.35);
-    sfxLose();
-    settleRound(false, null, 700);
-    return;
-  }
-
-  npcs.forEach((npc) => {
-    if (!npc.alive) return;
-    const inside = isInsideAnyBloodmoonSafeZone(npc.group.position, radius);
-    if (!inside && !npc.isBloodmoonTarget) dissolveNpc(npc);
-  });
-
-  hideBloodmoonSafeZones();
-  setPlayerWolfIdentity(true);
-  compactDeadNpcs();
-  respawnBloodmoonBoss();
-  summonBloodmoonWave();
-  restoreBloodmoonNpcAttacks();
-  state.mode = "phase2";
-  state.huntTimer = 0;
-  triggerShake(0.36, 0.22);
-}
-
-function isInsideAnyBloodmoonSafeZone(position, radius = levelState.bloodmoon?.safeZoneRadius ?? 2.35) {
-  return Boolean(levelState.bloodmoon?.safeZones?.some((safe) => (
-    safe && Math.hypot(position.x - safe.x, position.z - safe.z) <= radius
-  )));
-}
-
-function hideBloodmoonSafeZones() {
-  const state = levelState.bloodmoon;
-  state?.safeZoneVisuals?.forEach((visual) => {
-    visual.mesh.visible = false;
-    visual.ring.visible = false;
-  });
-}
-
-function respawnBloodmoonBoss() {
-  const state = levelState.bloodmoon;
-  let boss = state.huntBoss;
-  if (!boss) {
-    boss = createNpc(state.nextNpcId++, { bloodmoonTarget: true });
-    npcs.push(boss);
-    scene.add(boss.group);
-  }
-  boss.alive = true;
-  boss.group.visible = true;
-  boss.group.position.copy(randomOpenPosition());
-  boss.script = {
-    state: "wander",
-    timer: randomRange(2.0, 3.4),
-    waypoint: randomOpenPosition(),
-    cluePause: 0,
-  };
-  initBloodmoonNpc(boss);
-  state.huntBoss = null;
-}
-
-function summonBloodmoonWave() {
-  const state = levelState.bloodmoon;
-  state.summonWave += 1;
-  for (let i = 0; i < BLOODMOON_SUMMON_COUNT; i += 1) {
-    const npc = createNpc(state.nextNpcId++, {});
-    const pos = randomOpenPosition();
-    npc.group.position.set(pos.x, 0, pos.z);
-    npc.wanderTimer = randomRange(0.4, 1.7);
-    npc.pauseTimer = randomRange(0.1, 0.8);
-    initBloodmoonNpc(npc);
-    npcs.push(npc);
-    scene.add(npc.group);
-  }
-
-  const guard = createNpc(state.nextNpcId++, { wolfGuard: true });
-  const pos = randomBloodmoonGuardSpawnPosition();
-  guard.group.position.set(pos.x, 0, pos.z);
-  guard.speed = BLOODMOON_GUARD_SPEED;
-  guard.attackCooldown = 0.8;
-  guard.hostility = 1.8;
-  npcs.push(guard);
-  scene.add(guard.group);
-}
-
-function randomBloodmoonGuardSpawnPosition() {
-  const boss = npcs.find((npc) => npc.isBloodmoonTarget && npc.alive);
-  let fallback = null;
-  for (let tries = 0; tries < 60; tries += 1) {
-    const pos = randomOpenPosition();
-    fallback = fallback ?? pos;
-    const farFromPlayer = !player || pos.distanceTo(player.group.position) >= 5.2;
-    const farFromBoss = !boss || pos.distanceTo(boss.group.position) >= 3.4;
-    if (farFromPlayer && farFromBoss) return pos;
-  }
-  return fallback ?? randomOpenPosition();
-}
-
-function restoreBloodmoonNpcAttacks() {
-  npcs.forEach((npc) => {
-    if (!npc.alive) return;
-    npc.attackTimer = 0;
-    npc.attackResolveTimer = 0;
-    npc.alertTimer = randomRange(0.2, 0.9);
-    npc.attackCooldown = npc.isWolfGuard ? 0.35 : randomRange(0.45, 1.15);
-    npc.hostility = npc.isWolfGuard ? 2.2 : Math.max(npc.hostility ?? 1, 1.05);
-  });
-}
-
-function setPlayerWolfIdentity(visible) {
-  player?.group?.userData?.wolfParts?.forEach((part) => {
-    part.visible = visible;
-  });
-}
-
-function assignBloodmoonDecoyCues() {
-  const state = levelState.bloodmoon;
-  if (!state?.decoyCues?.length) return;
-  const candidates = npcs.filter((npc) => npc.alive && !npc.isBloodmoonTarget);
-  shuffleArray(candidates);
-
-  state.decoyCues.forEach((cue, index) => {
-    const npc = candidates[index];
-    cue.userData.decoyNpc = npc ?? null;
-    cue.userData.seed = Math.random() * 100;
-    cue.userData.missingToe = Math.floor(Math.random() * 4);
-    cue.userData.decoyCompleteness = randomRange(0.38, 0.72);
-    if (!npc) setBloodmoonClawIntensity(cue, 0);
-  });
-}
-
-function updateBloodmoonTarget(dt) {
-  const target = npcs.find((npc) => npc.isBloodmoonTarget);
-  if (!target || !target.alive || !target.script) return;
-  const script = target.script;
-
-  if (script.cluePause > 0) {
-    script.cluePause -= dt;
-    target.walking = false;
-    faceNpcToward(target, new THREE.Vector3(7.2, 0, -10.8));
-    return;
-  }
-
-  target.walking = true;
-  const reached = moveNpcToward(target, script.waypoint, NPC_SPEED * 1.06, dt);
-  script.timer -= dt;
-  if (reached || script.timer <= 0) {
-    script.timer = randomRange(2.2, 4.4);
-    script.waypoint = randomOpenPosition();
-  }
-}
-
-function updateBloodmoonNpcThreat(npc, dt) {
-  if (!player || !npc.alive) return;
-  const prevResolveTimer = npc.attackResolveTimer ?? 0;
-  npc.attackCooldown = Math.max(0, (npc.attackCooldown ?? 0) - dt);
-  npc.attackTimer = Math.max(0, (npc.attackTimer ?? 0) - dt);
-  npc.attackResolveTimer = Math.max(0, (npc.attackResolveTimer ?? 0) - dt);
-  npc.alertTimer = Math.max(0, (npc.alertTimer ?? 0) - dt);
-
-  scratchToPlayer.set(
-    player.group.position.x - npc.group.position.x,
-    player.group.position.z - npc.group.position.z,
-  );
-  const distance = scratchToPlayer.length();
-  if (prevResolveTimer > 0 && npc.attackResolveTimer <= 0) {
-    resolveBloodmoonNpcHit(npc);
-  }
-  if (distance > BLOODMOON_NPC_HIT_RANGE || npc.attackCooldown > 0) return;
-
-  getFacingVector(npc.group.rotation.y, scratchFacing);
-  const pressure = levelState.hostility * npc.hostility;
-  if (isFacingTarget(scratchFacing, scratchToPlayer) && npc.alertTimer <= 0 && Math.random() < dt * 1.8 * pressure) {
-    npc.attackTimer = 0.26;
-    npc.attackResolveTimer = 0.12;
-    npc.attackCooldown = randomRange(1.0, 1.7) / pressure;
-    faceNpcToward(npc, player.group.position);
-  }
-
-}
-
-function updateWolfGuard(npc, dt) {
-  if (!player || !npc.alive) return;
-  scratchWaypoint.copy(player.group.position);
-  const reached = moveNpcToward(npc, scratchWaypoint, npc.speed ?? BLOODMOON_GUARD_SPEED, dt);
-  npc.walking = !reached;
-  if (npc.group.position.distanceTo(player.group.position) < BLOODMOON_NPC_HIT_RANGE + 0.18) {
-    npc.alertTimer = 0;
-    npc.hostility = 2.2;
-    npc.attackCooldown = Math.min(npc.attackCooldown ?? 0.6, 0.18);
-    faceNpcToward(npc, player.group.position);
-  }
-}
-
-function resolveBloodmoonNpcHit(npc) {
-  if (levelState.level.id !== "bloodmoon" || levelState.playerInvuln > 0 || gameStatus !== "playing") return;
-  scratchToPlayer.set(
-    player.group.position.x - npc.group.position.x,
-    player.group.position.z - npc.group.position.z,
-  );
-  if (scratchToPlayer.length() > BLOODMOON_NPC_HIT_RANGE) return;
-  getFacingVector(npc.group.rotation.y, scratchFacing);
-  if (!isFacingTarget(scratchFacing, scratchToPlayer)) return;
-
-  levelState.sanity = Math.max(0, levelState.sanity - (npc.isWolfGuard ? BLOODMOON_GUARD_DAMAGE : BLOODMOON_NPC_HIT_DAMAGE));
-  levelState.playerInvuln = 0.72;
-  triggerShake(0.28, 0.2);
-  sfxNpcHit();
-  ui.hud.classList.add("bloodmoon-hit");
-  window.setTimeout(() => ui.hud.classList.remove("bloodmoon-hit"), 180);
-  updateHud();
-  if (levelState.sanity <= 0) {
-    settleRound(false, null, 620);
-  }
-}
-
-function updateBloodmoonTargetCue() {
-  const state = levelState.bloodmoon;
-  const target = npcs.find((npc) => npc.isBloodmoonTarget && npc.alive);
-  const intensity = state?.clueTimer > 0 ? THREE.MathUtils.clamp(state.clueTimer / BLOODMOON_CLUE_SECONDS, 0, 1) : 0;
-  if (state?.targetCue && target) {
-    const revealStage = Math.max(1, state.revealCount ?? 1);
-    const completeness = revealStage === 1 ? 0.3 : revealStage === 2 ? 0.64 : 1;
-    positionBloodmoonCue(state.targetCue, target);
-    setBloodmoonClawIntensity(state.targetCue, intensity, 0.9 + Math.abs(Math.sin(totalTime * 15)) * 0.28, completeness);
-  }
-
-  state?.decoyCues?.forEach((cue) => {
-    const npc = cue.userData.decoyNpc;
-    if (!npc?.alive) {
-      setBloodmoonClawIntensity(cue, 0);
-      return;
-    }
-    positionBloodmoonCue(cue, npc);
-    const flicker = 0.56 + Math.abs(Math.sin(totalTime * 20 + cue.userData.seed)) * 0.34;
-    setBloodmoonClawIntensity(cue, intensity * 0.82, flicker, cue.userData.decoyCompleteness, totalTime);
-  });
 }
 
 function tick() {
@@ -2577,20 +2139,15 @@ function tick() {
   totalTime += dt;
 
   if (gameStatus === "playing") {
-    if (levelState.level.id === "bloodmoon" && !isDuelActive()) {
-      updateBloodmoonHuntIntro(dt);
-      if (levelState.bloodmoon?.mode === "huntIntro" || levelState.bloodmoon?.mode === "huntBriefing") {
-        updateHud();
-        updateParticles(dt);
-        updateShake(dt);
-        renderer.render(scene, camera);
-        return;
-      }
-      updateBloodmoonStorm(dt);
-      levelState.playerInvuln = Math.max(0, levelState.playerInvuln - dt);
-      updateBloodmoonHunt(dt);
+    const frameResult = levelRunner.update(dt);
+    if (frameResult?.pauseWorld) {
+      updateHud();
+      updateParticles(dt);
+      updateShake(dt);
+      renderer.render(scene, camera);
+      return;
     }
-    if (!isDuelActive()) {
+    if (!isDuelActive() && levelState.level.timeLimit !== null) {
       levelState.remaining = Math.max(0, levelState.remaining - dt);
       if (levelState.remaining <= 0) {
         finishRound(false);
@@ -2663,7 +2220,7 @@ function updatePlayer(dt) {
 
   if (punchCooldown > 0) punchCooldown = Math.max(0, punchCooldown - dt);
   if (player.punchTimer > 0) player.punchTimer = Math.max(0, player.punchTimer - dt);
-  if (levelState.level.id !== "bloodmoon" && punchResetTimer > 0) {
+  if (levelState.level.attackVariant !== "wolf" && punchResetTimer > 0) {
     punchResetTimer -= dt;
     if (punchResetTimer <= 0) punchTier = 0;
   }
@@ -2673,7 +2230,9 @@ function updatePlayer(dt) {
 
 function animatePunchPose() {
   const userData = player.group.userData;
-  const t = player.punchTimer > 0 ? Math.sin((player.punchTimer / (levelState.level.id === "bloodmoon" ? 0.26 : PUNCH_SWING)) * Math.PI) : 0;
+  const t = player.punchTimer > 0
+    ? Math.sin((player.punchTimer / (player.punchDuration ?? PUNCH_SWING)) * Math.PI)
+    : 0;
   const wolfBoost = player.isWerewolf ? 1.3 : 1;
   userData.rightArm.rotation.x = -2.15 * t * wolfBoost;
   userData.rightArm.rotation.z = userData.baseArmRotations.rightZ - 1.05 * t * wolfBoost;
@@ -2765,30 +2324,6 @@ function updateRemotePlayerAnim(dt) {
 }
 
 function updateNpcs(dt) {
-  if (levelState.level.id === "bloodmoon" && !isDuelLevel()) {
-    const inHunt = levelState.bloodmoon?.mode === "hunt";
-    if (!inHunt) updateBloodmoonTarget(dt);
-    npcs.forEach((npc) => {
-      if (!npc.alive) return;
-      if (!npc.isBloodmoonTarget) {
-        if (npc.isWolfGuard && !inHunt) {
-          updateWolfGuard(npc, dt);
-        } else if (npc.isDecoy) {
-          updateDecoy(npc, dt);
-        } else {
-          updateWander(npc, dt);
-        }
-      }
-      if (!inHunt) updateBloodmoonNpcThreat(npc, dt);
-      animateActor(npc, dt, npc.walking);
-      animateNpcPunchPose(npc);
-    });
-    separateActors();
-    updateBloodmoonTargetCue();
-    compactDeadNpcs();
-    return;
-  }
-
   if (isDuelLevel()) {
     updateDuelGather();
     updateDuelHerdState();
@@ -2805,7 +2340,6 @@ function updateNpcs(dt) {
   }
 
   if (!levelState.level.legacy) {
-    levelRunner.update(dt);
     npcs.forEach((npc) => {
       if (!npc.alive) return;
       if (!npc.levelManaged) {
@@ -2816,9 +2350,10 @@ function updateNpcs(dt) {
         }
       }
       animateActor(npc, dt, npc.walking);
+      if (npc.attackResolveTimer != null) animateNpcPunchPose(npc);
     });
     separateActors();
-    levelRunner.handleAction({ type: "afterNpcUpdate" });
+    levelRunner.handleAction({ type: "afterNpcUpdate", deltaSeconds: dt });
     return;
   }
 }
@@ -3008,25 +2543,27 @@ function pushApart(a, b, minDistance, strength) {
 
 function triggerAttack() {
   if (gameStatus !== "playing" || punchCooldown > 0) return;
+  const attack = isDuelActive()
+    ? {}
+    : (levelRunner.handleAction({ type: "beforeAttack" }) ?? {});
+  if (attack.blocked) return;
   if (!consumeActionInterval()) return;
-  const isBloodmoon = levelState.level.id === "bloodmoon" && !isDuelActive();
-  if (isBloodmoon && ["huntIntro", "huntBriefing", "hunt"].includes(levelState.bloodmoon?.mode)) return;
-  punchCooldownMax = isBloodmoon
-    ? BLOODMOON_WOLF_COOLDOWN
-    : PUNCH_COOLDOWNS[Math.min(punchTier, PUNCH_COOLDOWNS.length - 1)];
+  punchCooldownMax = attack.cooldown
+    ?? PUNCH_COOLDOWNS[Math.min(punchTier, PUNCH_COOLDOWNS.length - 1)];
   punchCooldown = punchCooldownMax;
-  if (!isBloodmoon) {
+  if (attack.resetCombo !== false) {
     punchTier += 1;
     punchResetTimer = PUNCH_RESET_DELAY;
   }
-  player.punchTimer = isBloodmoon ? 0.26 : PUNCH_SWING;
+  player.punchDuration = attack.animationSeconds ?? PUNCH_SWING;
+  player.punchTimer = player.punchDuration;
   if (isDuelActive()) {
     sfxPunchHeavy();
     spawnPunchSwish(player);
     ui.attackButton.classList.add("punching");
     window.setTimeout(() => ui.attackButton.classList.remove("punching"), 180);
-  } else if (isBloodmoon) {
-    sfxWolfPunch();
+  } else if (attack.sound) {
+    playLevelSound(attack.sound);
   } else {
     sfxPunch();
   }
@@ -3070,12 +2607,10 @@ function triggerAttack() {
 
   const hit = findHitTarget();
   if (!hit) return;
+  const levelHit = levelRunner.handleAction({ type: "hitTarget", hit });
+  if (levelHit?.handled) return;
 
   if (hit.correct) {
-    if (isBloodmoon && hit.npc?.isBloodmoonTarget) {
-      handleBloodmoonBossHit(hit.npc);
-      return;
-    }
     if (hit.npcs) {
       hit.npcs.forEach((npc) => dissolveNpc(npc));
     } else {
@@ -3092,19 +2627,6 @@ function triggerAttack() {
       });
     }
     settleRound(true, null, 760);
-    return;
-  }
-
-  if (isBloodmoon) {
-    dissolveNpc(hit.npc);
-    compactDeadNpcs();
-    triggerHitstop(0.06);
-    triggerShake(0.14, 0.1);
-    sfxMiss();
-    if (levelState.bloodmoon) {
-      levelState.bloodmoon.revealCount = Math.max(0, (levelState.bloodmoon.revealCount ?? 0) - 1);
-    }
-    levelState.hostility = Math.min(2.35, levelState.hostility + 0.12);
     return;
   }
 
@@ -3146,7 +2668,7 @@ function findHitTarget() {
   if (!best) return null;
   return {
     npc: best,
-    correct: best.isGamingTarget || best.isLover || best.isSuShiTarget || best.isBloodmoonTarget,
+    correct: best.isLevelTarget,
   };
 }
 
@@ -3156,12 +2678,21 @@ function isFacingTarget(facing, toTarget) {
   return facing.dot(toTarget) >= HIT_FACING_DOT;
 }
 
+function isActorFacingTarget(actor, targetActor, maxDistance) {
+  scratchToPlayer.set(
+    targetActor.group.position.x - actor.group.position.x,
+    targetActor.group.position.z - actor.group.position.z,
+  );
+  if (scratchToPlayer.length() > maxDistance) return false;
+  getFacingVector(actor.group.rotation.y, scratchFacing);
+  return isFacingTarget(scratchFacing, scratchToPlayer);
+}
+
 
 function compactDeadNpcs() {
-  const huntBoss = levelState.bloodmoon?.huntBoss;
   for (let i = npcs.length - 1; i >= 0; i -= 1) {
     const npc = npcs[i];
-    if (npc.alive || npc === huntBoss) continue;
+    if (npc.alive || npc.preserveWhenDead) continue;
     if (npc.group) scene.remove(npc.group);
     npcs.splice(i, 1);
   }
@@ -3177,9 +2708,6 @@ function dissolveActor(actor) {
   actor.alive = false;
   actor.group.visible = false;
   levelRunner.handleAction({ type: "actorDissolved", actor });
-  if (actor.isBloodmoonTarget && levelState?.bloodmoon?.targetCue) {
-    setBloodmoonClawIntensity(levelState.bloodmoon.targetCue, 0);
-  }
   createPixelBurst(actor);
 }
 
@@ -3236,9 +2764,13 @@ function finishRound(won, failMessage) {
   if (won) sfxWin(); else sfxLose();
 
   const duel = isDuelLevel(levelState.level);
-  const isBloodmoon = !duel && levelState.level.id === "bloodmoon";
+  const resultResource = duel
+    ? null
+    : levelRunner.handleAction({ type: "getResultStats" });
   const timeUsed = Math.round(totalTime - levelState.startTime);
-  const attemptsLeft = duel ? player.hp : isBloodmoon ? Math.ceil(levelState.sanity) : levelState.attempts;
+  const attemptsLeft = duel
+    ? player.hp
+    : (resultResource?.attemptsLeft ?? levelState.attempts);
   const rating = duel
     ? { grade: won ? "S" : "F", rating: won ? 100 : 0 }
     : calcRating(won, timeUsed, attemptsLeft);
@@ -3253,11 +2785,13 @@ function finishRound(won, failMessage) {
   ui.resultRating.className = "result-rating rating-" + rating.grade.toLowerCase();
   ui.statTime.textContent = timeUsed + " 秒";
   if (ui.statAttemptsLabel) {
-    ui.statAttemptsLabel.textContent = duel ? "❤️ 剩余生命" : isBloodmoon ? "理智" : "🥊 剩余出拳";
+    ui.statAttemptsLabel.textContent = duel
+      ? "❤️ 剩余生命"
+      : (resultResource?.label ?? "🥊 剩余出拳");
   }
   ui.statAttempts.textContent = duel
     ? (won ? "对手生命归零" : formatHearts(attemptsLeft))
-    : isBloodmoon ? `${attemptsLeft} 点` : `${attemptsLeft} 次`;
+    : (resultResource?.value ?? `${attemptsLeft} 次`);
   ui.statAttempts.classList.toggle("hearts-display", duel);
 
   const guestWaitingForRetry = duel && isConnected() && !getIsHost();
@@ -3284,39 +2818,30 @@ function finishRound(won, failMessage) {
 
 function updateHud() {
   const duel = isDuelLevel();
-  const isBloodmoon = !duel && levelState.level.id === "bloodmoon";
-  const bloodmoonState = levelState.bloodmoon;
+  const levelHud = duel
+    ? null
+    : levelRunner.handleAction({ type: "getHudState" });
   const mechanicHintHtml = levelState.level.mechanicHintHtml ?? "";
-  const bloodmoonMechanicVisible = isBloodmoon
-    && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing");
+  const levelMechanicVisible = Boolean(levelHud?.mechanicVisible);
+  const bloodmoonTheme = levelHud?.theme === "bloodmoon";
   const duelPlaying = duel && (gameStatus === "playing" || gameStatus === "paused");
   if (ui.hud) ui.hud.classList.toggle("is-duel-play", duelPlaying);
 
   ui.sceneName.textContent = levelState.level.sceneName;
-  if (duel) {
-    ui.missionText.textContent = levelState.level.hudMission || levelState.level.mission;
-  } else if (isBloodmoon && bloodmoonState?.mode === "huntIntro") {
-    ui.missionText.textContent = "血月引路人正在发动猎杀时刻...";
-  } else if (isBloodmoon && bloodmoonState?.mode === "huntBriefing") {
-    ui.missionText.textContent = "阅读猎杀时刻机制，点击卡片按钮后开始倒计时。";
-  } else if (isBloodmoon && bloodmoonState?.mode === "hunt") {
-    ui.missionText.textContent = `猎杀时刻：${Math.ceil(bloodmoonState.huntTimer)} 秒内找到自己，进入任意绿色区域`;
-  } else if (isBloodmoon && bloodmoonState?.mode === "phase2") {
-    ui.missionText.textContent = `二阶段：boss 剩余 ${bloodmoonState.bossHp}/${BLOODMOON_PHASE2_HP_MAX} 格血`;
-  } else {
-    ui.missionText.textContent = levelState.level.hudMission || levelState.level.mission;
-  }
-
-  ui.timerText.textContent = duel || isBloodmoon ? "∞" : Math.ceil(levelState.remaining).toString();
-  ui.attemptLabel.textContent = duel ? "生命" : isBloodmoon ? "理智" : "出拳";
+  ui.missionText.textContent = duel
+    ? (levelState.level.hudMission || levelState.level.mission)
+    : (levelHud?.mission || levelState.level.hudMission || levelState.level.mission);
+  ui.timerText.textContent = duel
+    ? "∞"
+    : (levelHud?.timerText ?? Math.ceil(levelState.remaining).toString());
+  ui.attemptLabel.textContent = duel
+    ? "生命"
+    : (levelHud?.resourceLabel ?? "出拳");
   if (duel) {
     ui.attemptText.textContent = formatHearts(player.hp ?? levelState.playerHp);
     ui.attemptText.classList.add("hearts-display");
-  } else if (isBloodmoon) {
-    ui.attemptText.textContent = Math.ceil(levelState.sanity).toString();
-    ui.attemptText.classList.remove("hearts-display");
   } else {
-    ui.attemptText.textContent = levelState.attempts.toString();
+    ui.attemptText.textContent = levelHud?.resourceText ?? levelState.attempts.toString();
     ui.attemptText.classList.remove("hearts-display");
   }
 
@@ -3326,29 +2851,27 @@ function updateHud() {
       const base = `生命 ${formatHearts(player.hp)} · 对手 ${formatHearts(remotePlayer?.hp ?? DUEL_PLAYER_HP)}`;
       return gatherHint ? `${gatherHint} · ${base}` : `⚔️ ${base} · 每 1.5 分钟需到集合圈报到`;
     })();
-  } else if (isBloodmoon && (bloodmoonState?.mode === "hunt" || bloodmoonState?.mode === "huntBriefing")) {
-    ui.clueBar.textContent = "🟢 机制：玩家和 NPC 已随机散开，NPC 暂停攻击。绿区外会被血月秒杀。";
   } else {
-    ui.clueBar.textContent = "🔍 " + (levelState.level.hudClue || levelState.level.clue);
+    ui.clueBar.textContent = levelHud?.clue
+      ?? ("🔍 " + (levelState.level.hudClue || levelState.level.clue));
   }
-  ui.clueBar?.classList.toggle("hidden", Boolean(mechanicHintHtml));
+  ui.clueBar?.classList.toggle(
+    "hidden",
+    Boolean(mechanicHintHtml) && !levelMechanicVisible,
+  );
 
-  if (ui.attackIcon) ui.attackIcon.textContent = isBloodmoon ? "爪" : "拳";
-  ui.hud?.classList.toggle("bloodmoon-mode", isBloodmoon);
-  ui.attackButton?.classList.toggle("bloodmoon", isBloodmoon);
-  ui.sceneName?.classList.toggle("bloodmoon-text", isBloodmoon);
-  ui.clueBar?.classList.toggle("bloodmoon", isBloodmoon);
-  ui.attemptChip?.classList.toggle("bloodmoon", isBloodmoon);
+  if (ui.attackIcon) ui.attackIcon.textContent = levelHud?.attackIcon ?? "拳";
+  ui.hud?.classList.toggle("bloodmoon-mode", bloodmoonTheme);
+  ui.attackButton?.classList.toggle("bloodmoon", bloodmoonTheme);
+  ui.sceneName?.classList.toggle("bloodmoon-text", bloodmoonTheme);
+  ui.clueBar?.classList.toggle("bloodmoon", bloodmoonTheme);
+  ui.attemptChip?.classList.toggle("bloodmoon", bloodmoonTheme);
   if (ui.mechanicHint) {
-    ui.mechanicHint.classList.toggle("visible", Boolean(mechanicHintHtml) || bloodmoonMechanicVisible);
-    ui.mechanicHint.innerHTML = mechanicHintHtml
-      || (bloodmoonMechanicVisible
-        ? `
-        <div class="mechanic-hint-row"><span class="mechanic-hint-label">台词</span><span class="mechanic-hint-text">认不出自己的人，都会留在月光外。</span></div>
-        <div class="mechanic-hint-row"><span class="mechanic-hint-label">机制</span><span class="mechanic-hint-text">找到自己，进入任意绿色区域。</span></div>
-        <div class="mechanic-hint-row"><span class="mechanic-hint-label">处决</span><span class="mechanic-hint-text">倒计时结束时，绿区外全部秒杀。</span></div>
-      `
-        : "");
+    ui.mechanicHint.classList.toggle(
+      "visible",
+      Boolean(mechanicHintHtml) || levelMechanicVisible,
+    );
+    ui.mechanicHint.innerHTML = levelHud?.mechanicHtml || mechanicHintHtml;
   }
 
   updateGatherBanner();
