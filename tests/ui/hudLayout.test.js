@@ -73,6 +73,32 @@ test("操作按钮在手机横屏中保留拇指安全间距", async () => {
   assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(58px,\s*calc\(env\(safe-area-inset-bottom\) \+ 52px\)\)/);
 });
 
+test("左侧摇杆扩大触摸热区时保持原视觉位置", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const joystickRule = css.match(/\.joystick-hit-area\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const shortRule = css.match(
+    /@media\s*\(max-height:\s*480px\)\s*\{([\s\S]*?)\.attack-button/,
+  )?.[1] ?? "";
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(joystickRule, /--joystick-size:\s*118px/);
+  assert.match(joystickRule, /--joystick-hit-size:\s*177px/);
+  assert.match(joystickRule, /--joystick-hit-margin:\s*-29\.5px/);
+  assert.match(joystickRule, /margin:\s*var\(--joystick-hit-margin\)/);
+  assert.match(joystickRule, /width:\s*var\(--joystick-hit-size\)/);
+  assert.match(joystickRule, /height:\s*var\(--joystick-hit-size\)/);
+  assert.match(css, /\.joystick\s*\{[\s\S]*width:\s*var\(--joystick-size\)/);
+  assert.match(css, /\.joystick\s*\{[\s\S]*height:\s*var\(--joystick-size\)/);
+  assert.match(shortRule, /\.joystick-hit-area\s*\{[\s\S]*--joystick-size:\s*108px/);
+  assert.match(shortRule, /\.joystick-hit-area\s*\{[\s\S]*--joystick-hit-size:\s*162px/);
+  assert.match(shortRule, /\.joystick-hit-area\s*\{[\s\S]*--joystick-hit-margin:\s*-27px/);
+  assert.match(compactRule, /\.joystick-hit-area\s*\{[\s\S]*--joystick-size:\s*92px/);
+  assert.match(compactRule, /\.joystick-hit-area\s*\{[\s\S]*--joystick-hit-size:\s*138px/);
+  assert.match(compactRule, /\.joystick-hit-area\s*\{[\s\S]*--joystick-hit-margin:\s*-23px/);
+});
+
 test("手机横屏短高度顶部 HUD 避开平台角标", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const compactRule = css.match(

@@ -338,8 +338,12 @@ button {
 }
 
 .joystick-hit-area {
-  width: 177px;
-  height: 177px;
+  --joystick-size: 118px;
+  --joystick-hit-size: 177px;
+  --joystick-hit-margin: -29.5px;
+  width: var(--joystick-hit-size);
+  height: var(--joystick-hit-size);
+  margin: var(--joystick-hit-margin);
   display: grid;
   place-items: center;
   pointer-events: auto;
@@ -348,8 +352,8 @@ button {
 
 .joystick {
   position: relative;
-  width: 118px;
-  height: 118px;
+  width: var(--joystick-size);
+  height: var(--joystick-size);
   background: rgba(255, 246, 223, 0.28);
   border: var(--line);
   border-radius: 50%;
@@ -2094,13 +2098,9 @@ button {
   }
 
   .joystick-hit-area {
-    width: 162px;
-    height: 162px;
-  }
-
-  .joystick {
-    width: 108px;
-    height: 108px;
+    --joystick-size: 108px;
+    --joystick-hit-size: 162px;
+    --joystick-hit-margin: -27px;
   }
 
   .attack-button {
@@ -2288,13 +2288,12 @@ button {
   }
 
   .joystick-hit-area {
-    width: 138px;
-    height: 138px;
+    --joystick-size: 92px;
+    --joystick-hit-size: 138px;
+    --joystick-hit-margin: -23px;
   }
 
   .joystick {
-    width: 92px;
-    height: 92px;
     border-width: 2px;
   }
 
