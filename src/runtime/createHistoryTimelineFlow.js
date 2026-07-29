@@ -27,6 +27,8 @@ export function createHistoryTimelineFlow({
     onRevealComplete: () => {
       maybeShowLifeReport();
     },
+    // 番外关解锁条件：前五关全部 A 级及以上（与人生线报告同一门槛）。
+    isExtraUnlocked: () => lifeReport.isQualified(),
     // 半生通关入口：全 A 解锁后点击可随时重看报告。
     isLifeReportReady: () => lifeReport.isQualified(),
     onOpenLifeReport: () => lifeReport.show(),

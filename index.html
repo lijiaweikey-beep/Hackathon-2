@@ -70,16 +70,11 @@
         <header class="history-header">
           <div class="history-title-group">
             <div class="history-kicker">人生事件轴</div>
-            <!-- 半生通关入口：主线全通后出现，点击查看人生线报告（未全 A 时锁定） -->
-            <button id="lifeReportEntry" class="life-report-entry" type="button" hidden aria-label="查看人生线报告">
-              <span class="life-report-entry-text">半生通关</span>
-            </button>
           </div>
           <div class="history-header-actions">
-            <div class="history-build-meta">
-              <span id="historyVersionText">v0.10.x.1</span>
-              <span id="historyStampText">2026.06.18</span>
-            </div>
+            <button id="settingsButton" class="settings-button" type="button" aria-expanded="false" aria-controls="settingsPanel">
+              设置
+            </button>
             <div class="difficulty-picker" aria-label="体验难易程度">
               <span class="difficulty-label">难度</span>
               <div class="difficulty-options" role="group" aria-label="选择体验难度">
@@ -88,9 +83,10 @@
                 <button class="difficulty-option" type="button" data-difficulty="hard" aria-pressed="false">难</button>
               </div>
             </div>
-            <button id="settingsButton" class="settings-button" type="button" aria-expanded="false" aria-controls="settingsPanel">
-              设置
-            </button>
+            <div class="history-build-meta">
+              <span id="historyVersionText">v0.10.x.1</span>
+              <span id="historyStampText">2026.06.18</span>
+            </div>
           </div>
         </header>
 
@@ -254,6 +250,19 @@
           <button id="closeShareButton" class="secondary-button" type="button">关闭</button>
         </div>
       </div>
+    </section>
+
+    <!-- P0 漫画序章：每次点击揭开一格，看完后进入封面 -->
+    <section id="comicIntroScreen" class="comic-intro-screen">
+      <img class="comic-intro-frame shown" src="/src/assets/intro/p0-1.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-2.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-3.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-4.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-5.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-6.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-7.jpg" alt="">
+      <img class="comic-intro-frame" src="/src/assets/intro/p0-8.jpg" alt="">
+      <div class="comic-intro-hint">点击继续 ▶</div>
     </section>
 
     <!-- 进入体验前的加载页 -->
