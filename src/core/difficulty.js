@@ -1,4 +1,4 @@
-export const DEFAULT_DIFFICULTY = "easy";
+export const DEFAULT_DIFFICULTY = "medium";
 
 export const DIFFICULTIES = Object.freeze([
   { id: "easy", label: "易" },

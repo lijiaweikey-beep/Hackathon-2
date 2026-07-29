@@ -1335,11 +1335,12 @@ button {
   image-rendering: pixelated;
 }
 
-/* 右侧：上剧情、下历史数据 */
+/* 右侧：历史数据 */
 .history-detail-side {
   grid-column: 3;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, auto);
+  align-content: center;
   gap: 12px;
   min-height: 0;
 }
@@ -1381,6 +1382,7 @@ button {
 }
 
 .history-detail-lore {
+  display: none;
   min-height: 0;
   overflow-y: auto;
   padding: 12px 14px;
@@ -1417,6 +1419,7 @@ button {
 /* 历史数据行 */
 .history-detail-stats {
   display: grid;
+  align-self: center;
   border: 2px solid var(--ink);
   border-radius: var(--radius);
   background: var(--paper);
@@ -2713,10 +2716,11 @@ button {
     grid-column: 3;
     grid-row: 1;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
+    align-content: center;
     gap: 8px;
     max-height: none;
-    overflow-y: auto;
+    overflow: visible;
   }
 
   .history-detail-nav {
@@ -2730,10 +2734,11 @@ button {
   }
 
   .history-detail-lore {
-    max-height: none;
-    padding: 8px 10px;
-    font-size: 11px;
-    line-height: 1.45;
+    display: none;
+  }
+
+  .history-detail-stats {
+    align-self: center;
   }
 
   .history-detail-stat-row {
@@ -2765,6 +2770,7 @@ button {
   .history-detail-reward {
     min-height: 16px;
     font-size: 11px;
+    display: none;
   }
 
   .result-modal {

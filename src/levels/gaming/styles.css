@@ -35,6 +35,29 @@
   opacity: 1;
 }
 
+.tutorial-subtitle-host {
+  display: grid;
+  place-items: center;
+}
+
+.tutorial-subtitle {
+  max-width: min(88vw, 520px);
+  padding: 12px 18px;
+  color: #eef2ff;
+  font-size: clamp(15px, 2.6vw, 20px);
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.tutorial-subtitle.typing {
+  animation: tutorial-type-in 1.5s steps(24, end) both;
+}
+
+@keyframes tutorial-type-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
 .tutorial-miss-host {
   display: grid;
   place-items: center;

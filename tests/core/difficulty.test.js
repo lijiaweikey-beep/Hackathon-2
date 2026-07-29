@@ -7,10 +7,10 @@ import {
   normalizeDifficulty,
 } from "../../src/core/difficulty.js";
 
-test("难度默认从易开始并清洗非法值", () => {
-  assert.equal(DEFAULT_DIFFICULTY, "easy");
+test("难度默认从中开始并清洗非法值", () => {
+  assert.equal(DEFAULT_DIFFICULTY, "medium");
   assert.equal(normalizeDifficulty("hard"), "hard");
-  assert.equal(normalizeDifficulty("unknown"), "easy");
+  assert.equal(normalizeDifficulty("unknown"), "medium");
 });
 
 test("找人关随难度增加人数，爆金币随难度减少人数", () => {

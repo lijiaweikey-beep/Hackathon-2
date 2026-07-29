@@ -1,11 +1,9 @@
 const MISS_HINT = "注意主角的面朝方向，靠近一点再打！";
 
-export function showMoveTutorial(ui) {
-  ui.hideOverlay("tutorialJoystickGuide");
+export function showMoveTutorial(_ui) {
 }
 
-export function showAttackTutorial(ui) {
-  ui.hideOverlay("tutorialJoystickGuide");
+export function showAttackTutorial(_ui) {
 }
 
 export function showMissHint(ui) {
@@ -22,6 +20,5 @@ export function hideMissHint(ui) {
 
 export function hideTutorialOverlays(ui) {
   ui.hideOverlay("tutorialSubtitle");
-  ui.hideOverlay("tutorialJoystickGuide");
   ui.hideOverlay("tutorialMissHint");
 }

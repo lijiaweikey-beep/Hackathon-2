@@ -256,8 +256,8 @@ export function createDebtSmasherLevel(context) {
 
   function getHudState() {
     return {
-      mission: "按当前朝向踢送账单怪，把它们送进房贷车贷机关。",
-      clue: "红色区域即将压落；每只账单怪随机爆出一至五金币",
+      mission: "按当前朝向推送账单怪，把它们送进房贷车贷机关。",
+      clue: "房贷车贷化身成账单怪，在工厂里满街乱窜。你必须把它们推进压榨机关，爆出金币还清债务！",
       resourceLabel: "金币",
       resourceText: `${rules.snapshot().coins}/100`,
       timerText: String(Math.max(0, Math.ceil(ROUND_SECONDS - elapsed))),

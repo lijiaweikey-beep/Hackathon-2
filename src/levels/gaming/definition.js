@@ -48,7 +48,7 @@ export default {
     S: { title: "作息纠察队长", verdict: "一拳到位，宿舍在三点零一分恢复安静。" },
     A: { title: "熄灯前的正义", verdict: "稍微绕了点路，但发光舍友总算安静了。" },
     B: { title: "摸黑找人的", verdict: "人是找到了，天也快亮了。" },
-    C: { title: "陪打到天亮", verdict: "你没抓到人，反而看完了整局游戏。" },
+    C: { title: "陪打到天亮", verdict: "你没抓到人，反而看完了整段通宵对局。" },
   },
   cardStyle: {
     accent: "#818cf8",
@@ -77,7 +77,6 @@ export default {
   tutorialSteps: {
     moveTargetPos: { x: 0.4, z: 6.6 },
     moveRadius: 1.0,
-    attackTargetPos: { x: 0.4, z: 8.2 },
     attackTargetId: "noisy_roommate",
   },
   timeLimit: null,

@@ -19,7 +19,7 @@ export const TUTORIAL_FAN_SECONDS = 1.5;
 export const TUTORIAL_MISS_HINT_SECONDS = 2.2;
 export const TUTORIAL_ATTACK_COOLDOWN = 0.12;
 
-/** 目标电脑位：北侧中央，过道可到达（PLAY_Z_MIN=-5） */
+/** 教学高亮电脑位：北侧中央，过道可到达（PLAY_Z_MIN=-5） */
 export const TUTORIAL_COMPUTER_INDEX = 6;
 
 export const TUTORIAL_PLAYER_SPAWN = Object.freeze({ x: 0, z: 9.2 });
