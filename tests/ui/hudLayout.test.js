@@ -36,3 +36,14 @@ test("隐藏弹窗不拦截游戏内按钮", async () => {
   assert.match(modalRule, /visibility:\s*hidden/);
   assert.match(visibleRule, /visibility:\s*visible/);
 });
+
+test("手机横屏短高度启用紧凑 HUD、任务弹窗和事件轴布局", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(compactRule, /\.topbar/);
+  assert.match(compactRule, /\.task-panel/);
+  assert.match(compactRule, /\.history-footer/);
+});
