@@ -96,6 +96,20 @@ test("手机横屏短高度把结算页收纳为插画和信息两区", async ()
   assert.match(compactRule, /\.share-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
 });
 
+test("手机横屏短高度历史详情右侧信息不挤入窄列", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(compactRule, /\.history-detail-body\s*\{[\s\S]*grid-template-columns:\s*38px minmax\(0,\s*1fr\) 38px/);
+  assert.match(compactRule, /\.history-detail-share\s*\{[\s\S]*grid-column:\s*2/);
+  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-column:\s*1 \/ -1/);
+  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-row:\s*2/);
+  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(132px,\s*0\.72fr\)/);
+  assert.match(compactRule, /\.history-detail-nav\.next\s*\{[\s\S]*grid-column:\s*3/);
+});
+
 test("电脑横屏结算页与手机横屏使用同一套分区尺寸", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const desktopLandscapeRule = css.match(
