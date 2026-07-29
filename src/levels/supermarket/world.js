@@ -100,6 +100,20 @@ export function createSupermarketWorld(host) {
     position: [0, 18, 13],
     lookAt: [0, 0, 0],
   });
+  function resizeCamera(
+    width = host.rendering.canvas?.clientWidth,
+    height = host.rendering.canvas?.clientHeight,
+  ) {
+    if (!width || !height) return;
+    const halfHeight = 7.5;
+    const halfWidth = halfHeight * (width / height);
+    camera.left = -halfWidth;
+    camera.right = halfWidth;
+    camera.top = halfHeight;
+    camera.bottom = -halfHeight;
+    camera.updateProjectionMatrix();
+  }
+  resizeCamera();
 
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(24, 16),
@@ -171,6 +185,7 @@ export function createSupermarketWorld(host) {
     checkout,
     exit,
     ...cast,
+    resizeCamera,
     setExitOpen,
   };
 }

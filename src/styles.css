@@ -51,8 +51,24 @@ button {
   color: var(--text);
 }
 
-.hud.standalone-active > :not([data-level-surface]) {
+.hud.standalone-active > :not([data-level-surface], .topbar),
+.hud.standalone-active > .topbar > :not(.status-strip),
+.hud.standalone-active .status-strip > :not(.pause-button) {
   display: none;
+}
+
+.hud.standalone-active > .topbar {
+  top: auto;
+  right: auto;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 21;
+  min-height: 0;
+  transform: translateX(-50%);
+}
+
+.hud.standalone-active ~ #pauseModal {
+  z-index: 30;
 }
 
 .topbar {

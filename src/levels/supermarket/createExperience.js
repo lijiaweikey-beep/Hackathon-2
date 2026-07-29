@@ -124,6 +124,12 @@ export function createSupermarketExperience(host) {
     ["pointerup", "pointercancel"].forEach((type) => {
       host.input.listen(host.input.windowTarget, type, releaseJoystick);
     });
+    host.input.listen(host.input.windowTarget, "resize", () => {
+      world.resizeCamera(
+        host.rendering.canvas?.clientWidth,
+        host.rendering.canvas?.clientHeight,
+      );
+    });
     host.input.listen(host.input.windowTarget, "keydown", (event) => {
       keys.add(event.code);
       updateDirectionFromKeys();
