@@ -91,7 +91,7 @@ test("手机横屏短高度把结算页收纳为插画和信息两区", async ()
   assert.match(compactRule, /\.share-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
 });
 
-test("手机横屏短高度历史详情左右分栏避免裁切", async () => {
+test("手机横屏短高度历史详情只保留分享图和数据表", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const compactRule = css.match(
     /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
@@ -103,7 +103,10 @@ test("手机横屏短高度历史详情左右分栏避免裁切", async () => {
   assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-column:\s*3/);
   assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-row:\s*1/);
   assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
-  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*overflow-y:\s*auto/);
+  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*overflow:\s*visible/);
+  assert.match(compactRule, /\.history-detail-lore\s*\{[\s\S]*display:\s*none/);
+  assert.match(compactRule, /\.history-detail-stats\s*\{[\s\S]*align-self:\s*center/);
+  assert.match(compactRule, /\.history-detail-reward\s*\{[\s\S]*display:\s*none/);
   assert.match(compactRule, /\.history-detail-share-canvas\s*\{[\s\S]*max-height:\s*100%/);
   assert.match(compactRule, /\.history-detail-nav\.next\s*\{[\s\S]*grid-column:\s*4/);
 });

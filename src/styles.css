@@ -2670,10 +2670,11 @@ button {
     grid-column: 3;
     grid-row: 1;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
+    align-content: center;
     gap: 8px;
     max-height: none;
-    overflow-y: auto;
+    overflow: visible;
   }
 
   .history-detail-nav {
@@ -2687,10 +2688,11 @@ button {
   }
 
   .history-detail-lore {
-    max-height: none;
-    padding: 8px 10px;
-    font-size: 11px;
-    line-height: 1.45;
+    display: none;
+  }
+
+  .history-detail-stats {
+    align-self: center;
   }
 
   .history-detail-stat-row {
@@ -2722,6 +2724,7 @@ button {
   .history-detail-reward {
     min-height: 16px;
     font-size: 11px;
+    display: none;
   }
 
   .result-modal {
