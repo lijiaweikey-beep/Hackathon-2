@@ -15,6 +15,12 @@ export function createInputController(dependencies) {
   let acceptedAt = -Infinity;
   let lastActionAt = -Infinity;
 
+  function setJoystickKnobOffset(x, y) {
+    if (!dependencies.joystickKnob?.style) return;
+    dependencies.joystickKnob.style.transform =
+      `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+  }
+
   function isActive() {
     return dependencies.isActive?.() ?? true;
   }
@@ -58,9 +64,7 @@ export function createInputController(dependencies) {
     acceptedDirection.set(0, 0);
     acceptedAt = -Infinity;
     lastActionAt = -Infinity;
-    if (dependencies.joystickKnob?.style) {
-      dependencies.joystickKnob.style.transform = "translate(0px, 0px)";
-    }
+    setJoystickKnobOffset(0, 0);
   }
 
   function setKeyAxis(axis, value) {
@@ -82,7 +86,7 @@ export function createInputController(dependencies) {
     const scale = distance > radius ? radius / distance : 1;
     const x = deltaX * scale;
     const y = deltaY * scale;
-    dependencies.joystickKnob.style.transform = `translate(${x}px, ${y}px)`;
+    setJoystickKnobOffset(x, y);
     joystickDirection.set(x / radius, -y / radius);
     if (joystickDirection.lengthSq() > 1) joystickDirection.normalize();
   }
@@ -91,7 +95,7 @@ export function createInputController(dependencies) {
     if (event?.pointerId != null && event.pointerId !== pointerId) return;
     pointerId = null;
     joystickDirection.set(0, 0);
-    dependencies.joystickKnob.style.transform = "translate(0px, 0px)";
+    setJoystickKnobOffset(0, 0);
   }
 
   function bind() {

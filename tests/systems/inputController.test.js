@@ -117,3 +117,19 @@ test("重置输入会释放摇杆指针并阻止旧手指继续移动", () => {
 
   assert.deepEqual(direction.toArray(), [0, 0]);
 });
+
+test("摇杆黄点重置后保持视觉居中", () => {
+  const joystickKnob = { style: {} };
+  const input = createInputController({
+    isActive: () => true,
+    now: () => 1000,
+    joystickKnob,
+  });
+
+  input.reset();
+
+  assert.equal(
+    joystickKnob.style.transform,
+    "translate(-50%, -50%) translate(0px, 0px)",
+  );
+});
