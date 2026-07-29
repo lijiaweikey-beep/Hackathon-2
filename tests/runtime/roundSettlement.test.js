@@ -168,3 +168,44 @@ test("成功结算按固定延迟弹卡片", () => {
   assert.equal(session.phase, GAME_PHASES.RESULT);
   assert.equal(timers.length, 1);
 });
+
+test("胜利结算开始时立即清掉命中顿帧", () => {
+  const calls = [];
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "age-19" },
+      startTime: 0,
+      attempts: 3,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult() {},
+  };
+  const settlement = createRoundSettlement({
+    session,
+    timerHost: {
+      setTimeout(callback, delay) {
+        calls.push(["timer", delay]);
+        return 1;
+      },
+      clearTimeout() {},
+    },
+    getPlayer: () => null,
+    hasScene: () => true,
+    getTotalTime: () => 2,
+    getResultStats: () => ({ attemptsLeft: 3 }),
+    calculateRating: () => ({ grade: "S", rating: 100 }),
+    showResult() {},
+    saveBestScore() {},
+    playWin() {},
+    playLose() {},
+    clearHitstop: () => calls.push(["clearHitstop"]),
+  });
+
+  settlement.settle(true, null, 760);
+
+  assert.deepEqual(calls[0], ["clearHitstop"]);
+  assert.equal(session.phase, GAME_PHASES.SETTLING);
+});

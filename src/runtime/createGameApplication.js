@@ -288,6 +288,7 @@ export function boot() {
     session,
     getPlayer: () => player,
     hasScene: () => Boolean(experienceManager.active),
+    clearHitstop: () => { fx.hitstopTimer = 0; },
     getTotalTime: () => totalTime,
     getResultStats: () => experienceManager.getResultStats(),
     calculateRating: calcRating,

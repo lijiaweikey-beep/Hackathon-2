@@ -67,6 +67,7 @@ export function createRoundSettlement(dependencies) {
     if (dependencies.session.phase !== GAME_PHASES.PLAYING) return;
     dependencies.session.transition(GAME_PHASES.SETTLING);
     clearPending();
+    if (won) dependencies.clearHitstop?.();
     const settledDelayMs = won
       ? Math.max(delayMs, MIN_WIN_SETTLEMENT_DELAY_MS)
       : delayMs;
