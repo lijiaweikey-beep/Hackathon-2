@@ -39,6 +39,23 @@ test("体验管理器统一委托独立玩法生命周期", () => {
   ]);
 });
 
+test("声明共享布局的独立体验启用共享呈现模式", () => {
+  const manager = createExperienceManager({
+    createHost: ({ definition }) => ({ definition }),
+    createClassicExperience: () => null,
+  });
+
+  manager.load({
+    id: "shared",
+    sharedLayout: true,
+    extensions: {
+      createExperience: () => createExperience([]),
+    },
+  });
+
+  assert.equal(manager.presentation, "shared");
+});
+
 test("加载新体验前先销毁旧体验和资源域", () => {
   const calls = [];
   const manager = createExperienceManager({

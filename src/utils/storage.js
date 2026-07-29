@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import {
   DEFAULT_NPC_COUNT,
   MIN_NPC_COUNT,
@@ -8,7 +7,7 @@ import {
 } from "../config/constants.js";
 
 export function clampNpcCount(value) {
-  return THREE.MathUtils.clamp(Math.round(value), MIN_NPC_COUNT, MAX_NPC_COUNT);
+  return Math.min(MAX_NPC_COUNT, Math.max(MIN_NPC_COUNT, Math.round(value)));
 }
 
 export function loadMatchNpcCount() {

@@ -34,7 +34,9 @@ export function createExperienceManager({
     try {
       const host = createHost({ definition, scope });
       const factory = definition.extensions?.createExperience;
-      const presentation = factory ? "standalone" : "classic";
+      const presentation = factory
+        ? (definition.sharedLayout ? "shared" : "standalone")
+        : "classic";
       const experience = factory
         ? factory(host)
         : createClassicExperience(definition, host);

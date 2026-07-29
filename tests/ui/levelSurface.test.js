@@ -4,11 +4,17 @@ import { createResourceScope } from "../../src/core/resourceScope.js";
 import { createLevelSurface } from "../../src/ui/createLevelSurface.js";
 
 function createElement(tagName) {
+  const classes = new Set();
   return {
     tagName,
     children: [],
     dataset: {},
     style: {},
+    classList: {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name),
+    },
     append(...children) {
       this.children.push(...children);
     },
@@ -38,6 +44,26 @@ test("独立关卡界面使用隔离根节点并随资源域销毁", () => {
   assert.equal(parent.children.length, 1);
   assert.equal(surface.root.innerHTML, "<button>开始</button>");
   assert.equal(surface.style.textContent, "button { color: red; }");
+  assert.equal(parent.classList.contains("standalone-active"), true);
   scope.dispose();
+  assert.equal(parent.classList.contains("standalone-active"), false);
   assert.equal(parent.children[0].removed, true);
+});
+
+test("共享布局的独立关卡保留第一关界面并在销毁时移除标记", () => {
+  const parent = createElement("parent");
+  const scope = createResourceScope();
+
+  createLevelSurface({
+    documentTarget: { createElement },
+    parent,
+    levelId: "supermarket",
+    sharedLayout: true,
+    scope,
+  });
+
+  assert.equal(parent.classList.contains("standalone-active"), true);
+  assert.equal(parent.classList.contains("shared-layout-active"), true);
+  scope.dispose();
+  assert.equal(parent.classList.contains("shared-layout-active"), false);
 });

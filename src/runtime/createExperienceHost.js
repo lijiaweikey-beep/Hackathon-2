@@ -14,6 +14,8 @@ export function createExperienceHost({
   input,
   audio,
   flow,
+  controls,
+  ui,
   storageBackend = localStorage,
   randomRange,
 }) {
@@ -42,6 +44,8 @@ export function createExperienceHost({
     input: freezeGroup(input),
     audio: freezeGroup(audio),
     flow: freezeGroup(flow),
+    controls: freezeGroup(controls),
+    ui: freezeGroup(ui),
     storage,
     random: Object.freeze({ range: randomRange }),
   });
@@ -61,6 +65,8 @@ export function createStandaloneExperienceHost({
   rendering,
   audio,
   flow,
+  controls,
+  ui,
   storageBackend,
   randomRange,
 }) {
@@ -68,6 +74,7 @@ export function createStandaloneExperienceHost({
     documentTarget,
     parent,
     levelId: definition.id,
+    sharedLayout: definition.sharedLayout,
     scope,
   });
   surface.setStyles(definition.styleText ?? "");
@@ -86,6 +93,8 @@ export function createStandaloneExperienceHost({
     input,
     audio,
     flow,
+    controls,
+    ui,
     storageBackend,
     randomRange,
   });

@@ -1,52 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import * as THREE from "three";
 import definition from "../../src/levels/debt-smasher/definition.js";
 
-test("爆金币属于三十岁独立主线终局关卡", () => {
+test("爆金币属于三十岁经典主线终局关卡", () => {
   assert.equal(definition.track, "mainline");
   assert.equal(definition.age, 30);
-  assert.equal(typeof definition.extensions.createExperience, "function");
-});
-
-test("爆金币体验暂停时不推进时间并在离开时释放场景", () => {
-  const calls = [];
-  const root = {
-    querySelector: () => ({
-      style: {},
-      classList: { add() {}, remove() {}, toggle() {} },
-      setPointerCapture() {},
-      getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
-      textContent: "",
-    }),
-  };
-  const host = {
-    surface: {
-      root,
-      setContent: () => {},
-      clear: () => calls.push("clear"),
-    },
-    input: { windowTarget: new EventTarget(), listen() {} },
-    rendering: {
-      THREE,
-      createScene: () => new THREE.Scene(),
-      createCamera: () => new THREE.OrthographicCamera(-12, 12, 8, -8, 0.1, 100),
-      render() {},
-      disposeScene: () => calls.push("dispose"),
-    },
-    flow: { start() {}, finish() {}, leave() {} },
-    random: { range: (min) => min },
-  };
-  const experience = definition.extensions.createExperience(host);
-
-  experience.mount();
-  experience.start();
-  experience.update(1);
-  const beforePause = experience.getResultStats().elapsed;
-  experience.pause();
-  experience.update(1);
-  experience.dispose();
-
-  assert.equal(experience.getResultStats().elapsed, beforePause);
-  assert.deepEqual(calls, ["dispose", "clear"]);
+  assert.equal(definition.timeLimit, 100);
+  assert.equal(definition.actionIcon, "🫸");
+  assert.equal(definition.actionGuide, "推按钮/空格 按当前朝向推送");
+  assert.equal(definition.legacy, false);
+  assert.equal(typeof definition.createLevel, "function");
+  assert.equal(definition.extensions.createExperience, undefined);
+  assert.equal(typeof definition.extensions.createPlayer, "function");
+  assert.equal(typeof definition.extensions.createNpc, "function");
+  assert.equal(typeof definition.extensions.createPreviewModel, "function");
+  assert.match(definition.mission, /账单怪/);
+  assert.doesNotMatch(definition.mission, /路人/);
 });

@@ -5,7 +5,7 @@ import {
 
 export function createTaskModalModel({ level, npcCount }) {
   return {
-    npcCount,
+    npcCount: level.npcCountText ?? npcCount,
     timeText: level.timeLimit === null
       ? "∞"
       : String(level.timeLimit ?? ROUND_SECONDS),
@@ -17,6 +17,8 @@ export function createTaskModalModel({ level, npcCount }) {
       level.transition?.intro,
       level.mission,
     ].filter(Boolean).join("\n\n"),
+    actionIcon: level.actionIcon ?? "👊",
+    actionGuide: level.actionGuide ?? "拳按钮/空格 攻击",
   };
 }
 
@@ -37,6 +39,8 @@ export function renderTaskModal(ui, { level, npcCount }) {
   ui.taskNpcCount.textContent = model.npcCount;
   ui.taskTime.textContent = model.timeText;
   updateTaskAttemptsChip(ui, model.resourceHtml);
+  if (ui.taskActionIcon) ui.taskActionIcon.textContent = model.actionIcon;
+  if (ui.taskActionGuide) ui.taskActionGuide.textContent = model.actionGuide;
   ui.targetLabel.textContent = model.targetLabel;
   ui.levelSelectModal.classList.remove("visible");
   ui.taskModal.classList.add("visible");

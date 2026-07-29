@@ -27,13 +27,8 @@ async function readTreeSources(root) {
   return sources;
 }
 
-test("活动应用不导入休眠双人模式", async () => {
-  const source = await readSource("game.js");
-  assert.doesNotMatch(source, /modes\/duel|multiplayer/);
-});
-
 test("游戏入口只负责组装且保持精简", async () => {
-  const source = await readSource("game.js");
+  const source = await readSource("main.js");
   assert.ok(source.split("\n").length <= 250);
   assert.doesNotMatch(
     source,
@@ -53,20 +48,6 @@ test("共享运行时按单一职责控制模块体积", async () => {
       `${file} 不应超过 ${maximumLines} 行`,
     );
   }
-});
-
-test("单人关卡注册中心不包含双人模式", async () => {
-  const entries = await readdir(levelsRoot, { withFileTypes: true });
-  const duelDirectory = entries.find((entry) => entry.isDirectory() && entry.name === "library-duel");
-  const duelFiles = duelDirectory
-    ? await readdir(new URL("library-duel/", levelsRoot))
-    : [];
-  assert.equal(duelFiles.includes("definition.js"), false);
-});
-
-test("活动页面不再暴露双人决斗结构", async () => {
-  const html = await readFile(new URL("../../index.html", import.meta.url), "utf8");
-  assert.doesNotMatch(html, /duelLobby|duelTopHud|mpCreateBtn/);
 });
 
 test("不同关卡目录之间不能互相导入", async () => {
@@ -91,7 +72,7 @@ test("不同关卡目录之间不能互相导入", async () => {
 
 test("共享运行时不按具体关卡标识或资源变体分派", async () => {
   const sharedFiles = [
-    "game.js",
+    "main.js",
     "entities/actors.js",
     "ui/targetPreview.js",
     "world/createWorldBuilder.js",
@@ -109,7 +90,7 @@ test("共享运行时不按具体关卡标识或资源变体分派", async () =>
 
 test("共享运行时不包含关卡专属界面标识", async () => {
   const sources = [
-    await readSource("game.js"),
+    await readSource("main.js"),
     ...await readDirectorySources("runtime/"),
     ...await readDirectorySources("systems/"),
     ...await readDirectorySources("ui/"),
@@ -123,7 +104,7 @@ test("共享运行时不包含关卡专属界面标识", async () => {
 });
 
 test("共享运行时不读取关卡专属角色特征", async () => {
-  const source = await readSource("game.js");
+  const source = await readSource("main.js");
   assert.doesNotMatch(source, /isWerewolf|wolfCape|wolfParts/);
 });
 

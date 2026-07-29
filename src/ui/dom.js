@@ -23,6 +23,8 @@ export const ui = {
   taskTime: document.querySelector("#taskTime"),
   taskAttempts: document.querySelector("#taskAttempts"),
   taskAttemptsChip: document.querySelector("#taskAttempts")?.parentElement,
+  taskActionIcon: document.querySelector("#taskActionIcon"),
+  taskActionGuide: document.querySelector("#taskActionGuide"),
   taskNpcCount: document.querySelector("#taskNpcCount"),
   npcCountInput: document.querySelector("#npcCountInput"),
   npcCountUp: document.querySelector(".match-settings-arrow.up"),

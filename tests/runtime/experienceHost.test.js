@@ -34,6 +34,24 @@ test("独立体验宿主冻结能力并隔离存储键", () => {
   assert.equal(values.has("level:standalone:score"), true);
 });
 
+test("独立体验宿主向共享布局关卡提供共享控制和界面能力", () => {
+  const controls = { readDirection() {}, applyReverseLock() {} };
+  const sharedUi = { updateHud() {} };
+  const host = createExperienceHost({
+    definition: { id: "shared" },
+    scope: createResourceScope(),
+    controls,
+    ui: sharedUi,
+    storageBackend: { getItem: () => null, setItem() {} },
+    randomRange: (min) => min,
+  });
+
+  assert.equal(host.controls.readDirection, controls.readDirection);
+  assert.equal(host.ui.updateHud, sharedUi.updateHud);
+  assert.equal(Object.isFrozen(host.controls), true);
+  assert.equal(Object.isFrozen(host.ui), true);
+});
+
 test("独立宿主装配界面样式和自动清理输入", () => {
   const calls = [];
   const surface = {

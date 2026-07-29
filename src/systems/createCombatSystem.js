@@ -69,7 +69,17 @@ export function createCombatSystem(dependencies) {
   function resolveHit(hit) {
     if (!hit) return;
     const levelHit = dependencies.dispatch({ type: "hitTarget", hit });
-    if (levelHit?.handled) return;
+    if (levelHit?.handled) {
+      if (
+        typeof levelHit.cooldown === "number"
+        && Number.isFinite(levelHit.cooldown)
+        && levelHit.cooldown >= 0
+      ) {
+        cooldownMax = levelHit.cooldown;
+        cooldown = cooldownMax;
+      }
+      return;
+    }
 
     if (hit.correct) {
       if (hit.npcs) hit.npcs.forEach(dissolveNpc);
