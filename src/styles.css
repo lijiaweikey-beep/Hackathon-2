@@ -503,104 +503,6 @@ button {
   letter-spacing: 2px;
 }
 
-/* ---- 难度摘要（任务卡内） ---- */
-.match-settings {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border: 2px solid var(--ink);
-  border-radius: 12px;
-  background: var(--panel-2);
-  box-shadow: var(--shadow-sm);
-  pointer-events: auto;
-}
-
-.match-settings-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.match-settings-icon {
-  font-size: 22px;
-}
-
-.match-settings-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  color: var(--muted);
-}
-
-.match-settings-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.match-settings-input-wrap {
-  background: #fff;
-  border: 2px solid var(--ink);
-  border-radius: var(--radius);
-}
-
-.match-settings-input {
-  width: 62px;
-  padding: 4px 8px;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 900;
-  text-align: center;
-  color: var(--ink);
-  outline: none;
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-.match-settings-input::-webkit-outer-spin-button,
-.match-settings-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.match-settings-hint {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.match-settings-summary {
-  margin-top: 4px;
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--ink);
-}
-
-.match-settings-arrows {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.match-settings-arrow {
-  width: 24px;
-  height: 20px;
-  line-height: 1;
-  font-size: 11px;
-  font-weight: 900;
-  background: var(--sun);
-  border: 2px solid var(--ink);
-  border-radius: 3px;
-}
-
-.match-settings-arrow:active {
-  transform: translate(1px, 1px);
-}
-
 .level-section-label {
   margin: 2px 4px 0;
   font-size: 11px;
@@ -716,10 +618,17 @@ button {
   letter-spacing: 0.08em;
 }
 
+.history-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
 .history-viewport {
   position: absolute;
   z-index: 1;
-  inset: 84px 0 154px;
+  inset: 84px 0 104px;
   overflow-x: auto;
   overflow-y: hidden;
   touch-action: pan-x;
@@ -1027,17 +936,17 @@ button {
 .difficulty-picker {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 6px 8px;
   border: 2px solid var(--ink);
   border-radius: 999px;
   background: rgba(255, 249, 236, 0.94);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
   pointer-events: auto;
 }
 
 .difficulty-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   color: var(--muted);
 }
@@ -1048,9 +957,9 @@ button {
 }
 
 .difficulty-option {
-  min-width: 34px;
-  height: 28px;
-  padding: 0 10px;
+  min-width: 30px;
+  height: 26px;
+  padding: 0 8px;
   border: 2px solid var(--ink);
   border-radius: 999px;
   background: #fff;
@@ -1065,14 +974,6 @@ button {
 .difficulty-option.active {
   background: var(--sun);
   box-shadow: 2px 2px 0 var(--ink);
-}
-
-.difficulty-hint {
-  min-width: 70px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 900;
-  color: var(--ink);
 }
 
 .history-status-text {
@@ -1433,30 +1334,6 @@ button {
   font-weight: 900;
 }
 
-.task-controls-guide {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 2px dashed rgba(37, 36, 42, 0.34);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.guide-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.guide-icon {
-  font-size: 15px;
-}
-
-
 /* ---- 结算：等级插画铺满全屏 ---- */
 .result-modal {
   padding: 0;
@@ -1753,18 +1630,27 @@ button {
 
 @media (max-width: 760px) {
   .history-viewport {
-    inset: 74px 0 168px;
+    inset: 74px 0 118px;
+  }
+
+  .history-header-actions {
+    gap: 8px;
   }
 
   .difficulty-picker {
-    max-width: calc(100vw - 28px);
-    gap: 7px;
-    padding: 7px 9px;
+    gap: 5px;
+    padding: 5px 6px;
   }
 
-  .difficulty-label,
-  .difficulty-hint {
-    font-size: 11px;
+  .difficulty-label {
+    font-size: 10px;
+  }
+
+  .difficulty-option {
+    min-width: 27px;
+    height: 24px;
+    padding: 0 6px;
+    font-size: 13px;
   }
 
   .history-kicker {

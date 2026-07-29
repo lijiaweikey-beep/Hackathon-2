@@ -34,7 +34,6 @@ function updateTaskAttemptsChip(ui, resourceHtml) {
 export function renderTaskModal(ui, {
   level,
   npcCount,
-  difficultyLabel = "易",
   npcCountText,
 }) {
   const model = createTaskModalModel({ level, npcCount, npcCountText });
@@ -43,10 +42,6 @@ export function renderTaskModal(ui, {
   ui.taskCopy.textContent = model.briefingText;
   ui.taskClue.textContent = "🔍 " + level.clue;
   if (ui.taskNpcCount) ui.taskNpcCount.textContent = model.npcCount;
-  if (ui.npcCountInput) ui.npcCountInput.value = String(model.npcCount);
-  if (ui.taskDifficultyText) {
-    ui.taskDifficultyText.textContent = `${difficultyLabel} · ${model.npcCount}`;
-  }
   ui.taskTime.textContent = model.timeText;
   updateTaskAttemptsChip(ui, model.resourceHtml);
   if (ui.taskActionIcon) ui.taskActionIcon.textContent = model.actionIcon;

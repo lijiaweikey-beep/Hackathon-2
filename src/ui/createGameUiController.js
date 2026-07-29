@@ -1,8 +1,6 @@
 import {
   DEFAULT_DIFFICULTY,
-  getDifficultyLabel,
   getDifficultyNpcCount,
-  getDifficultyNpcText,
   normalizeDifficulty,
 } from "../core/difficulty.js";
 import { GAME_PHASES } from "../core/gamePhase.js";
@@ -41,20 +39,13 @@ export function createGameUiController(dependencies) {
     return getDifficultyNpcCount(level, difficulty);
   }
 
-  function getDifficultySummary(level = getCurrentLevel()) {
-    return `${getDifficultyLabel(difficulty)} · ${getDifficultyNpcText(level, difficulty)}`;
-  }
-
-  function syncDifficultyUi(level = getCurrentLevel()) {
+  function syncDifficultyUi() {
     const normalized = normalizeDifficulty(difficulty);
     ui.difficultyButtons?.forEach((button) => {
       const active = button.dataset.difficulty === normalized;
       button.classList?.toggle("active", active);
       button.setAttribute?.("aria-pressed", String(active));
     });
-    if (ui.difficultyHint) {
-      ui.difficultyHint.textContent = getDifficultySummary(level);
-    }
   }
 
   function selectDifficulty(nextDifficulty) {
@@ -78,10 +69,8 @@ export function createGameUiController(dependencies) {
     renderTaskModal(ui, {
       level,
       npcCount: getActiveNpcCount(level),
-      difficultyLabel: getDifficultyLabel(difficulty),
-      npcCountText: getDifficultyNpcText(level, difficulty),
     });
-    syncDifficultyUi(level);
+    syncDifficultyUi();
     renderTargetPreview(ui.targetPreviewCanvas, level);
     updateHud();
   }

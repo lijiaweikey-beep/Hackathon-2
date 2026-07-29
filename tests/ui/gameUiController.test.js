@@ -57,14 +57,13 @@ test("界面控制器回到首页时交给人生事件轴并刷新抬头信息",
   assert.equal(ui.timerText.textContent, "10");
 });
 
-test("难度按钮会更新当前关卡人数", () => {
+test("难度按钮只更新当前关卡人数和选中状态", () => {
   const buttons = ["easy", "medium", "hard"].map(createButton);
   const ui = {
     taskModal: { classList: createClassList() },
     resultModal: { classList: createClassList() },
     shareModal: { classList: createClassList() },
     difficultyButtons: buttons,
-    difficultyHint: { textContent: "" },
     missionText: { textContent: "" },
     timerText: { textContent: "" },
     taskEmoji: { textContent: "" },
@@ -72,7 +71,6 @@ test("难度按钮会更新当前关卡人数", () => {
     taskCopy: { textContent: "" },
     taskClue: { textContent: "" },
     taskNpcCount: { textContent: "" },
-    taskDifficultyText: { textContent: "" },
     taskTime: { textContent: "" },
     targetLabel: { textContent: "" },
     retryButton: { disabled: true, textContent: "", addEventListener() {} },
@@ -97,8 +95,6 @@ test("难度按钮会更新当前关卡人数", () => {
 
   assert.equal(controller.getMatchNpcCount(), 35);
   assert.equal(buttons[2].attributes["aria-pressed"], "true");
-  assert.equal(ui.difficultyHint.textContent, "难 · 35 人");
-  assert.equal(ui.taskDifficultyText.textContent, "难 · 35 人");
 });
 
 test("结算页使用关卡等级贴图和节点文案", () => {

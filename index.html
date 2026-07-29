@@ -68,9 +68,19 @@
       <div class="history-cosmos">
         <header class="history-header">
           <div class="history-kicker">人生事件轴</div>
-          <div class="history-build-meta">
-            <span id="historyVersionText">v0.10.x.1</span>
-            <span id="historyStampText">2026.06.18</span>
+          <div class="history-header-actions">
+            <div class="history-build-meta">
+              <span id="historyVersionText">v0.10.x.1</span>
+              <span id="historyStampText">2026.06.18</span>
+            </div>
+            <div class="difficulty-picker" aria-label="游戏难易程度">
+              <span class="difficulty-label">难度</span>
+              <div class="difficulty-options" role="group" aria-label="选择游戏难度">
+                <button class="difficulty-option" type="button" data-difficulty="easy" aria-pressed="true">易</button>
+                <button class="difficulty-option" type="button" data-difficulty="medium" aria-pressed="false">中</button>
+                <button class="difficulty-option" type="button" data-difficulty="hard" aria-pressed="false">难</button>
+              </div>
+            </div>
           </div>
         </header>
 
@@ -79,15 +89,6 @@
         </div>
 
         <footer class="history-footer">
-          <div class="difficulty-picker" aria-label="游戏难易程度">
-            <span class="difficulty-label">游戏难易程度</span>
-            <div class="difficulty-options" role="group" aria-label="选择游戏难度">
-              <button class="difficulty-option" type="button" data-difficulty="easy" aria-pressed="true">易</button>
-              <button class="difficulty-option" type="button" data-difficulty="medium" aria-pressed="false">中</button>
-              <button class="difficulty-option" type="button" data-difficulty="hard" aria-pressed="false">难</button>
-            </div>
-            <span id="difficultyHint" class="difficulty-hint">易 · 20 人</span>
-          </div>
           <div id="historyStatusText" class="history-status-text">历史仍在等待记录……</div>
           <div id="historyNodeDetail" class="history-node-detail" aria-live="polite"></div>
           <div id="storyEnding" class="story-ending" hidden>
@@ -132,17 +133,6 @@
         <div class="task-info-row">
           <div class="task-info-chip">⏱ <span id="taskTime">90</span> 秒</div>
           <div class="task-info-chip" id="taskAttemptsChip">❤️ <span id="taskAttempts">❤️❤️❤️</span></div>
-        </div>
-        <div class="match-settings">
-          <div class="match-settings-icon" aria-hidden="true">👥</div>
-          <div class="match-settings-body">
-            <span class="match-settings-label">当前难度</span>
-            <div id="taskDifficultyText" class="match-settings-summary">易 · 20 人</div>
-          </div>
-        </div>
-        <div class="task-controls-guide">
-          <div class="guide-item"><span class="guide-icon">🕹</span> 摇杆/WASD 移动</div>
-          <div class="guide-item"><span class="guide-icon">👊</span> 拳按钮/空格 攻击</div>
         </div>
         <div class="task-actions">
           <button id="backFromTaskButton" class="secondary-button" type="button">返回坐标轴</button>
