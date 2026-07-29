@@ -146,6 +146,7 @@ export function createGameUiController(dependencies) {
       level,
       npcCount: getActiveNpcCount(level),
       mainlineIndex,
+      difficulty,
     });
     syncDifficultyUi();
     renderTargetPreview(ui.targetPreviewCanvas, level);

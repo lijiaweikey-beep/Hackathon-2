@@ -2,7 +2,7 @@ import {
   ATTEMPTS,
   ROUND_SECONDS,
 } from "../config/constants.js";
-import { createLevelCardModel } from "./levelCardModel.js";
+import { getDifficultyLabel } from "../core/difficulty.js";
 
 const CN_ORDINALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 const FIST_ICON = new URL("../assets/ui/icon-fist.png", import.meta.url).href;
@@ -70,14 +70,15 @@ export function renderTaskModal(ui, {
   npcCount,
   npcCountText,
   mainlineIndex = -1,
+  difficulty,
 }) {
   const model = createTaskModalModel({ level, npcCount, npcCountText });
   // 标题直接用目标 NPC 名，和预览图保持同一目标。
   ui.taskTitle.textContent = model.targetLabel || getTaskEntryTitle(level, mainlineIndex);
   renderTaskTraits(ui, level);
   if (ui.taskDifficulty) {
-    const { difficulty } = createLevelCardModel(level, { npcCount });
-    ui.taskDifficulty.textContent = `难度 · ${difficulty.label || "新手"}`;
+    // 难度徽章跟随玩家在难度选择器里选中的档位（易/中/难）。
+    ui.taskDifficulty.textContent = `难度 · ${getDifficultyLabel(difficulty)}`;
   }
   if (ui.taskNpcCount) ui.taskNpcCount.textContent = model.npcCount;
   ui.taskTime.textContent = model.timeText;

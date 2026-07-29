@@ -87,11 +87,21 @@ export function createLifeReportController({ ui, levels, storage, getBest }) {
     ui.lifeReportModal?.classList.remove("visible");
   }
 
+  // 关闭即视为已读：以后不再自动弹，但入口仍可随时重看。
+  function dismiss() {
+    markSeen();
+    hide();
+  }
+
   function bind({ onConfirm } = {}) {
     ui.lifeReportConfirmButton?.addEventListener("click", () => {
-      markSeen();
-      hide();
+      dismiss();
       onConfirm?.();
+    });
+    ui.lifeReportCloseButton?.addEventListener("click", () => dismiss());
+    // 点击卡片外的暗色区域也可以关闭。
+    ui.lifeReportModal?.addEventListener("click", (event) => {
+      if (event.target === ui.lifeReportModal) dismiss();
     });
   }
 

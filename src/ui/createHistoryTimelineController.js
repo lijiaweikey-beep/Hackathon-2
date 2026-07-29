@@ -6,7 +6,6 @@ const TRACK_PADDING = 130;
 const EXTRA_GAP = 150;
 const REVEAL_AUTO_DELAY = 2000;
 const REVEAL_ANIMATION_MS = 1250;
-const NODE_ROWS = [96, 44];
 
 function getNodeLabel(level) {
   return level.age == null ? "番外" : `${level.age} 岁`;
@@ -185,7 +184,7 @@ export function createHistoryTimelineController({
     });
   }
 
-  function appendLoreButton(level, x, y) {
+  function appendLoreButton(level, x) {
     const lore = document.createElement("button");
     lore.type = "button";
     lore.className = "history-node-lore";
@@ -193,7 +192,6 @@ export function createHistoryTimelineController({
     lore.setAttribute("aria-label", `查看${level.sceneName}的历史记录`);
     lore.textContent = "📖";
     lore.style.setProperty("--x", `${x}px`);
-    lore.style.setProperty("--y", `${y}px`);
     lore.addEventListener("click", (event) => {
       event.stopPropagation();
       setStatus(`历史节点已记录：${level.sceneName}`);
@@ -204,7 +202,7 @@ export function createHistoryTimelineController({
   }
 
   function appendNodeCard(level, index, geometry) {
-    const { x, y } = geometry;
+    const { x } = geometry;
     const state = getState(level);
     const hidden = state === "fog";
     const seal = '<span class="history-seal-eye" aria-hidden="true"></span>'
@@ -222,7 +220,6 @@ export function createHistoryTimelineController({
     card.className = `history-node-card ${state}`;
     card.dataset.historyNode = level.id;
     card.style.setProperty("--x", `${x}px`);
-    card.style.setProperty("--y", `${y}px`);
     card.disabled = false;
     let artHtml;
     if (hidden) {
@@ -268,7 +265,7 @@ export function createHistoryTimelineController({
     ui.historyTrack.appendChild(card);
     // 有结算记录（含失败）就给历史记录入口；封印/迷雾状态除外。
     if (state === "unlocked" || (state === "open" && getBestScore(level.id))) {
-      appendLoreButton(level, x, y);
+      appendLoreButton(level, x);
     }
   }
 
@@ -308,7 +305,6 @@ export function createHistoryTimelineController({
     levels.forEach((level, index) => {
       appendNodeCard(level, index, {
         x: TRACK_PADDING + index * NODE_GAP + shiftAt(index),
-        y: NODE_ROWS[index % NODE_ROWS.length],
       });
     });
   }

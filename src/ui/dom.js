@@ -43,6 +43,7 @@ export const ui = {
   lifeReportProgress: document.querySelector("#lifeReportProgress"),
   lifeReportRows: document.querySelector("#lifeReportRows"),
   lifeReportConfirmButton: document.querySelector("#lifeReportConfirmButton"),
+  lifeReportCloseButton: document.querySelector("#lifeReportCloseButton"),
   taskTitle: document.querySelector("#taskTitle"),
   taskTraits: document.querySelector("#taskTraits"),
   taskTime: document.querySelector("#taskTime"),

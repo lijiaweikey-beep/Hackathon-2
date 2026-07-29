@@ -703,13 +703,16 @@ button {
   position: relative;
   height: 100%;
   min-width: 100%;
+  /* 轴心 = 屏幕垂直中心（视口顶部偏移 84px，需换算回 track 坐标系） */
+  --axis-center: calc(50dvh - 84px);
 }
 
 .history-axis {
   position: absolute;
   left: 64px;
   right: 64px;
-  top: min(66vh, 430px);
+  /* 轴线中心固定在视口垂直中心（容器内 top+24 处是线的中心） */
+  top: calc(var(--axis-center) - 24px);
   height: 48px;
 }
 
@@ -755,7 +758,7 @@ button {
 .history-diamond {
   position: absolute;
   left: var(--x);
-  top: calc(min(66vh, 430px) + 18px);
+  top: calc(var(--axis-center) - 6px);
   width: 12px;
   height: 12px;
   transform: rotate(45deg);
@@ -771,7 +774,9 @@ button {
 .history-node-card {
   position: absolute;
   left: var(--x);
-  top: var(--y);
+  /* 卡片垂直中心对齐事件轴线 */
+  top: var(--axis-center);
+  transform: translateY(-50%);
   width: 228px;
   min-height: 276px;
   display: grid;
@@ -794,7 +799,7 @@ button {
 .history-node-card.unlocked:active,
 .history-node-card.open:hover,
 .history-node-card.open:active {
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(calc(-50% - 4px)) scale(1.02);
   border-color: var(--sun);
   box-shadow: 0 16px 34px rgba(37, 36, 42, 0.22), 0 0 0 3px rgba(255, 212, 71, 0.7);
 }
@@ -814,7 +819,7 @@ button {
 }
 
 .history-node-card.sealed {
-  transform: scale(1.08);
+  transform: translateY(-50%) scale(1.08);
   border: 2px solid var(--grade-a);
   background: rgba(226, 219, 248, 0.9);
   box-shadow: 0 18px 40px rgba(37, 36, 42, 0.24), 0 0 0 4px rgba(143, 122, 216, 0.35);
@@ -843,7 +848,8 @@ button {
   position: absolute;
   z-index: 2;
   left: calc(var(--x) + 178px);
-  top: calc(var(--y) + 12px);
+  /* 卡片中心在轴心，卡高 276px：右上角 = 轴心 - 138px + 12px */
+  top: calc(var(--axis-center) - 126px);
   width: 38px;
   height: 38px;
   border-radius: 50%;
@@ -892,17 +898,22 @@ button {
 
 .history-track-divider.locked::after {
   content: "锁";
+  /* 锁牌固定在“人生之外”文字正下方、同一竖列 */
+  position: absolute;
+  top: calc(50% + 46px);
+  left: 50%;
+  transform: translateX(-50%);
   display: grid;
   place-items: center;
   width: 24px;
   height: 24px;
-  margin-top: 10px;
   border: 2px solid rgba(37, 36, 42, 0.48);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.7);
   color: rgba(37, 36, 42, 0.68);
   font-size: 12px;
   letter-spacing: 0;
+  writing-mode: horizontal-tb;
 }
 
 .history-node-age {
@@ -1505,11 +1516,11 @@ button {
 }
 
 @keyframes historyShake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-7px); }
-  40% { transform: translateX(6px); }
-  60% { transform: translateX(-4px); }
-  80% { transform: translateX(3px); }
+  0%, 100% { transform: translateY(-50%) translateX(0); }
+  20% { transform: translateY(-50%) translateX(-7px); }
+  40% { transform: translateY(-50%) translateX(6px); }
+  60% { transform: translateY(-50%) translateX(-4px); }
+  80% { transform: translateY(-50%) translateX(3px); }
 }
 
 @keyframes historyCardReveal {
@@ -1522,7 +1533,7 @@ button {
       0 0 42px rgba(255, 136, 77, 0.6);
   }
   100% {
-    transform: rotateY(180deg) scale(1.05);
+    transform: translateY(-50%) rotateY(180deg) scale(1.05);
     opacity: 0.1;
   }
 }
@@ -1860,6 +1871,37 @@ button {
 /* ---- 人生线报告：主线全通后的一次性总结卡 ---- */
 .life-report-modal {
   z-index: 46;
+}
+
+.life-report-close {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.life-report-close:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow);
+}
+
+.life-report-close:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
 }
 
 .life-report-art {
@@ -2217,6 +2259,10 @@ button {
     inset: 74px 0 118px;
   }
 
+  .history-track {
+    --axis-center: calc(50dvh - 74px);
+  }
+
   .history-header-actions {
     gap: 8px;
   }
@@ -2549,12 +2595,8 @@ button {
     inset: 54px 0 48px;
   }
 
-  .history-axis {
-    top: min(48vh, 210px);
-  }
-
-  .history-diamond {
-    top: calc(min(48vh, 210px) + 18px);
+  .history-track {
+    --axis-center: calc(50dvh - 54px);
   }
 
   .history-node-card {
@@ -2597,7 +2639,8 @@ button {
 
   .history-node-lore {
     left: calc(var(--x) + 112px);
-    top: calc(var(--y) + 8px);
+    /* 紧凑卡高 168px：右上角 = 轴心 - 84px + 8px */
+    top: calc(var(--axis-center) - 76px);
     width: 28px;
     height: 28px;
     font-size: 13px;
