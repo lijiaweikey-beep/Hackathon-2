@@ -1,3 +1,3 @@
-import { boot } from "./game.js";
+import { boot } from "./runtime/createGameApplication.js";
 
 boot();
