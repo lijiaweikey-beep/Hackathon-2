@@ -18,6 +18,7 @@ export function createWorld(world) {
     scene,
     addWall,
     collidesWithObstacle,
+    registerObstacle,
     randomRange,
   } = world;
   const computers = [];
@@ -62,6 +63,7 @@ export function createWorld(world) {
     desk.castShadow = true;
     desk.receiveShadow = true;
     scene.add(desk);
+    registerObstacle(x, z, 1.05, 0.5);
 
     const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.5, 0.12), monitorMat);
     monitor.position.set(x, 0.92, z + (z > 0 ? -0.25 : 0.25));
@@ -108,6 +110,7 @@ export function createWorld(world) {
     bed.castShadow = true;
     bed.receiveShadow = true;
     scene.add(bed);
+    registerObstacle(x, z, 0.75, 1.25);
 
     const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.18, 1.55), quiltMat);
     quilt.position.set(x, 0.52, z + 0.18);
