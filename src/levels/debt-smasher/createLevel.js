@@ -3,7 +3,7 @@ import { createDebtRules } from "./rules.js";
 
 const HIT_PUSH_DISTANCE = 2.4;
 const ROUND_SECONDS = 100;
-const DEBT_TYPES = ["mortgage", "car-loan", "interest", "collection"];
+const DEBT_TYPES = ["mortgage", "car-loan"];
 
 export function createDebtSmasherLevel(context) {
   const rules = createDebtRules({
@@ -102,7 +102,14 @@ export function createDebtSmasherLevel(context) {
       source: npc,
     }));
     const result = rules.smash(machine, npcs, context.actors.getPlayer().group.position);
-    result.crushed.forEach((entry) => crush(entry.source));
+    result.crushed.forEach((entry) => {
+      crush(entry.source);
+      context.sceneData.createCoinBurst?.({
+        position: entry.source.group.position.clone(),
+        debtType: entry.source.debtType,
+        coins: entry.coinsDropped ?? 0,
+      });
+    });
     if (result.crushed.length > 0) {
       context.combat.triggerShake(0.32, 0.18);
       context.ui.refreshHud();

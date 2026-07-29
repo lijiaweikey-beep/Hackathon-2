@@ -7,6 +7,7 @@ function createActor(id, x, z) {
   return {
     id,
     alive: true,
+    debtType: "car-loan",
     isDebtTarget: true,
     group: {
       position: new THREE.Vector3(x, 0, z),
@@ -21,6 +22,7 @@ function createActor(id, x, z) {
 
 function createContext() {
   const records = {
+    coinBursts: [],
     finished: [],
     hudRefreshes: 0,
     hits: 0,
@@ -46,6 +48,9 @@ function createContext() {
           press: { position: { y: 4.6 } },
         },
       ],
+      createCoinBurst(args) {
+        records.coinBursts.push(args);
+      },
       updateEnvironment() {},
     },
     actors: {
@@ -105,7 +110,7 @@ test("经典爆金币按玩家当前朝向推送账单怪", () => {
 });
 
 test("经典爆金币机关压碎账单怪后计入金币", () => {
-  const { context, npc } = createContext();
+  const { context, records, npc } = createContext();
   const level = createDebtSmasherLevel(context);
   level.start();
   npc.group.position.set(3, 0, 0);
@@ -116,6 +121,9 @@ test("经典爆金币机关压碎账单怪后计入金币", () => {
 
   assert.equal(level.handleAction({ type: "getResultStats" }).value, "1 / 100");
   assert.equal(npc.alive, false);
+  assert.equal(records.coinBursts.length, 1);
+  assert.equal(records.coinBursts[0].debtType, "car-loan");
+  assert.equal(records.coinBursts[0].coins, 1);
 });
 
 test("经典爆金币未被推入的账单怪不会自动被陷阱砸中", () => {
