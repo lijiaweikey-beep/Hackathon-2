@@ -81,6 +81,7 @@ function avoidStaticFetchFlag() {
 }
 
 export default defineConfig({
+  base: "./",
   plugins: [avoidStaticFetchFlag()],
   build: {
     modulePreload: false,

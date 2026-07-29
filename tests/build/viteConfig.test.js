@@ -28,3 +28,7 @@ test("Vite 配置会规避真实 fetch 调用的静态检测", () => {
     'console.warn("fetch() not supported.");',
   );
 });
+
+test("Vite 构建使用相对资源路径适配互动空间包路径", () => {
+  assert.equal(viteConfig.base, "./");
+});
