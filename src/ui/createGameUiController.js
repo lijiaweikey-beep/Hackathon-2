@@ -22,6 +22,40 @@ export function createGameUiController(dependencies) {
   const storyIntro = createStoryIntroPlayer({ ui });
   let difficulty = DEFAULT_DIFFICULTY;
   let lastResult = null;
+  let clueTypeTarget = "";
+  let clueTypeTimer = null;
+  let clueFloatTimer = null;
+
+  function typeClueCharByChar(text) {
+    if (text === clueTypeTarget) return;
+    clueTypeTarget = text;
+    if (clueTypeTimer) clearInterval(clueTypeTimer);
+    if (clueFloatTimer) clearTimeout(clueFloatTimer);
+    if (!ui.clueBar) return;
+    // 重置浮动状态
+    ui.clueBar.classList.remove("floated");
+    if (!text) {
+      ui.clueBar.textContent = "";
+      return;
+    }
+    ui.clueBar.textContent = "";
+    let i = 0;
+    clueTypeTimer = setInterval(() => {
+      i += 1;
+      ui.clueBar.textContent = text.slice(0, i);
+      ui.clueBar.classList.remove("char-pop");
+      void ui.clueBar.offsetWidth;
+      ui.clueBar.classList.add("char-pop");
+      if (i >= text.length) {
+        clearInterval(clueTypeTimer);
+        clueTypeTimer = null;
+        // 打完字停留 3 秒后浮到上方
+        clueFloatTimer = setTimeout(() => {
+          ui.clueBar?.classList.add("floated");
+        }, 3000);
+      }
+    }, 110);
+  }
 
   function getStoryStats() {
     const mainline = dependencies.levelRegistry?.mainline ?? [];
@@ -61,6 +95,14 @@ export function createGameUiController(dependencies) {
     if (leaveLevel) dependencies.onLeaveLevel?.();
     syncDifficultyUi();
     levelViewHost.clear();
+    // 清除 clue bar 残留文字和状态
+    clueTypeTarget = "";
+    if (clueTypeTimer) clearInterval(clueTypeTimer);
+    if (clueFloatTimer) clearTimeout(clueFloatTimer);
+    if (ui.clueBar) {
+      ui.clueBar.textContent = "";
+      ui.clueBar.classList.remove("floated", "char-pop", "hidden");
+    }
     ui.taskModal?.classList.remove("visible");
     ui.resultModal?.classList.remove("visible");
     ui.shareModal?.classList.remove("visible");
@@ -77,7 +119,7 @@ export function createGameUiController(dependencies) {
     });
     syncDifficultyUi();
     renderTargetPreview(ui.targetPreviewCanvas, level);
-    updateHud();
+    // HUD 更新推迟到 startExperience() 之后，避免逐字动画被任务弹窗/剧情弹窗遮住
   }
 
   function getLevelSlug(level) {
@@ -179,11 +221,12 @@ export function createGameUiController(dependencies) {
       ui.attemptText.classList?.remove("hearts-display");
     }
     if (ui.clueBar) {
-      ui.clueBar.textContent = viewModel?.clue
-        ?? `🔍 ${level.hudClue || level.clue || ""}`;
+      const newClue = viewModel?.clue
+        ?? (viewModel?.hideClue ? "" : `🔍 ${level.hudClue || level.clue || ""}`);
+      typeClueCharByChar(newClue);
       ui.clueBar.classList?.toggle(
         "hidden",
-        Boolean(mechanicHintHtml) && !mechanicVisible,
+        viewModel?.hideClue || (Boolean(mechanicHintHtml) && !mechanicVisible),
       );
     }
     if (ui.attackIcon) ui.attackIcon.textContent = viewModel?.attackIcon ?? "拳";
@@ -193,6 +236,15 @@ export function createGameUiController(dependencies) {
         Boolean(mechanicHintHtml) || mechanicVisible,
       );
       ui.mechanicHint.innerHTML = viewModel?.mechanicHtml || mechanicHintHtml;
+    }
+    // 教学关：摇杆引导高亮
+    if (ui.joystick) {
+      ui.joystick.classList.toggle("tutorial-guide", viewModel?.joystickGuide ?? false);
+    }
+    // 教学关：攻击按钮状态
+    if (ui.attackButton) {
+      ui.attackButton.classList.toggle("tutorial-locked", viewModel?.attackLocked ?? false);
+      ui.attackButton.classList.toggle("tutorial-pulse", viewModel?.attackPulse ?? false);
     }
     updateCooldown();
   }

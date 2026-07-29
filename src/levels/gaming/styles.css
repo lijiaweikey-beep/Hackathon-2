@@ -90,25 +90,20 @@
 
 .tutorial-subtitle-host {
   display: grid;
-  place-items: start center;
-  padding-top: max(86px, calc(env(safe-area-inset-top) + 72px));
+  place-items: center;
 }
 
 .tutorial-subtitle {
   max-width: min(88vw, 520px);
   padding: 12px 18px;
-  border-radius: 16px;
-  background: rgba(8, 12, 22, 0.72);
-  border: 1px solid rgba(165, 180, 252, 0.28);
   color: #eef2ff;
   font-size: clamp(15px, 2.6vw, 20px);
   letter-spacing: 0.02em;
   text-align: center;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
 .tutorial-subtitle.typing {
-  animation: tutorial-type-in 720ms steps(24, end) both;
+  animation: tutorial-type-in 1.5s steps(24, end) both;
 }
 
 @keyframes tutorial-type-in {
@@ -153,6 +148,56 @@
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
   animation: tutorial-finger-drag 1.5s ease-in-out infinite;
+}
+
+/* 摇杆四方向箭头 */
+.tutorial-arrow {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0.8;
+  animation: arrow-blink 1s ease-in-out infinite;
+}
+
+.arrow-up {
+  left: 50%;
+  top: -18px;
+  margin-left: -10px;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 14px solid rgba(52, 211, 153, 0.9);
+}
+
+.arrow-down {
+  left: 50%;
+  bottom: -18px;
+  margin-left: -10px;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 14px solid rgba(52, 211, 153, 0.9);
+}
+
+.arrow-left {
+  top: 50%;
+  left: -18px;
+  margin-top: -10px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 14px solid rgba(52, 211, 153, 0.9);
+}
+
+.arrow-right {
+  top: 50%;
+  right: -18px;
+  margin-top: -10px;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-left: 14px solid rgba(52, 211, 153, 0.9);
+}
+
+@keyframes arrow-blink {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 .tutorial-finger::after {
