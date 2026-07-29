@@ -258,7 +258,7 @@ export function boot() {
     onStart: startExperience,
     onPause: pauseExperience,
     onResume: resumeExperience,
-    onPrelaunchDismissed: () => storyBgm.stop(),
+    onPrelaunchDismissed: () => storyBgm.playIntro(),
     onHomeShown: () => historyTimelineFlow?.showHome(),
     onDifficultyChanged: () => historyTimelineFlow?.showHome(),
     onRetry() {

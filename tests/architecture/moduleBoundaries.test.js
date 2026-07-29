@@ -50,6 +50,12 @@ test("共享运行时按单一职责控制模块体积", async () => {
   }
 });
 
+test("预启动手势不停止入场音乐", async () => {
+  const source = await readSource("runtime/createGameApplication.js");
+  assert.match(source, /onPrelaunchDismissed:\s*\(\)\s*=>\s*storyBgm\.playIntro\(\)/);
+  assert.doesNotMatch(source, /onPrelaunchDismissed:\s*\(\)\s*=>\s*storyBgm\.stop\(\)/);
+});
+
 test("不同关卡目录之间不能互相导入", async () => {
   const entries = (await readdir(levelsRoot, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory());
