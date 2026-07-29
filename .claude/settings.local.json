@@ -24,7 +24,8 @@
       "Bash(node --test --test-name-pattern=\"gaming|tutorial\")",
       "Bash(node *)",
       "Bash(curl -s http://localhost:3000)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(git -c http.sslVerify=false pull)"
     ]
   }
 }

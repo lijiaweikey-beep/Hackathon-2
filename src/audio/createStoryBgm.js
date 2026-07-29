@@ -2,10 +2,11 @@
  * 人生主线 BGM（与关卡玩法解耦）
  *
  * 规则：
- * - 打开游戏 → 循环播放入场曲
- * - 点击「开始游戏」→ 停止入场曲
- * - 点击「进入关卡」且年龄命中映射 → 循环播放对应关曲
+ * - 打开作品 → 循环播放入场曲（选关页继续播放）
+ * - 点击「进入关卡」且年龄命中映射 → 停止入场曲，循环播放对应关曲
  * - 任务成功 / 任务失败 → 停止 BGM
+ * - 返回选关页 → 恢复入场曲
+ * - 全局音乐开关可随时静音 / 恢复当前意图曲目
  */
 
 function resolveAudioUrl(fileName) {
@@ -39,6 +40,7 @@ function safePlay(audio) {
  * @param {number} [options.volume]
  * @param {typeof Audio} [options.AudioCtor]
  * @param {Document | null} [options.documentTarget]
+ * @param {() => boolean} [options.isEnabled]
  */
 export function createStoryBgm({
   introSrc = INTRO_SRC,
@@ -46,10 +48,16 @@ export function createStoryBgm({
   volume = 0.55,
   AudioCtor = globalThis.Audio,
   documentTarget = globalThis.document,
+  isEnabled = () => true,
 } = {}) {
   let current = null;
   let introWanted = false;
+  let desiredAge = null;
   let unlockHandler = null;
+
+  function musicOn() {
+    return isEnabled() !== false;
+  }
 
   function disarmIntroUnlock() {
     if (!unlockHandler || !documentTarget) {
@@ -64,7 +72,7 @@ export function createStoryBgm({
   function armIntroUnlock() {
     if (unlockHandler || !documentTarget) return;
     unlockHandler = () => {
-      if (!introWanted || !current) {
+      if (!introWanted || !current || !musicOn()) {
         disarmIntroUnlock();
         return;
       }
@@ -98,15 +106,27 @@ export function createStoryBgm({
     return audio;
   }
 
-  function playIntro() {
-    introWanted = true;
-    const audio = playSrc(introSrc, { loop: true });
+  function startCurrent(audio, { allowUnlock = false } = {}) {
     if (!audio) return;
+    if (!musicOn()) {
+      audio.pause();
+      return;
+    }
     safePlay(audio).then((ok) => {
-      // 浏览器拦截自动播放时，等首次手势再恢复入场曲
+      if (!allowUnlock) {
+        disarmIntroUnlock();
+        return;
+      }
       if (ok === false || audio.paused) armIntroUnlock();
       else disarmIntroUnlock();
     });
+  }
+
+  function playIntro() {
+    introWanted = true;
+    desiredAge = null;
+    const audio = playSrc(introSrc, { loop: true });
+    startCurrent(audio, { allowUnlock: true });
   }
 
   /**
@@ -119,12 +139,14 @@ export function createStoryBgm({
     disarmIntroUnlock();
     const src = ageTracks[age];
     if (!src) {
+      desiredAge = null;
       stopCurrent();
       return false;
     }
+    desiredAge = age;
     const audio = playSrc(src, { loop: true });
     if (!audio) return false;
-    safePlay(audio);
+    startCurrent(audio);
     return true;
   }
 
@@ -135,8 +157,27 @@ export function createStoryBgm({
 
   function stop() {
     introWanted = false;
+    desiredAge = null;
     disarmIntroUnlock();
     stopCurrent();
+  }
+
+  /** 全局音乐开关变化时暂停或恢复当前意图曲目 */
+  function syncEnabled() {
+    if (!musicOn()) {
+      disarmIntroUnlock();
+      if (current) current.pause();
+      return;
+    }
+    if (introWanted) {
+      if (current) startCurrent(current, { allowUnlock: true });
+      else playIntro();
+      return;
+    }
+    if (desiredAge != null) {
+      if (current) startCurrent(current);
+      else playForAge(desiredAge);
+    }
   }
 
   function dispose() {
@@ -148,6 +189,7 @@ export function createStoryBgm({
     playForAge,
     playForLevel,
     stop,
+    syncEnabled,
     dispose,
     get currentSrc() {
       return current?.src ?? null;

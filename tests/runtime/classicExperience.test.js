@@ -53,7 +53,7 @@ test("经典体验在顿帧期间只更新震动", () => {
   assert.deepEqual(calls, ["shake"]);
 });
 
-test("经典游戏适配器把输入和规则动作转发给现有系统", () => {
+test("经典体验适配器把输入和规则动作转发给现有系统", () => {
   const calls = [];
   const experience = createClassicGameExperience({
     session: { result: { won: true }, levelState: { level: { timeLimit: null } } },

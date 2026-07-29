@@ -4,12 +4,17 @@ import {
   MAX_NPC_COUNT,
   NPC_COUNT_STORAGE_KEY,
   DIFFICULTY_STORAGE_KEY,
+  PLAYER_PREFS_STORAGE_KEY,
   BEST_SCORE_STORAGE_KEY,
 } from "../config/constants.js";
 import {
   DEFAULT_DIFFICULTY,
   normalizeDifficulty,
 } from "../core/difficulty.js";
+import {
+  DEFAULT_PLAYER_PREFERENCES,
+  normalizePlayerPreferences,
+} from "../core/playerPreferences.js";
 
 export function clampNpcCount(value) {
   return Math.min(MAX_NPC_COUNT, Math.max(MIN_NPC_COUNT, Math.round(value)));
@@ -43,6 +48,23 @@ export function saveDifficultySetting(difficulty) {
       normalizeDifficulty(difficulty),
     );
   } catch { /* ignore */ }
+}
+
+export function loadPlayerPreferences() {
+  try {
+    const raw = localStorage.getItem(PLAYER_PREFS_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_PLAYER_PREFERENCES };
+    return normalizePlayerPreferences(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return { ...DEFAULT_PLAYER_PREFERENCES };
+}
+
+export function savePlayerPreferences(preferences) {
+  const normalized = normalizePlayerPreferences(preferences);
+  try {
+    localStorage.setItem(PLAYER_PREFS_STORAGE_KEY, JSON.stringify(normalized));
+  } catch { /* ignore */ }
+  return normalized;
 }
 
 export function getBestScore(levelId) {

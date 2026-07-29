@@ -77,6 +77,7 @@ export default {
   tutorialSteps: {
     moveTargetPos: { x: 0.4, z: 6.6 },
     moveRadius: 1.0,
+    attackTargetPos: { x: 0.4, z: 8.2 },
     attackTargetId: "noisy_roommate",
   },
   timeLimit: null,

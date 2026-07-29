@@ -17,7 +17,6 @@ import { GAME_PHASES } from "../core/gamePhase.js";
 import { createClassicLevelRunner } from "./createClassicLevelRunner.js";
 import { createGameSession } from "./createGameSession.js";
 import { createGameLoop } from "./createGameLoop.js";
-import { createGameAudio } from "./createGameAudio.js";
 import { createClassicGameExperience } from "./createClassicGameExperience.js";
 import { createStandaloneExperienceHost } from "./createExperienceHost.js";
 import { createExperienceManager } from "./createExperienceManager.js";
@@ -28,17 +27,17 @@ import { createActorSystem } from "../systems/createActorSystem.js";
 import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
-import { createStoryBgm } from "../audio/createStoryBgm.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
 import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
+import { createPlayerFeedback } from "./createPlayerFeedback.js";
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager;
 let storyProgress, historyTimelineFlow, totalTime = 0;
 const session = createGameSession();
-const audio = createGameAudio();
-const storyBgm = createStoryBgm();
+const playerFeedback = createPlayerFeedback();
+const { audio, storyBgm } = playerFeedback;
 const levelRunner = createClassicLevelRunner({
   session,
   getServices: () => ({
@@ -85,7 +84,7 @@ function leaveLevel() {
   settlement.clearPending();
   experienceManager?.dispose();
   session.reset();
-  storyBgm.stop();
+  storyBgm.playIntro();
 }
 
 function selectLevelById(id) {
@@ -136,10 +135,7 @@ function createStandaloneHost({ definition, scope }) {
       render: rendering.render,
       disposeScene: (targetScene) => rendering.disposeScene(targetScene),
     },
-    audio: {
-      playSound: audio.play,
-      resume: audio.resume,
-    },
+    audio: audio.experience,
     flow: {
       start: startExperience,
       pause: pauseExperience,
@@ -226,11 +222,8 @@ export function boot() {
     getNpcs: () => actorSystem.getNpcs(),
     dispatch: (action) => levelRunner.handleAction(action),
     consumeActionInterval: () => inputController.consumeAction(),
-    playSound: audio.play,
-    playPunch: audio.punch,
-    playHit: audio.hit,
-    playMiss: audio.miss,
-    vibrate: (pattern) => navigator.vibrate?.(pattern),
+    ...audio.combat,
+    vibrate: playerFeedback.vibrate,
     triggerHitstop,
     triggerShake,
     settleRound,
@@ -261,9 +254,10 @@ export function boot() {
     onStart: startExperience,
     onPause: pauseExperience,
     onResume: resumeExperience,
-    onPrelaunchDismissed: () => storyBgm.stop(),
+    onPrelaunchDismissed: () => storyBgm.playIntro(),
     onHomeShown: () => historyTimelineFlow?.showHome(),
     onDifficultyChanged: () => historyTimelineFlow?.showHome(),
+    onPreferencesChanged: playerFeedback.setPreferences,
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
@@ -303,8 +297,7 @@ export function boot() {
     },
     saveBestScore,
     onLevelCompleted: (level) => historyTimelineFlow?.onLevelCompleted(level),
-    playWin: audio.win,
-    playLose: audio.lose,
+    ...audio.settlement,
   });
   gameLoop = createGameLoop({
     session,

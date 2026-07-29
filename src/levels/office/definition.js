@@ -56,7 +56,7 @@ export default {
   },
   cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找到甩锅老板并一拳打爆`,
   mission: "观察地面红圈躲开黑锅，同时在人群中找到老板。",
-  clue: "红圈是黑锅落点；老板戴红领带且不会被锅砸",
+  clue: "红圈是黑锅的落点，老板带红领带且不会被砸到，一拳把老板打爆",
   targetDesc: "甩锅老板",
   difficulty: 4,
   success: "老板倒下，黑锅雨也停了。这个锅，终于不用你背。",

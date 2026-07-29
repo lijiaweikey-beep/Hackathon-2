@@ -27,7 +27,7 @@ async function readTreeSources(root) {
   return sources;
 }
 
-test("游戏入口只负责组装且保持精简", async () => {
+test("体验入口只负责组装且保持精简", async () => {
   const source = await readSource("main.js");
   assert.ok(source.split("\n").length <= 250);
   assert.doesNotMatch(
@@ -48,6 +48,12 @@ test("共享运行时按单一职责控制模块体积", async () => {
       `${file} 不应超过 ${maximumLines} 行`,
     );
   }
+});
+
+test("预启动手势不停止入场音乐", async () => {
+  const source = await readSource("runtime/createGameApplication.js");
+  assert.match(source, /onPrelaunchDismissed:\s*\(\)\s*=>\s*storyBgm\.playIntro\(\)/);
+  assert.doesNotMatch(source, /onPrelaunchDismissed:\s*\(\)\s*=>\s*storyBgm\.stop\(\)/);
 });
 
 test("不同关卡目录之间不能互相导入", async () => {

@@ -12,7 +12,6 @@ import {
   hideTutorialOverlays,
   showAttackTutorial,
   showMissHint,
-  showMoveTutorial,
 } from "./view.js";
 
 function applyTargetGlow(npc, enabled) {
@@ -67,6 +66,11 @@ export function createGamingLevel(context) {
     steps.moveTargetPos?.z ?? 6.6,
   );
   const moveRadius = steps.moveRadius ?? 1;
+  const attackPos = new THREE.Vector3(
+    steps.attackTargetPos?.x ?? movePos.x,
+    0,
+    steps.attackTargetPos?.z ?? movePos.z + 1.6,
+  );
   const extraNpcCount = Math.max(
     1,
     (context.definition.npcCount ?? context.actors.npcCount ?? 6) - 1,
@@ -129,7 +133,9 @@ export function createGamingLevel(context) {
       levelTarget: true,
     });
     target.id = steps.attackTargetId ?? "noisy_roommate";
-    target.group.position.copy(context.movement.randomOpenPosition());
+    target.levelManaged = true;
+    target.walking = false;
+    target.group.position.copy(attackPos);
     context.ui.setBlackEye(target, 0.7);
     context.actors.addNpc(target);
 
@@ -138,8 +144,8 @@ export function createGamingLevel(context) {
     }
 
     placeWaypoint();
-    showMoveTutorial(context.ui);
-    refreshHud();
+    hideTutorialOverlays(context.ui);
+    // HUD 刷新推迟到 classic experience start() 中，避免逐字动画被弹窗遮住
   }
 
   function update(deltaSeconds) {
@@ -182,7 +188,7 @@ export function createGamingLevel(context) {
 
   function handleAction(action) {
     if (action.type === "beginPlay") {
-      showMoveTutorial(context.ui);
+      hideTutorialOverlays(context.ui);
       refreshHud();
       return { handled: true };
     }

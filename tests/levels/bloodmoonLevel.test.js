@@ -127,7 +127,7 @@ test("血月插件生成引路人与剩余角色", () => {
   assert.equal(records.created[0].levelManaged, true);
 });
 
-test("进入正式游戏时由血月关卡播放开场音效", () => {
+test("进入正式体验时由血月关卡播放开场音效", () => {
   const { context, records } = createFakeContext();
   const level = createBloodmoonLevel(context);
 

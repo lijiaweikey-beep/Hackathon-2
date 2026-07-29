@@ -8,21 +8,9 @@
   text-shadow: 0 0 10px rgba(251, 113, 133, 0.4);
 }
 
-.attack-button[data-level-theme="office"] {
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.26), transparent 34%),
-    linear-gradient(160deg, #9f1239, #fb7185 55%, #1e293b);
-  box-shadow: 0 18px 34px rgba(251, 113, 133, 0.28), 0 20px 36px var(--shadow);
-  color: #fff1f2;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
-}
-
 .clue-bar[data-level-theme="office"] {
   color: #fecdd3;
   text-shadow: 0 0 12px rgba(251, 113, 133, 0.38);
-  border-color: rgba(251, 113, 133, 0.25);
-  background: rgba(159, 18, 57, 0.12);
-  backdrop-filter: blur(16px);
 }
 
 .hud.office-hit::after {

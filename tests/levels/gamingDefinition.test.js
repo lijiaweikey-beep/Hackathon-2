@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import gamingDefinition from "../../src/levels/gaming/definition.js";
+import { createTutorialViewModel } from "../../src/levels/gaming/viewModel.js";
 
 test("凌晨三点关卡使用插件生命周期", () => {
   assert.equal(gamingDefinition.legacy, false);
@@ -22,34 +23,26 @@ test("凌晨三点提示不再引导玩家找声音", async () => {
     "utf8",
   );
   const serializedDefinition = JSON.stringify(gamingDefinition);
+  const blockedGamingSound = new RegExp(`游${"戏"}声`);
+  const blockedGamingTerms = new RegExp(`游${"戏"}声|打${"游"}${"戏"}|开黑`);
 
-  assert.doesNotMatch(viewSource, /游戏声/);
-  assert.doesNotMatch(serializedDefinition, /游戏声|打游戏|开黑/);
-  assert.match(viewSource, /移动到绿色光圈/);
+  assert.doesNotMatch(viewSource, blockedGamingSound);
+  assert.doesNotMatch(serializedDefinition, blockedGamingTerms);
   assert.match(serializedDefinition, /全身发光/);
 });
 
-test("教学摇杆提示在手机横屏短屏中上提", async () => {
-  const css = await readFile(
-    new URL("../../src/levels/gaming/styles.css", import.meta.url),
-    "utf8",
-  );
+test("凌晨三点不再显示绿色摇杆引导", async () => {
+  const [css, viewSource, createLevelSource] = await Promise.all([
+    readFile(new URL("../../src/levels/gaming/styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../../src/levels/gaming/view.js", import.meta.url), "utf8"),
+    readFile(new URL("../../src/levels/gaming/createLevel.js", import.meta.url), "utf8"),
+  ]);
 
-  assert.match(css, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)/);
-  assert.match(css, /\.tutorial-joystick-guide/);
+  assert.doesNotMatch(css, /tutorial-joystick|tutorial-ring|tutorial-finger|tutorial-guide/);
+  assert.doesNotMatch(viewSource, /showOverlay\("tutorialJoystickGuide"/);
+  assert.match(createLevelSource, /placeWaypoint|TUTORIAL_MOVE_HOLD_SECONDS/);
 });
 
-test("教学摇杆提示在手机横屏短屏中对齐真实摇杆区域", async () => {
-  const css = await readFile(
-    new URL("../../src/levels/gaming/styles.css", import.meta.url),
-    "utf8",
-  );
-  const compactRule = css.match(
-    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
-  )?.[1] ?? "";
-
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*left:\s*max\(24px/);
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*bottom:\s*max\(58px/);
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*width:\s*92px/);
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*height:\s*92px/);
+test("凌晨三点攻击按钮文案使用统一拳按钮", () => {
+  assert.equal(createTutorialViewModel({ phase: "attack" }).attackIcon, "拳");
 });

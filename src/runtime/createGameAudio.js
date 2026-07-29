@@ -25,21 +25,58 @@ const defaultSounds = Object.freeze({
 export function createGameAudio({
   sounds = defaultSounds,
   schedule = (play, delayMs) => setTimeout(play, delayMs),
+  isEnabled = () => true,
 } = {}) {
+  function gated(sound) {
+    if (!sound) return () => {};
+    return (...args) => {
+      if (isEnabled() === false) return;
+      sound(...args);
+    };
+  }
+
+  const hit = gated(sounds.hit);
+  const miss = gated(sounds.miss);
+  const punch = gated(sounds.punch);
+  const win = gated(sounds.win);
+  const lose = gated(sounds.lose);
+
   function play(name, delayMs = 0) {
     const sound = sounds[name];
     if (!sound) return;
-    if (delayMs > 0) schedule(sound, delayMs);
-    else sound();
+    const run = () => {
+      if (isEnabled() === false) return;
+      sound();
+    };
+    if (delayMs > 0) schedule(run, delayMs);
+    else run();
   }
+
+  const experience = Object.freeze({
+    playSound: play,
+    resume: sounds.resume,
+  });
+  const combat = Object.freeze({
+    playSound: play,
+    playPunch: punch,
+    playHit: hit,
+    playMiss: miss,
+  });
+  const settlement = Object.freeze({
+    playWin: win,
+    playLose: lose,
+  });
 
   return Object.freeze({
     play,
-    punch: sounds.punch,
-    hit: sounds.hit,
-    miss: sounds.miss,
-    win: sounds.win,
-    lose: sounds.lose,
+    punch,
+    hit,
+    miss,
+    win,
+    lose,
     resume: sounds.resume,
+    experience,
+    combat,
+    settlement,
   });
 }
