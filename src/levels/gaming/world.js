@@ -1,4 +1,5 @@
 import {
+  BED_LAYOUT,
   FLASHLIGHT_COLOR,
   FLASHLIGHT_DECAY,
   FLASHLIGHT_DISTANCE,
@@ -8,6 +9,7 @@ import {
   FLASHLIGHT_RADIUS,
   FLASHLIGHT_SPEED,
   FLASHLIGHT_SPOT_ANGLE,
+  TUTORIAL_COMPUTER_INDEX,
 } from "./constants.js";
 
 export function createWorld(world) {
@@ -19,6 +21,7 @@ export function createWorld(world) {
     randomRange,
   } = world;
   const computers = [];
+  const bedSpots = BED_LAYOUT.map((bed) => ({ ...bed }));
   const wallTex = world.textures.getWallTexture("gaming");
   const wallMaterial = new THREE.MeshStandardMaterial({
     map: wallTex,
@@ -38,10 +41,10 @@ export function createWorld(world) {
     roughness: 0.25,
   });
   const chairMat = new THREE.MeshStandardMaterial({ color: 0x283348, roughness: 0.82 });
+  // 仅保留两侧靠墙电脑位，中间过道清空，降低新手认知负荷
   const spots = [
     [-7.2, -6.7],
     [-3.6, -7.0],
-    [0, -6.8],
     [3.7, -7.0],
     [7.3, -6.7],
     [-7.0, 7.0],
@@ -69,9 +72,21 @@ export function createWorld(world) {
     const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.34), screenMat.clone());
     screen.position.set(x, 0.93, z + (z > 0 ? -0.32 : 0.32));
     screen.rotation.y = z > 0 ? 0 : Math.PI;
+    // 教学目标电脑更亮
+    if (index === TUTORIAL_COMPUTER_INDEX) {
+      screen.material.emissiveIntensity = 3.4;
+      screen.material.color.setHex(0xb8f0ff);
+    } else {
+      screen.material.emissiveIntensity = 0.35;
+      screen.material.color.setHex(0x1a3048);
+    }
     scene.add(screen);
 
-    const glow = new THREE.PointLight(0x33aaff, 0.65, 4.4);
+    const glow = new THREE.PointLight(
+      0x33aaff,
+      index === TUTORIAL_COMPUTER_INDEX ? 1.15 : 0.18,
+      index === TUTORIAL_COMPUTER_INDEX ? 5.2 : 2.4,
+    );
     glow.position.set(x, 1.2, z + (z > 0 ? -0.6 : 0.6));
     scene.add(glow);
 
@@ -87,26 +102,86 @@ export function createWorld(world) {
   const flashlight = createFlashlight();
   const bedMat = new THREE.MeshStandardMaterial({ color: 0x243448, roughness: 0.86 });
   const quiltMat = new THREE.MeshStandardMaterial({ color: 0x445a78, roughness: 0.92 });
-  [-10.2, 10.2].forEach((x) => {
-    [-5.2, 0.6, 6.3].forEach((z) => {
-      const bed = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.38, 2.45), bedMat);
-      bed.position.set(x, 0.22, z);
-      bed.castShadow = true;
-      bed.receiveShadow = true;
-      scene.add(bed);
+  bedSpots.forEach(({ x, z }) => {
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.38, 2.45), bedMat);
+    bed.position.set(x, 0.22, z);
+    bed.castShadow = true;
+    bed.receiveShadow = true;
+    scene.add(bed);
 
-      const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.18, 1.55), quiltMat);
-      quilt.position.set(x, 0.52, z + 0.18);
-      quilt.castShadow = true;
-      scene.add(quilt);
-    });
+    const quilt = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.18, 1.55), quiltMat);
+    quilt.position.set(x, 0.52, z + 0.18);
+    quilt.castShadow = true;
+    scene.add(quilt);
   });
+
+  const waypointGroup = new THREE.Group();
+  waypointGroup.visible = false;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.72, 1.05, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0x00ff88,
+      emissive: 0x00ff00,
+      emissiveIntensity: 2.4,
+      transparent: true,
+      opacity: 0.92,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.08;
+  ring.renderOrder = 20;
+  waypointGroup.add(ring);
+
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(0.72, 40),
+    new THREE.MeshBasicMaterial({
+      color: 0x22ff99,
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    }),
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.06;
+  disc.renderOrder = 19;
+  waypointGroup.add(disc);
+
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.22, 0.48, 5),
+    new THREE.MeshStandardMaterial({
+      color: 0x86efac,
+      emissive: 0x22c55e,
+      emissiveIntensity: 1.8,
+    }),
+  );
+  arrow.position.y = 1.35;
+  arrow.rotation.x = Math.PI;
+  waypointGroup.add(arrow);
+  scene.add(waypointGroup);
+
+  const fanMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(1.85, 32, 0, Math.PI / 6),
+    new THREE.MeshBasicMaterial({
+      color: 0xff3355,
+      transparent: true,
+      opacity: 0.38,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  fanMesh.rotation.x = -Math.PI / 2;
+  fanMesh.position.y = 0.09;
+  fanMesh.visible = false;
+  fanMesh.renderOrder = 21;
+  scene.add(fanMesh);
 
   function randomFlashlightPoint() {
     let position;
     let tries = 0;
     do {
-      position = new THREE.Vector3(randomRange(-8.6, 8.6), 0, randomRange(-7.6, 7.6));
+      position = new THREE.Vector3(randomRange(-8.6, 8.6), 0, randomRange(-4.2, 7.6));
       tries += 1;
     } while (tries < 30 && collidesWithObstacle(position, FLASHLIGHT_RADIUS * 0.6));
     return position;
@@ -116,7 +191,7 @@ export function createWorld(world) {
     const start = randomFlashlightPoint();
     const spot = new THREE.SpotLight(
       FLASHLIGHT_COLOR,
-      FLASHLIGHT_INTENSITY,
+      FLASHLIGHT_INTENSITY * 0.55,
       FLASHLIGHT_DISTANCE,
       FLASHLIGHT_SPOT_ANGLE,
       FLASHLIGHT_PENUMBRA,
@@ -157,10 +232,21 @@ export function createWorld(world) {
         flashlight.position.z += (dz / distance) * step;
       }
     }
-    flashlight.spot.intensity = FLASHLIGHT_INTENSITY;
+    flashlight.spot.intensity = FLASHLIGHT_INTENSITY * 0.55;
     flashlight.spot.position.set(flashlight.position.x, FLASHLIGHT_HEIGHT, flashlight.position.z);
     flashlight.spot.target.position.set(flashlight.position.x, 0, flashlight.position.z);
+
+    if (waypointGroup.visible) {
+      ring.rotation.z += deltaSeconds * 0.7;
+      arrow.position.y = 1.35 + Math.sin(performance.now() * 0.004) * 0.16;
+    }
   }
 
-  return { computers, updateEnvironment };
+  return {
+    computers,
+    bedSpots,
+    waypointGroup,
+    fanMesh,
+    updateEnvironment,
+  };
 }

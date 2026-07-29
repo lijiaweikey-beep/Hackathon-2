@@ -3,16 +3,6 @@ import { createGamingLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
-const art = {
-  cover: new URL("./assets/cover.jpg", import.meta.url).href,
-  grades: {
-    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
-    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
-    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
-    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
-  },
-};
-
 export default {
   id: "gaming",
   order: 10,
@@ -29,30 +19,43 @@ export default {
     directional: { color: 0x9fc4ff, intensity: 0.42 },
     floor: { texture: "gaming", roughness: 0.58 },
   },
-  decoyCount: 3,
-  sceneName: "凌晨三点",
-  emoji: "🌙",
-  art,
-  nodes: {
-    S: { title: "作息纠察队长", verdict: "一拳到位，宿舍的夜终于安静了。" },
-    A: { title: "熄灯前的正义", verdict: "有点狼狈，但你确实把人抓到了。" },
-    B: { title: "摸黑找人的", verdict: "找是找到了，全宿舍也跟着醒了。" },
-    C: { title: "陪打到天亮", verdict: "你没有赢，你只是也熬到了三点。" },
-  },
+  actions: [
+    "beforeAttack",
+    "findHitTarget",
+    "hitTarget",
+    "attackMiss",
+    "getHudState",
+    "getResultStats",
+    "beginPlay",
+  ],
+  decoyCount: 0,
+  sceneName: "宿舍教学",
+  emoji: "⌨️",
   cardStyle: {
     accent: "#818cf8",
     glow: "rgba(129, 140, 248, 0.28)",
   },
-  cardDesc: ({ npcCount }) => `在 ${npcCount} 人中找到凌晨三点还在打游戏的人`,
-  mission: "有人凌晨三点还在打游戏，吵得全宿舍睡不着！",
-  clue: "目标特征：有明显黑眼圈",
-  targetDesc: "打游戏的人",
-  difficulty: 2,
-  success: "精准命中，宿舍终于安静了。",
-  failure: "这个人游戏打爽了，大家都被吵醒了",
+  cardDesc: "新手报到：半夜打游戏的舍友太吵了！",
+  mission: "学习移动与出拳：走到光圈处，教训发光的舍友！",
+  hudMission: "走到绿色光圈处",
+  clue: "新手提示：根据画面指示进行操作",
+  targetDesc: "发光的舍友",
+  difficulty: 0,
+  success: "宿舍终于安静了。新手报到完成！",
+  failure: "教学关不会失败，再试一次。",
   transition: {
     intro: "十九岁，第一次离开家住进宿舍，也第一次发现青春会在凌晨三点吵得人睡不着。",
     success: "宿舍终于安静。两年后，梗哥走进了图书馆。",
   },
   lighting: "night",
+  mode: "tutorial",
+  tutorialSteps: {
+    moveTargetPos: { x: 0.4, z: 6.6 },
+    moveRadius: 1.0,
+    attackTargetId: "noisy_roommate",
+  },
+  timeLimit: null,
+  attackComboExpires: false,
+  initialHp: 999,
+  npcCount: 6,
 };

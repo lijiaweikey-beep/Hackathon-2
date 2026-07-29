@@ -67,7 +67,11 @@ export function createCombatSystem(dependencies) {
   }
 
   function resolveHit(hit) {
-    if (!hit) return;
+    if (!hit) {
+      const levelMiss = dependencies.dispatch({ type: "attackMiss" });
+      if (!levelMiss?.handled) dependencies.playMiss();
+      return;
+    }
     const levelHit = dependencies.dispatch({ type: "hitTarget", hit });
     if (levelHit?.handled) {
       if (

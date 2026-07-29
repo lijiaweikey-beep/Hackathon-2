@@ -1,6 +1,7 @@
 export const LEVEL_ACTIONS = Object.freeze([
   "actorDissolved",
   "afterNpcUpdate",
+  "attackMiss",
   "beforeAttack",
   "beginPlay",
   "beginSpecialPhase",
