@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("互动内显示任务和目标特征提示条", async () => {
+test("互动内隐藏左上角任务卡并保留目标提示条", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const topbarRule = css.match(/\.topbar\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const missionRule = css.match(/\.mission-strip\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const clueWrapRule = css.match(/\.clue-bar-wrap\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-  assert.match(topbarRule, /justify-content:\s*space-between/);
-  assert.doesNotMatch(missionRule, /display:\s*none/);
+  assert.match(topbarRule, /justify-content:\s*flex-end/);
+  assert.match(missionRule, /display:\s*none/);
   assert.match(clueWrapRule, /position:\s*fixed/);
   assert.match(clueWrapRule, /inset:\s*0/);
 });

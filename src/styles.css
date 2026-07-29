@@ -141,11 +141,12 @@ button {
 .topbar {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
 }
 
 .mission-strip {
+  display: none;
   max-width: 56%;
   padding: 8px 14px;
   background: var(--paper);
