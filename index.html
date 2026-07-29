@@ -79,6 +79,15 @@
         </div>
 
         <footer class="history-footer">
+          <div class="difficulty-picker" aria-label="游戏难易程度">
+            <span class="difficulty-label">游戏难易程度</span>
+            <div class="difficulty-options" role="group" aria-label="选择游戏难度">
+              <button class="difficulty-option" type="button" data-difficulty="easy" aria-pressed="true">易</button>
+              <button class="difficulty-option" type="button" data-difficulty="medium" aria-pressed="false">中</button>
+              <button class="difficulty-option" type="button" data-difficulty="hard" aria-pressed="false">难</button>
+            </div>
+            <span id="difficultyHint" class="difficulty-hint">易 · 20 人</span>
+          </div>
           <div id="historyStatusText" class="history-status-text">历史仍在等待记录……</div>
           <div id="historyNodeDetail" class="history-node-detail" aria-live="polite"></div>
           <div id="storyEnding" class="story-ending" hidden>
@@ -127,27 +136,8 @@
         <div class="match-settings">
           <div class="match-settings-icon" aria-hidden="true">👥</div>
           <div class="match-settings-body">
-            <label class="match-settings-label" for="npcCountInput">对局人数</label>
-            <div class="match-settings-row">
-              <div class="match-settings-input-wrap">
-                <input
-                  id="npcCountInput"
-                  class="match-settings-input"
-                  type="number"
-                  min="10"
-                  max="100"
-                  step="1"
-                  value="20"
-                  inputmode="numeric"
-                  aria-describedby="npcCountHint"
-                />
-              </div>
-              <span id="npcCountHint" class="match-settings-hint">10–100 人</span>
-              <div class="match-settings-arrows">
-                <button class="match-settings-arrow up" type="button" aria-label="增加人数">↑</button>
-                <button class="match-settings-arrow down" type="button" aria-label="减少人数">↓</button>
-              </div>
-            </div>
+            <span class="match-settings-label">当前难度</span>
+            <div id="taskDifficultyText" class="match-settings-summary">易 · 20 人</div>
           </div>
         </div>
         <div class="task-controls-guide">

@@ -503,7 +503,7 @@ button {
   letter-spacing: 2px;
 }
 
-/* ---- 对局人数（任务卡内） ---- */
+/* ---- 难度摘要（任务卡内） ---- */
 .match-settings {
   display: flex;
   align-items: center;
@@ -571,6 +571,13 @@ button {
   font-size: 11px;
   font-weight: 700;
   color: var(--muted);
+}
+
+.match-settings-summary {
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--ink);
 }
 
 .match-settings-arrows {
@@ -712,7 +719,7 @@ button {
 .history-viewport {
   position: absolute;
   z-index: 1;
-  inset: 84px 0 104px;
+  inset: 84px 0 154px;
   overflow-x: auto;
   overflow-y: hidden;
   touch-action: pan-x;
@@ -1015,6 +1022,57 @@ button {
   gap: 10px;
   text-align: center;
   pointer-events: none;
+}
+
+.difficulty-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: rgba(255, 249, 236, 0.94);
+  box-shadow: 3px 3px 0 var(--ink);
+  pointer-events: auto;
+}
+
+.difficulty-label {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+}
+
+.difficulty-options {
+  display: flex;
+  gap: 4px;
+}
+
+.difficulty-option {
+  min-width: 34px;
+  height: 28px;
+  padding: 0 10px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 2px 2px 0 rgba(32, 33, 45, 0.35);
+}
+
+.difficulty-option.active {
+  background: var(--sun);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.difficulty-hint {
+  min-width: 70px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--ink);
 }
 
 .history-status-text {
@@ -1695,7 +1753,18 @@ button {
 
 @media (max-width: 760px) {
   .history-viewport {
-    inset: 74px 0 118px;
+    inset: 74px 0 168px;
+  }
+
+  .difficulty-picker {
+    max-width: calc(100vw - 28px);
+    gap: 7px;
+    padding: 7px 9px;
+  }
+
+  .difficulty-label,
+  .difficulty-hint {
+    font-size: 11px;
   }
 
   .history-kicker {

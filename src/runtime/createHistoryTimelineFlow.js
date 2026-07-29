@@ -7,6 +7,7 @@ export function createHistoryTimelineFlow({
   storage,
   storyProgress,
   onEnterLevel,
+  getNpcCount,
   timerHost = globalThis,
 }) {
   const revealProgress = createHistoryRevealProgress({ levels, storage });
@@ -16,6 +17,7 @@ export function createHistoryTimelineFlow({
     storyProgress,
     revealProgress,
     onEnterLevel,
+    getNpcCount,
     timerHost,
   });
   let pendingRevealId = null;

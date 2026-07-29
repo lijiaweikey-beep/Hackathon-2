@@ -15,6 +15,24 @@ function createClassList() {
   };
 }
 
+function createButton(difficulty) {
+  const listeners = {};
+  return {
+    dataset: { difficulty },
+    classList: createClassList(),
+    attributes: {},
+    addEventListener(type, handler) {
+      listeners[type] = handler;
+    },
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    },
+    click() {
+      listeners.click?.();
+    },
+  };
+}
+
 test("界面控制器回到首页时交给人生事件轴并刷新抬头信息", () => {
   let homeShown = false;
   const ui = {
@@ -37,6 +55,50 @@ test("界面控制器回到首页时交给人生事件轴并刷新抬头信息",
   assert.equal(homeShown, true);
   assert.equal(ui.missionText.textContent, "测试任务");
   assert.equal(ui.timerText.textContent, "10");
+});
+
+test("难度按钮会更新当前关卡人数", () => {
+  const buttons = ["easy", "medium", "hard"].map(createButton);
+  const ui = {
+    taskModal: { classList: createClassList() },
+    resultModal: { classList: createClassList() },
+    shareModal: { classList: createClassList() },
+    difficultyButtons: buttons,
+    difficultyHint: { textContent: "" },
+    missionText: { textContent: "" },
+    timerText: { textContent: "" },
+    taskEmoji: { textContent: "" },
+    taskTitle: { textContent: "" },
+    taskCopy: { textContent: "" },
+    taskClue: { textContent: "" },
+    taskNpcCount: { textContent: "" },
+    taskDifficultyText: { textContent: "" },
+    taskTime: { textContent: "" },
+    targetLabel: { textContent: "" },
+    retryButton: { disabled: true, textContent: "", addEventListener() {} },
+  };
+  const level = {
+    id: "debt-smasher",
+    emoji: "🪙",
+    sceneName: "爆金币",
+    clue: "金币有限",
+    targetDesc: "房贷",
+    mission: "尽量打金币。",
+  };
+  const controller = createGameUiController({
+    ui,
+    session: { levelState: { level, remaining: 10, attempts: 3 } },
+    levelViewHost: { clear() {}, setTheme() {} },
+  });
+
+  controller.bind();
+  buttons[2].click();
+  controller.showTask(level);
+
+  assert.equal(controller.getMatchNpcCount(), 35);
+  assert.equal(buttons[2].attributes["aria-pressed"], "true");
+  assert.equal(ui.difficultyHint.textContent, "难 · 35 人");
+  assert.equal(ui.taskDifficultyText.textContent, "难 · 35 人");
 });
 
 test("结算页使用关卡等级贴图和节点文案", () => {

@@ -1,12 +1,14 @@
 import {
-  DEFAULT_NPC_COUNT,
-} from "../config/constants.js";
+  DEFAULT_DIFFICULTY,
+  getDifficultyLabel,
+  getDifficultyNpcCount,
+  getDifficultyNpcText,
+  normalizeDifficulty,
+} from "../core/difficulty.js";
 import { GAME_PHASES } from "../core/gamePhase.js";
 import {
-  clampNpcCount,
-  loadMatchNpcCount,
-  parseNpcCountRaw,
-  saveMatchNpcCount,
+  loadDifficultySetting,
+  saveDifficultySetting,
 } from "../utils/storage.js";
 import { renderShareCard } from "./shareCard.js";
 import { renderTargetPreview } from "./targetPreview.js";
@@ -18,7 +20,7 @@ export function createGameUiController(dependencies) {
     session,
     levelViewHost = { clear() {}, setTheme() {} },
   } = dependencies;
-  let npcCount = DEFAULT_NPC_COUNT;
+  let difficulty = DEFAULT_DIFFICULTY;
   let lastResult = null;
 
   function getStoryStats() {
@@ -31,24 +33,40 @@ export function createGameUiController(dependencies) {
     };
   }
 
-  function syncNpcCountInput() {
-    if (ui.npcCountInput) ui.npcCountInput.value = String(npcCount);
+  function getCurrentLevel() {
+    return session.levelState?.level ?? null;
   }
 
-  function getNpcCountPreview() {
-    const parsed = parseNpcCountRaw(ui.npcCountInput?.value);
-    return parsed == null ? npcCount : clampNpcCount(parsed);
+  function getActiveNpcCount(level = getCurrentLevel()) {
+    return getDifficultyNpcCount(level, difficulty);
   }
 
-  function commitNpcCountInput() {
-    npcCount = getNpcCountPreview();
-    syncNpcCountInput();
-    saveMatchNpcCount(npcCount);
+  function getDifficultySummary(level = getCurrentLevel()) {
+    return `${getDifficultyLabel(difficulty)} · ${getDifficultyNpcText(level, difficulty)}`;
+  }
+
+  function syncDifficultyUi(level = getCurrentLevel()) {
+    const normalized = normalizeDifficulty(difficulty);
+    ui.difficultyButtons?.forEach((button) => {
+      const active = button.dataset.difficulty === normalized;
+      button.classList?.toggle("active", active);
+      button.setAttribute?.("aria-pressed", String(active));
+    });
+    if (ui.difficultyHint) {
+      ui.difficultyHint.textContent = getDifficultySummary(level);
+    }
+  }
+
+  function selectDifficulty(nextDifficulty) {
+    difficulty = normalizeDifficulty(nextDifficulty);
+    saveDifficultySetting(difficulty);
+    syncDifficultyUi();
+    dependencies.onDifficultyChanged?.();
   }
 
   function showHome({ leaveLevel = true } = {}) {
     if (leaveLevel) dependencies.onLeaveLevel?.();
-    syncNpcCountInput();
+    syncDifficultyUi();
     levelViewHost.clear();
     ui.taskModal?.classList.remove("visible");
     ui.resultModal?.classList.remove("visible");
@@ -57,7 +75,13 @@ export function createGameUiController(dependencies) {
   }
 
   function showTask(level = session.levelState.level) {
-    renderTaskModal(ui, { level, npcCount });
+    renderTaskModal(ui, {
+      level,
+      npcCount: getActiveNpcCount(level),
+      difficultyLabel: getDifficultyLabel(difficulty),
+      npcCountText: getDifficultyNpcText(level, difficulty),
+    });
+    syncDifficultyUi(level);
     renderTargetPreview(ui.targetPreviewCanvas, level);
     updateHud();
   }
@@ -179,37 +203,12 @@ export function createGameUiController(dependencies) {
     updateCooldown();
   }
 
-  function bindNpcCountInput() {
-    const input = ui.npcCountInput;
-    if (!input) return;
-    input.addEventListener("input", () => {
-      const digits = input.value.replace(/\D/g, "");
-      if (input.value !== digits) input.value = digits;
+  function bindDifficultyButtons() {
+    ui.difficultyButtons?.forEach((button) => {
+      button.addEventListener("click", () => {
+        selectDifficulty(button.dataset.difficulty);
+      });
     });
-    input.addEventListener("blur", () => {
-      commitNpcCountInput();
-    });
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        input.blur();
-      } else if (["e", "E", "+", "-", "."].includes(event.key)) {
-        event.preventDefault();
-      }
-    });
-    input.addEventListener("wheel", (event) => {
-      if (document.activeElement === input) event.preventDefault();
-    }, { passive: false });
-
-    const adjust = (offset) => {
-      const next = clampNpcCount(npcCount + offset);
-      if (next === npcCount) return;
-      npcCount = next;
-      syncNpcCountInput();
-      saveMatchNpcCount(npcCount);
-    };
-    ui.npcCountUp?.addEventListener("click", () => adjust(1));
-    ui.npcCountDown?.addEventListener("click", () => adjust(-1));
   }
 
   function bindPrelaunch() {
@@ -268,14 +267,13 @@ export function createGameUiController(dependencies) {
   }
 
   function bind() {
-    npcCount = loadMatchNpcCount();
-    syncNpcCountInput();
-    bindNpcCountInput();
+    difficulty = loadDifficultySetting();
+    syncDifficultyUi();
+    bindDifficultyButtons();
     bindPrelaunch();
     bindShareCard();
     ui.startButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.BRIEFING) return;
-      commitNpcCountInput();
       dependencies.onStart?.();
       ui.taskModal.classList.remove("visible");
     });
@@ -322,8 +320,7 @@ export function createGameUiController(dependencies) {
     showTask,
     showResult,
     updateHud,
-    getMatchNpcCount: () => npcCount,
-    getNpcCountPreview,
+    getMatchNpcCount: (level) => getActiveNpcCount(level),
     flashHud,
     showOverlay: (...args) => levelViewHost.showOverlay?.(...args),
     hideOverlay: (...args) => levelViewHost.hideOverlay?.(...args),

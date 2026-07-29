@@ -13,11 +13,11 @@ function getNodeTitle(level) {
   return `${getNodeLabel(level)} · ${level.sceneName}`;
 }
 
-function getNodeCopy(level) {
+function getNodeCopy(level, npcCount = 20) {
   return level.transition?.intro
     || level.transition?.success
     || level.success
-    || level.cardDesc?.({ npcCount: 20 })
+    || level.cardDesc?.({ npcCount })
     || "这段历史仍在等待记录。";
 }
 
@@ -104,6 +104,7 @@ export function createHistoryTimelineController({
   storyProgress,
   revealProgress,
   onEnterLevel,
+  getNpcCount = () => 20,
   version = "v0.10.x.1",
   clock = () => new Date(),
   timerHost = globalThis,
@@ -130,7 +131,7 @@ export function createHistoryTimelineController({
     if (!ui.historyNodeDetail || !level) return;
     ui.historyNodeDetail.innerHTML = `
       <strong>${prefix}：${getNodeTitle(level)}</strong>
-      <span>${getNodeCopy(level)}</span>
+      <span>${getNodeCopy(level, getNpcCount(level))}</span>
     `;
   }
 
@@ -211,7 +212,7 @@ export function createHistoryTimelineController({
       <span class="history-node-age">${getNodeLabel(level)}</span>
       <span class="history-node-art" aria-hidden="true">${hidden ? "?" : level.emoji}</span>
       <span class="history-node-name">${hidden ? "未知历史" : level.sceneName}</span>
-      <span class="history-node-copy">${hidden ? "前置历史尚未查明" : getNodeCopy(level)}</span>
+      <span class="history-node-copy">${hidden ? "前置历史尚未查明" : getNodeCopy(level, getNpcCount(level))}</span>
       ${state === "sealed" ? seal : ""}
       ${hidden || state === "sealed" ? "" : '<span class="history-node-enter">▶ 进入关卡</span>'}
     `;

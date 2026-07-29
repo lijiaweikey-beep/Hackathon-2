@@ -3,9 +3,9 @@ import {
   ROUND_SECONDS,
 } from "../config/constants.js";
 
-export function createTaskModalModel({ level, npcCount }) {
+export function createTaskModalModel({ level, npcCount, npcCountText }) {
   return {
-    npcCount: level.npcCountText ?? npcCount,
+    npcCount: npcCountText ?? level.npcCountText ?? npcCount,
     timeText: level.timeLimit === null
       ? "∞"
       : String(level.timeLimit ?? ROUND_SECONDS),
@@ -23,6 +23,7 @@ export function createTaskModalModel({ level, npcCount }) {
 }
 
 function updateTaskAttemptsChip(ui, resourceHtml) {
+  if (typeof document === "undefined") return;
   const chip = document.querySelector("#taskAttemptsChip");
   if (!chip) return;
 
@@ -30,14 +31,22 @@ function updateTaskAttemptsChip(ui, resourceHtml) {
   ui.taskAttempts = document.querySelector("#taskAttempts");
 }
 
-export function renderTaskModal(ui, { level, npcCount }) {
-  const model = createTaskModalModel({ level, npcCount });
+export function renderTaskModal(ui, {
+  level,
+  npcCount,
+  difficultyLabel = "易",
+  npcCountText,
+}) {
+  const model = createTaskModalModel({ level, npcCount, npcCountText });
   ui.taskEmoji.textContent = level.emoji;
   ui.taskTitle.textContent = level.sceneName;
   ui.taskCopy.textContent = model.briefingText;
   ui.taskClue.textContent = "🔍 " + level.clue;
   if (ui.taskNpcCount) ui.taskNpcCount.textContent = model.npcCount;
   if (ui.npcCountInput) ui.npcCountInput.value = String(model.npcCount);
+  if (ui.taskDifficultyText) {
+    ui.taskDifficultyText.textContent = `${difficultyLabel} · ${model.npcCount}`;
+  }
   ui.taskTime.textContent = model.timeText;
   updateTaskAttemptsChip(ui, model.resourceHtml);
   if (ui.taskActionIcon) ui.taskActionIcon.textContent = model.actionIcon;

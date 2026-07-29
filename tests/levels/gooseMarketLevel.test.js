@@ -19,7 +19,7 @@ function position(x = 0, z = 0) {
   };
 }
 
-function createFakeContext({ duckCount = 3 } = {}) {
+function createFakeContext({ duckCount = 3, npcCount = 14 } = {}) {
   const records = {
     compactCount: 0,
     created: [],
@@ -58,7 +58,7 @@ function createFakeContext({ duckCount = 3 } = {}) {
       },
     },
     actors: {
-      npcCount: 20,
+      npcCount,
       getPlayer: () => player,
       createNpc(id, flags) {
         const isGoose = Boolean(flags.gooseVendor);
@@ -126,7 +126,7 @@ test("鹅腿夜市属于二十三岁主线并声明自己的战斗动作", () =>
   ]);
 });
 
-test("每局随机创建三至五个鸭腿目标和十个鹅腿干扰", () => {
+test("易难度每局随机创建三至五个鸭腿目标和十个鹅腿干扰", () => {
   for (const duckCount of [3, 5]) {
     const { context, records } = createFakeContext({ duckCount });
     const level = createGooseMarketLevel(context);
@@ -140,6 +140,26 @@ test("每局随机创建三至五个鸭腿目标和十个鹅腿干扰", () => {
     assert.ok(ducks.every(({ npc }) => npc.isLevelTarget));
     assert.ok(geese.every(({ npc }) => npc.isLevelTarget === false));
     assert.equal(records.randomPositions.length, duckCount + 11);
+  }
+});
+
+test("鸭鹅关按难度增加鸭腿目标和鹅腿干扰", () => {
+  const cases = [
+    { npcCount: 17, duckCount: 6, gooseCount: 12 },
+    { npcCount: 20, duckCount: 7, gooseCount: 15 },
+  ];
+
+  for (const item of cases) {
+    const { context, records } = createFakeContext(item);
+    const level = createGooseMarketLevel(context);
+
+    level.start();
+
+    const ducks = records.created.filter(({ npc }) => npc.isDuckVendor);
+    const geese = records.created.filter(({ npc }) => npc.isGoose);
+    assert.equal(ducks.length, item.duckCount);
+    assert.equal(geese.length, item.gooseCount);
+    assert.equal(records.randomPositions.length, item.duckCount + item.gooseCount + 1);
   }
 });
 

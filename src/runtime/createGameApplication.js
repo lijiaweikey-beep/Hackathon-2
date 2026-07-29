@@ -256,16 +256,14 @@ export function boot() {
     levelViewHost,
     storyProgress,
     getHudState: () => levelRunner.handleAction({ type: "getHudState" }),
-    getCooldown: () => ({
-      cooldown: combatSystem.cooldown,
-      cooldownMax: combatSystem.cooldownMax,
-    }),
+    getCooldown: () => ({ cooldown: combatSystem.cooldown, cooldownMax: combatSystem.cooldownMax }),
     onSelectLevel: selectLevelById,
     onLeaveLevel: leaveLevel,
     onStart: startExperience,
     onPause: pauseExperience,
     onResume: resumeExperience,
     onHomeShown: () => historyTimelineFlow?.showHome(),
+    onDifficultyChanged: () => historyTimelineFlow?.showHome(),
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
@@ -290,6 +288,7 @@ export function boot() {
     storage: window.localStorage,
     storyProgress,
     onEnterLevel: selectLevelById,
+    getNpcCount: (level) => uiController.getMatchNpcCount(level),
   });
   settlement = createRoundSettlement({
     session,
