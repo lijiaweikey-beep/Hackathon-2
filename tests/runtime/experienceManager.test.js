@@ -56,6 +56,22 @@ test("声明共享布局的独立体验启用共享呈现模式", () => {
   assert.equal(manager.presentation, "shared");
 });
 
+test("体验管理器在结算等待期委托空闲更新", () => {
+  const calls = [];
+  const manager = createExperienceManager({
+    createHost: ({ definition }) => ({ definition }),
+    createClassicExperience: () => ({
+      ...createExperience(calls),
+      updateIdle: (deltaSeconds) => calls.push(`idle:${deltaSeconds}`),
+    }),
+  });
+
+  manager.load({ id: "classic", extensions: {} });
+  manager.updateIdle(0.016);
+
+  assert.deepEqual(calls, ["idle:0.016"]);
+});
+
 test("加载新体验前先销毁旧体验和资源域", () => {
   const calls = [];
   const manager = createExperienceManager({

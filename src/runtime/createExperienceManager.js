@@ -79,6 +79,7 @@ export function createExperienceManager({
     start: () => invoke("start"),
     update: (deltaSeconds) => invoke("update", deltaSeconds),
     updateResult: (deltaSeconds) => invoke("updateResult", deltaSeconds),
+    updateIdle: (deltaSeconds) => invoke("updateIdle", deltaSeconds),
     pause: () => invoke("pause"),
     resume: () => invoke("resume"),
     handleInput: (input) => invoke("handleInput", input),
