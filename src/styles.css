@@ -1170,7 +1170,8 @@ button {
 .history-detail-visual {
   grid-column: 2;
   position: relative;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   margin: 0;
   display: grid;
   place-items: center;
@@ -1679,6 +1680,83 @@ button {
 
 
 /* ---- 响应式 ---- */
+@media (orientation: landscape) and (min-width: 900px) {
+  .result-modal {
+    align-items: center;
+    justify-content: center;
+    padding:
+      max(20px, env(safe-area-inset-top))
+      max(20px, env(safe-area-inset-right))
+      max(20px, env(safe-area-inset-bottom))
+      max(20px, env(safe-area-inset-left));
+    background: rgba(39, 59, 99, 0.82);
+  }
+
+  .result-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.74fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    width: min(1120px, calc(100vw - 40px));
+    height: min(640px, calc(100dvh - 40px));
+    border: var(--line);
+    border-radius: 18px;
+    background: var(--paper);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+
+  .result-art {
+    position: relative;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border-right: 2px solid var(--ink);
+    background-position: center;
+    background-size: contain;
+  }
+
+  .result-art::after {
+    background:
+      radial-gradient(
+        88% 72% at 50% 50%,
+        rgba(255, 246, 223, 0) 54%,
+        rgba(255, 246, 223, 0.36) 82%,
+        var(--paper) 100%
+      );
+  }
+
+  .result-slug {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 16px 16px 0;
+  }
+
+  .result-brief {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 14px 16px 16px 0;
+  }
+
+  .history-detail-panel {
+    width: min(960px, calc(100vw - 40px));
+    max-height: calc(100dvh - 40px);
+    overflow: hidden;
+  }
+
+  .history-detail-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--paper);
+  }
+}
+
 @media (max-height: 480px) {
   .hud {
     padding: 6px 12px 10px;

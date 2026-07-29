@@ -83,3 +83,39 @@ test("手机横屏短高度把结算页收纳为插画和信息两区", async ()
   assert.match(compactRule, /\.result-brief\s*\{[\s\S]*overflow-y:\s*auto/);
   assert.match(compactRule, /\.share-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
 });
+
+test("电脑横屏结算页使用稳定分区而不是全屏裁切", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const desktopLandscapeRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(min-width:\s*900px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*grid-template-columns/);
+  assert.match(desktopLandscapeRule, /\.result-art\s*\{[\s\S]*position:\s*relative/);
+  assert.match(desktopLandscapeRule, /\.result-art\s*\{[\s\S]*background-size:\s*contain/);
+  assert.match(desktopLandscapeRule, /\.result-brief\s*\{[\s\S]*overflow-y:\s*auto/);
+});
+
+test("电脑横屏历史揭晓详情页不裁切成顶部大图", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const visualRule = css.match(/\.history-detail-visual\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const desktopLandscapeRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(min-width:\s*900px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(visualRule, /min-height:\s*0/);
+  assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 40px\)/);
+  assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*position:\s*absolute/);
+  assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*inset:\s*0/);
+  assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*object-fit:\s*contain/);
+});
+
+test("事件轴弹层高于结算弹层避免返回时残影压住", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const modalRule = css.match(/\.modal\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const historyRule = css.match(/\.history-timeline-modal\.modal\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+  const modalZ = Number(modalRule.match(/z-index:\s*(\d+)/)?.[1] ?? 0);
+  const historyZ = Number(historyRule.match(/z-index:\s*(\d+)/)?.[1] ?? 0);
+  assert.ok(historyZ > modalZ);
+});
