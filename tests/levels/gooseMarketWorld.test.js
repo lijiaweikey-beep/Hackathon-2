@@ -31,6 +31,29 @@ test("鹅腿夜市创建移动路灯且只有鸭腿会显绿色", () => {
   assert.ok(obstacles.length > 0);
 });
 
+test("鹅腿夜市保留低多边形红棚摊位并增加串灯", () => {
+  const { scene } = createResources();
+  const awnings = scene.children.filter(
+    (child) => child.userData.gameplayRole === "market-awning",
+  );
+  const stringLights = scene.children.filter(
+    (child) => child.userData.gameplayRole === "string-light",
+  );
+  const bottomStringLights = stringLights.filter(
+    (child) => child.userData.row === "bottom",
+  );
+  const bottomBulbs = bottomStringLights.filter((child) => child.isMesh);
+  const topAwnings = awnings.filter((awning) => awning.position.z < 0);
+
+  assert.equal(awnings.length, 5);
+  assert.ok(stringLights.length >= 2);
+  assert.ok(bottomStringLights.length >= 2);
+  assert.ok(bottomBulbs.every((bulb) => bulb.position.y <= 2.35));
+  assert.ok(bottomBulbs.every((bulb) => bulb.position.z >= 6.35));
+  assert.ok(topAwnings.every((awning) => awning.position.z >= -4.8));
+  assert.ok(awnings.every((awning) => awning.material.color.getHex() === 0xd9485f));
+});
+
 test("玩家不踩开关时夜市不会自动熄灯", () => {
   const { resources } = createResources();
 

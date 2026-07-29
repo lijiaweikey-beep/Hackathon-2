@@ -38,7 +38,7 @@ export function createWorld(world) {
     roughness: 0.72,
   });
   [-8.5, -4.2, 0, 4.2, 8.5].forEach((x, index) => {
-    const z = index % 2 === 0 ? -8.3 : 7.4;
+    const z = index % 2 === 0 ? -4.6 : 7.4;
     const stall = new THREE.Mesh(
       new THREE.BoxGeometry(2.5, 0.72, 1.25),
       stallMaterial,
@@ -51,9 +51,55 @@ export function createWorld(world) {
       awningMaterial,
     );
     awning.position.set(x, 1.7, z);
+    awning.userData.gameplayRole = "market-awning";
     scene.add(awning);
+    const valance = new THREE.Mesh(
+      new THREE.BoxGeometry(2.8, 0.24, 0.12),
+      awningMaterial,
+    );
+    valance.position.set(x, 1.53, z + (z < 0 ? 0.84 : -0.84));
+    valance.userData.gameplayRole = "market-awning-trim";
+    scene.add(valance);
     registerObstacle(x, z, 1.25, 0.64);
   });
+
+  const bulbMaterial = new THREE.MeshBasicMaterial({ color: 0xffd36b });
+  function addStringLights(points, row) {
+    const cable = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(points),
+      new THREE.LineBasicMaterial({ color: 0x334155 }),
+    );
+    cable.userData.gameplayRole = "string-light";
+    cable.userData.row = row;
+    scene.add(cable);
+    points.forEach((point) => {
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), bulbMaterial);
+      bulb.position.copy(point);
+      bulb.position.y -= 0.16;
+      bulb.userData.gameplayRole = "string-light";
+      bulb.userData.row = row;
+      scene.add(bulb);
+    });
+  }
+  addStringLights([
+    new THREE.Vector3(-9.8, 3.35, -3.9),
+    new THREE.Vector3(-7.2, 3.12, -3.1),
+    new THREE.Vector3(-4.8, 3.28, -3.6),
+    new THREE.Vector3(-2.2, 3.08, -2.8),
+    new THREE.Vector3(0.4, 3.25, -3.5),
+    new THREE.Vector3(3, 3.1, -2.8),
+    new THREE.Vector3(5.6, 3.28, -3.6),
+    new THREE.Vector3(8.2, 3.1, -3.1),
+    new THREE.Vector3(10.2, 3.3, -3.9),
+  ], "top");
+  addStringLights([
+    new THREE.Vector3(-5.8, 2.28, 6.72),
+    new THREE.Vector3(-4.2, 2.42, 6.44),
+    new THREE.Vector3(-2.6, 2.26, 6.68),
+    new THREE.Vector3(2.6, 2.24, 6.68),
+    new THREE.Vector3(4.2, 2.4, 6.44),
+    new THREE.Vector3(5.8, 2.26, 6.72),
+  ], "bottom");
 
   const polePositions = [
     new THREE.Vector3(-10.4, 0, -4),
