@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createNpc as createGamingNpc } from "../../src/levels/gaming/actors.js";
 import { createGamingLevel } from "../../src/levels/gaming/createLevel.js";
+import { renderPreview } from "../../src/levels/gaming/preview.js";
 import { createActorAnimator } from "../../src/systems/createActorAnimator.js";
 
 function createPosition(x = 0, y = 0, z = 0) {
@@ -48,6 +49,7 @@ function createFakeContext({
     environmentUpdates: 0,
     moveCalls: 0,
     randomOpenPositions: [],
+    blackEyeCalls: 0,
   };
   const context = {
     definition: {
@@ -108,6 +110,7 @@ function createFakeContext({
     },
     ui: {
       setBlackEye(npc, intensity) {
+        records.blackEyeCalls += 1;
         npc.markIntensity = intensity;
       },
       showOverlay(name, options) {
@@ -136,10 +139,11 @@ test("凌晨三点插件生成目标和剩余路人", () => {
   level.start();
 
   assert.deepEqual(records.created.map(({ id }) => id), [0, 1, 2, 3]);
-  assert.equal(records.created[0].flags.gamingTarget, true);
+  assert.notEqual(records.created[0].flags.gamingTarget, true);
   assert.equal(records.target.levelManaged, false);
   assert.equal(records.target.script, undefined);
-  assert.equal(records.target.markIntensity, 0.7);
+  assert.equal(records.target.markIntensity, 0);
+  assert.equal(records.blackEyeCalls, 0);
   assert.equal(records.target.group.position.x, 3);
   assert.equal(records.target.group.position.z, 5);
   assert.equal(records.randomOpenPositions.length, 2);
@@ -154,8 +158,51 @@ test("凌晨三点教学目标随机生成且交给通用随机游走系统", ()
   assert.equal(records.target.script, undefined);
   assert.equal(records.target.levelManaged, false);
   assert.equal(records.moveCalls, 0);
-  assert.equal(records.target.markIntensity, 0.7);
+  assert.equal(records.target.markIntensity, 0);
   assert.equal(records.environmentUpdates, 1);
+});
+
+test("凌晨三点教学目标只用外圈圆环标记", () => {
+  const { context, records } = createFakeContext({
+    npcCount: 2,
+    actorFactory: createGamingNpc,
+  });
+  const level = createGamingLevel(context);
+  level.start();
+  records.player.group.position.set(0.4, 0, 6.6);
+  level.update(0.2);
+
+  const glowMarkers = [];
+  records.target.group.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach((material) => {
+      if (material.userData?._tutorialEmissive != null) glowMarkers.push(material);
+    });
+  });
+
+  assert.ok(records.target.tutorialAura);
+  assert.equal(glowMarkers.length, 0);
+  assert.equal(records.target.markIntensity, 0);
+});
+
+test("凌晨三点目标预览使用普通人物加圆环", () => {
+  const added = [];
+  renderPreview({ scene: { add: (group) => added.push(group) } });
+
+  const group = added[0];
+  const hasRing = group.children.some((child) => child.geometry?.type === "TorusGeometry");
+  const glowMarkers = [];
+  group.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach((material) => {
+      if (material.userData?._tutorialEmissive != null) glowMarkers.push(material);
+    });
+  });
+
+  assert.equal(hasRing, true);
+  assert.equal(glowMarkers.length, 0);
 });
 
 test("凌晨三点教学目标开局不会固定刷在玩家周围", () => {
@@ -193,7 +240,7 @@ test("凌晨三点教学目标待机时保持可渲染坐标", () => {
   assert.equal(Number.isFinite(records.target.group.userData.visual.position.y), true);
 });
 
-test("凌晨三点挥空时提示靠近并面向发光目标", () => {
+test("凌晨三点挥空时提示靠近并面向圆环目标", () => {
   const { context, records } = createFakeContext({
     npcCount: 2,
     actorFactory: createGamingNpc,
@@ -207,11 +254,11 @@ test("凌晨三点挥空时提示靠近并面向发光目标", () => {
 
   assert.equal(
     records.overlays.at(-1).html,
-    '<div class="tutorial-miss-hint">没打中！靠近发光舍友并面向他出拳！</div>',
+    '<div class="tutorial-miss-hint">没打中！靠近带圆环的舍友并面向他出拳！</div>',
   );
 });
 
-test("凌晨三点打到普通人物时提示认准发光目标", () => {
+test("凌晨三点打到普通人物时提示认准圆环目标", () => {
   const { context, records } = createFakeContext({
     npcCount: 2,
     actorFactory: createGamingNpc,
@@ -228,6 +275,6 @@ test("凌晨三点打到普通人物时提示认准发光目标", () => {
 
   assert.equal(
     records.overlays.at(-1).html,
-    '<div class="tutorial-miss-hint">打错人了！认准全身发光的舍友！</div>',
+    '<div class="tutorial-miss-hint">打错人了！认准带圆环的舍友！</div>',
   );
 });

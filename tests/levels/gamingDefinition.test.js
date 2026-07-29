@@ -28,7 +28,7 @@ test("凌晨三点提示不再引导玩家找声音", async () => {
 
   assert.doesNotMatch(viewSource, blockedGamingSound);
   assert.doesNotMatch(serializedDefinition, blockedGamingTerms);
-  assert.match(serializedDefinition, /全身发光/);
+  assert.match(serializedDefinition, /外圈圆环/);
 });
 
 test("凌晨三点不再显示绿色摇杆引导", async () => {

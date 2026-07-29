@@ -6,6 +6,7 @@ import {
   TUTORIAL_MOVE_HOLD_SECONDS,
   TUTORIAL_PHASES,
 } from "./constants.js";
+import { setTutorialTargetRing } from "./targetRing.js";
 import { createTutorialViewModel } from "./viewModel.js";
 import {
   hideMissHint,
@@ -15,51 +16,8 @@ import {
   showMoveTutorial,
 } from "./view.js";
 
-const EMPTY_ATTACK_HINT = "没打中！靠近发光舍友并面向他出拳！";
-const WRONG_TARGET_HINT = "打错人了！认准全身发光的舍友！";
-
-function applyTargetGlow(npc, enabled) {
-  if (!npc?.group) return;
-  npc.group.traverse((child) => {
-    if (!child.isMesh || !child.material) return;
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach((material) => {
-      if (!material?.emissive) return;
-      if (enabled) {
-        if (material.userData._tutorialEmissive == null) {
-          material.userData._tutorialEmissive = material.emissiveIntensity ?? 0;
-          material.userData._tutorialEmissiveColor = material.emissive.clone();
-        }
-        material.emissive.setHex(0xffaa33);
-        material.emissiveIntensity = 1.35;
-      } else if (material.userData._tutorialEmissive != null) {
-        material.emissive.copy(material.userData._tutorialEmissiveColor);
-        material.emissiveIntensity = material.userData._tutorialEmissive;
-      }
-    });
-  });
-
-  if (enabled && !npc.tutorialAura) {
-    const aura = new THREE.Mesh(
-      new THREE.TorusGeometry(0.62, 0.045, 10, 36),
-      new THREE.MeshBasicMaterial({
-        color: 0xffb020,
-        transparent: true,
-        opacity: 0.85,
-        depthWrite: false,
-      }),
-    );
-    aura.rotation.x = Math.PI / 2;
-    aura.position.y = 1.05;
-    npc.group.add(aura);
-    npc.tutorialAura = aura;
-  } else if (!enabled && npc.tutorialAura) {
-    npc.group.remove(npc.tutorialAura);
-    npc.tutorialAura.geometry?.dispose?.();
-    npc.tutorialAura.material?.dispose?.();
-    npc.tutorialAura = null;
-  }
-}
+const EMPTY_ATTACK_HINT = "没打中！靠近带圆环的舍友并面向他出拳！";
+const WRONG_TARGET_HINT = "打错人了！认准带圆环的舍友！";
 
 export function createGamingLevel(context) {
   const resources = context.sceneData;
@@ -114,7 +72,7 @@ export function createGamingLevel(context) {
     state.phase = TUTORIAL_PHASES.ATTACK;
     state.moveHold = 0;
     hideWaypoint();
-    applyTargetGlow(target, true);
+    setTutorialTargetRing(target, true);
     showAttackTutorial(context.ui);
     showFanIndicator();
     refreshHud();
@@ -128,13 +86,11 @@ export function createGamingLevel(context) {
     }
 
     target = context.actors.createNpc(0, {
-      gamingTarget: true,
       levelTarget: true,
     });
     target.levelManaged = false;
     target.walking = false;
     target.group.position.copy(context.movement.randomOpenPosition());
-    context.ui.setBlackEye(target, 0.7);
     context.actors.addNpc(target);
 
     for (let id = 1; id <= extraNpcCount; id += 1) {
@@ -239,7 +195,7 @@ export function createGamingLevel(context) {
       const hit = action.hit;
       if (hit?.correct && hit.npc === target) {
         state.phase = TUTORIAL_PHASES.DONE;
-        applyTargetGlow(target, false);
+        setTutorialTargetRing(target, false);
         hideTutorialOverlays(context.ui);
         context.actors.dissolve(target);
         context.combat.triggerHitstop(0.08);
@@ -265,7 +221,7 @@ export function createGamingLevel(context) {
     dispose() {
       hideWaypoint();
       if (resources.fanMesh) resources.fanMesh.visible = false;
-      applyTargetGlow(target, false);
+      setTutorialTargetRing(target, false);
       hideTutorialOverlays(context.ui);
       target = null;
     },

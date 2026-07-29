@@ -1,11 +1,11 @@
 function getMission(phase) {
-  if (phase === "attack") return "击打发光目标";
+  if (phase === "attack") return "击打圆环目标";
   if (phase === "done") return "教学完成！";
   return "走到绿色光圈处";
 }
 
 function getClue(phase) {
-  if (phase === "attack") return "🔍 靠近发光的舍友，按下攻击按钮";
+  if (phase === "attack") return "🔍 靠近带圆环的舍友，按下攻击按钮";
   if (phase === "done") return "";
   return "🔍 首先，使用摇杆左右移动找到自己，然后移动到绿色光圈处";
 }

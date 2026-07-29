@@ -43,7 +43,7 @@ test("经典体验在顿帧期间只更新震动", () => {
   const calls = [];
   const experience = createClassicExperience({
     consumeHitstop: () => true,
-    updateEffects: () => calls.push("effects"),
+    updateActors: () => calls.push("actors"),
     updateShake: () => calls.push("shake"),
     render: () => {},
   });
