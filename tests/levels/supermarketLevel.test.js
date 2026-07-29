@@ -12,6 +12,7 @@ test("超市取证属于二十五岁独立主线关卡", () => {
 
 test("超市体验完成挂载、暂停、恢复和释放生命周期", () => {
   const calls = [];
+  const hudStates = [];
   const root = {
     querySelector() {
       return {
@@ -33,6 +34,16 @@ test("超市体验完成挂载、暂停、恢复和释放生命周期", () => {
     input: {
       windowTarget: new EventTarget(),
       listen: () => calls.push(["listen"]),
+    },
+    controls: {
+      readDirection: (target) => target.set(0, 0),
+      applyReverseLock() {},
+      getPlayerVelocity: () => new THREE.Vector2(),
+      consumeAction: () => true,
+      reset() {},
+    },
+    ui: {
+      updateHud: (state) => hudStates.push(state),
     },
     rendering: {
       THREE,
@@ -58,23 +69,23 @@ test("超市体验完成挂载、暂停、恢复和释放生命周期", () => {
   experience.resume();
   experience.render();
   const listenerCount = calls.filter(([name]) => name === "listen").length;
-  experience.showResult({ won: false });
+  assert.equal(experience.showResult, undefined);
   assert.equal(
     calls.filter(([name]) => name === "listen").length,
     listenerCount,
   );
   experience.dispose();
 
-  assert.equal(experience.presentation, "standalone");
+  assert.equal(experience.presentation, "shared");
   const mountedContent = calls.find(([name]) => name === "content")[1];
-  assert.match(mountedContent, /取证进度/);
-  assert.match(mountedContent, /警戒/);
-  assert.match(mountedContent, /进入目标视线会上升/);
-  assert.match(mountedContent, /货架遮挡会下降/);
-  assert.match(mountedContent, /满值即失败/);
-  assert.match(mountedContent, /data-feedback/);
+  assert.doesNotMatch(mountedContent, /supermarket-hud/);
+  assert.doesNotMatch(mountedContent, /警戒/);
+  assert.doesNotMatch(mountedContent, /出口/);
+  assert.doesNotMatch(mountedContent, /standalone-controls/);
   assert.match(mountedContent, /data-focus/);
   assert.match(mountedContent, /data-evidence/);
+  assert.equal(hudStates.at(-1).attackIcon, "📸");
+  assert.equal(hudStates.at(-1).resourceLabel, "照片");
   assert.equal(calls.some(([name]) => name === "render"), true);
   assert.deepEqual(calls.slice(-2).map(([name]) => name), ["dispose-scene", "clear"]);
 });
@@ -106,12 +117,23 @@ test("有效拍照同时触发快门动画、证据卡和进度更新", () => {
     },
   };
   const scene = new THREE.Scene();
+  const hudStates = [];
+  const finishes = [];
+  const velocity = new THREE.Vector2();
   const experience = definition.extensions.createExperience({
     surface: { root, setContent() {}, clear() {} },
     input: {
       windowTarget: new EventTarget(),
       listen() {},
     },
+    controls: {
+      readDirection: (target) => target.set(0, 0),
+      applyReverseLock() {},
+      getPlayerVelocity: () => velocity,
+      consumeAction: () => true,
+      reset: () => velocity.set(0, 0),
+    },
+    ui: { updateHud: (state) => hudStates.push(state) },
     rendering: {
       THREE,
       canvas: {},
@@ -120,7 +142,7 @@ test("有效拍照同时触发快门动画、证据卡和进度更新", () => {
       render() {},
       disposeScene() {},
     },
-    flow: { start() {}, finish() {}, leave() {} },
+    flow: { start() {}, finish: (result) => finishes.push(result), leave() {} },
     random: { range: (min) => min },
   });
 
@@ -128,7 +150,7 @@ test("有效拍照同时触发快门动画、证据卡和进度更新", () => {
   experience.start();
   for (let frame = 0; frame < 120; frame += 1) {
     experience.update(0.05);
-    if (nodes.get("[data-feedback]")?.textContent.includes("目标正在互动")) break;
+    if (hudStates.at(-1)?.clue?.includes("两人")) break;
   }
 
   const player = scene.children.find(({ userData }) => userData.role === "player");
@@ -139,10 +161,25 @@ test("有效拍照同时触发快门动画、证据卡和进度更新", () => {
   experience.update(0);
   experience.handleInput({ type: "photo" });
 
-  assert.equal(nodes.get("[data-feedback]").textContent, "拍摄成功，目标确认 1/4");
   assert.equal(nodes.get(".supermarket-game").classList.contains("capturing"), true);
   assert.equal(nodes.get("[data-evidence]").classList.contains("visible"), true);
   assert.equal(nodes.get("[data-evidence-count]").textContent, "目标确认 · 证据 1/4");
-  assert.equal(nodes.get("[data-photos]").textContent, "▣□□□ 1/4");
+  assert.equal(hudStates.at(-1).resourceText, "1 / 4");
+
+  for (let photo = 2; photo <= 4; photo += 1) {
+    for (let frame = 0; frame < 70; frame += 1) experience.update(0.05);
+    const nextTargets = scene.children.filter(({ userData }) => userData.role === "target");
+    const nextCenterX = (nextTargets[0].position.x + nextTargets[1].position.x) / 2;
+    player.position.set(nextCenterX, 0, nextTargets[0].position.z + 1);
+    player.rotation.y = Math.PI;
+    experience.update(0);
+    experience.handleInput({ type: "photo" });
+    assert.equal(hudStates.at(-1).resourceText, `${photo} / 4`);
+  }
+
+  assert.equal(finishes.length, 0);
+  experience.update(0.6);
+  assert.equal(finishes.length, 1);
+  assert.equal(finishes[0].won, true);
   experience.dispose();
 });

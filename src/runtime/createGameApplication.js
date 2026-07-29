@@ -30,7 +30,6 @@ import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
-
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager, storyProgress;
@@ -160,6 +159,8 @@ function createStandaloneHost({ definition, scope }) {
         settlement.finish(Boolean(won), failMessage, stats),
       leave: () => uiController.showLevelSelect(),
     },
+    controls: inputController,
+    ui: uiController,
     storageBackend: window.localStorage,
     randomRange,
   });
@@ -197,9 +198,8 @@ export function boot() {
     randomRange,
   });
   inputController = createInputController({
-    isActive: () =>
-      session.phase === GAME_PHASES.PLAYING
-      && experienceManager?.presentation === "classic",
+    isActive: () => session.phase === GAME_PHASES.PLAYING
+      && ["classic", "shared"].includes(experienceManager?.presentation),
     joystick: ui.joystick,
     joystickKnob: ui.joystickKnob,
     primeAudio: audio.resume,
@@ -368,7 +368,7 @@ function resetLevel(index, options = {}) {
     if (options.skipBriefing) {
       session.levelState.startTime = totalTime - (options.elapsed ?? 0);
       experienceManager.start();
-    }
+    } else if (level.sharedLayout) uiController.showTask();
     return;
   }
 

@@ -49,3 +49,12 @@ test("超市阵容使用共享标准角色状态以支持移动和步行动画",
     assert.equal(typeof actor.walkCycle, "number");
   });
 });
+
+test("两名目标拥有只供开局显示的同组成对标识", () => {
+  const cast = createSupermarketCast(new THREE.Scene(), (min) => min);
+
+  cast.couple.forEach(({ group }) => {
+    assert.ok(group.userData.pairMarker instanceof THREE.Mesh);
+    assert.equal(group.userData.pairMarker.visible, true);
+  });
+});

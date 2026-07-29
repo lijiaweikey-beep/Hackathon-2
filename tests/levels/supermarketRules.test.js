@@ -4,7 +4,6 @@ import * as THREE from "three";
 import {
   createPhotoEvidenceRules,
   evaluatePhotoScene,
-  isPlayerObserved,
 } from "../../src/levels/supermarket/rules.js";
 
 function createActor(x, z, rotation = 0) {
@@ -89,7 +88,7 @@ test("同一次互动只能生成一张有效证据", () => {
   });
 });
 
-test("拍满四张只开启出口，抵达收银区后才通关", () => {
+test("拍满四张立即通关且不再等待出口", () => {
   const rules = createPhotoEvidenceRules({
     requiredPhotos: 4,
     opportunities: 5,
@@ -106,10 +105,9 @@ test("拍满四张只开启出口，抵达收银区后才通关", () => {
     assert.equal(rules.capture().ok, true);
   }
 
-  assert.equal(rules.snapshot().exitOpen, true);
-  assert.equal(rules.snapshot().won, false);
-  assert.equal(rules.reachExit(), true);
   assert.equal(rules.snapshot().won, true);
+  assert.equal("exitOpen" in rules.snapshot(), false);
+  assert.equal("reachExit" in rules, false);
 });
 
 test("剩余机会不足以集齐照片时取证失败", () => {
@@ -149,24 +147,5 @@ test("取景计算要求两名目标同时位于玩家面对方向且无遮挡",
       isLineBlocked: () => false,
     }).framedTargets,
     0,
-  );
-});
-
-test("任一目标视线内近距离无遮挡时玩家会引起警戒", () => {
-  const player = createActor(0, 3);
-  const couple = [createActor(0, 0, 0), createActor(3, 0, 0)];
-
-  assert.equal(
-    isPlayerObserved({ player, couple, isLineBlocked: () => false }),
-    true,
-  );
-  assert.equal(
-    isPlayerObserved({ player, couple, isLineBlocked: () => true }),
-    false,
-  );
-  couple[0].group.rotation.y = Math.PI;
-  assert.equal(
-    isPlayerObserved({ player, couple, isLineBlocked: () => false }),
-    false,
   );
 });

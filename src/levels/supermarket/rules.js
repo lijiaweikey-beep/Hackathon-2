@@ -35,22 +35,6 @@ export function evaluatePhotoScene({
   return { framedTargets, obstructed, distance };
 }
 
-export function isPlayerObserved({
-  player,
-  couple,
-  isLineBlocked,
-  maxDistance = 4.2,
-  viewDot = 0.25,
-}) {
-  return couple.some(({ group }) => {
-    const direction = horizontalDirection(group.position, player.group.position);
-    if (direction.distance > maxDistance) return false;
-    const facing = getFacingVector(group.rotation.y);
-    return facing.x * direction.x + facing.y * direction.z >= viewDot
-      && !isLineBlocked(group.position, player.group.position);
-  });
-}
-
 export function createPhotoEvidenceRules({
   requiredPhotos = 4,
   opportunities = 5,
@@ -64,7 +48,6 @@ export function createPhotoEvidenceRules({
     obstructed: true,
     distance: Infinity,
     framedTargets: 0,
-    exitOpen: false,
     won: false,
     failed: false,
   };
@@ -112,9 +95,9 @@ export function createPhotoEvidenceRules({
     state.photos += 1;
     state.opportunitiesRemaining = Math.max(0, state.opportunitiesRemaining - 1);
     state.interacting = false;
-    state.exitOpen = state.photos >= requiredPhotos;
+    state.won = state.photos >= requiredPhotos;
     checkFailure();
-    return { ok: true, photos: state.photos, exitOpen: state.exitOpen };
+    return { ok: true, photos: state.photos, won: state.won };
   }
 
   function missOpportunity() {
@@ -123,18 +106,11 @@ export function createPhotoEvidenceRules({
     checkFailure();
   }
 
-  function reachExit() {
-    if (!state.exitOpen || state.failed) return false;
-    state.won = true;
-    return true;
-  }
-
   return Object.freeze({
     setScene,
     canCapture,
     capture,
     missOpportunity,
-    reachExit,
     snapshot: () => ({ ...state }),
   });
 }

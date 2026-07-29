@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { createLowPolyPerson } from "../../entities/lowPolyPerson.js";
 import { LOW_POLY_NPC_PALETTES } from "../../entities/palettes.js";
 import { createNpc, createPlayer } from "../../entities/actors.js";
@@ -17,6 +18,17 @@ export function createSupermarketPerson(palette, x, z) {
   group.position.set(x, 0, z);
   group.scale.setScalar(0.86);
   return group;
+}
+
+function addPairMarker(group) {
+  const marker = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.24, 0),
+    new THREE.MeshBasicMaterial({ color: 0xec4899, depthTest: false }),
+  );
+  marker.position.y = 2.25;
+  marker.renderOrder = 4;
+  group.add(marker);
+  group.userData.pairMarker = marker;
 }
 
 export function createSupermarketCast(scene, randomRange) {
@@ -44,15 +56,16 @@ export function createSupermarketCast(scene, randomRange) {
   });
   const couple = [
     createNpc(0, {
-      createBody: createBody(LOW_POLY_NPC_PALETTES[1], -1.2, -0.1),
+      createBody: createBody(LOW_POLY_NPC_PALETTES[1], -0.45, -0.1),
     }, randomRange),
     createNpc(1, {
-      createBody: createBody(LOW_POLY_NPC_PALETTES[0], 1.2, -0.1),
+      createBody: createBody(LOW_POLY_NPC_PALETTES[0], 0.45, -0.1),
     }, randomRange),
   ];
   player.group.userData.role = "player";
   couple.forEach(({ group }) => {
     group.userData.role = "target";
+    addPairMarker(group);
   });
   customers.forEach(({ group }) => {
     group.userData.role = "customer";

@@ -51,13 +51,13 @@ button {
   color: var(--text);
 }
 
-.hud.standalone-active > :not([data-level-surface], .topbar),
-.hud.standalone-active > .topbar > :not(.status-strip),
-.hud.standalone-active .status-strip > :not(.pause-button) {
+.hud.standalone-active:not(.shared-layout-active) > :not([data-level-surface], .topbar),
+.hud.standalone-active:not(.shared-layout-active) > .topbar > :not(.status-strip),
+.hud.standalone-active:not(.shared-layout-active) .status-strip > :not(.pause-button) {
   display: none;
 }
 
-.hud.standalone-active > .topbar {
+.hud.standalone-active:not(.shared-layout-active) > .topbar {
   top: auto;
   right: auto;
   bottom: max(10px, env(safe-area-inset-bottom));

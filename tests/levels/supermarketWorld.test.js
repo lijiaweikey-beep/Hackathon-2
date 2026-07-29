@@ -25,7 +25,7 @@ function createHost(width = 1200, height = 750) {
   };
 }
 
-test("超市场景提供完整货架、商品、人物和收银区", () => {
+test("超市场景提供完整货架、商品、人物和收银区且没有出口装置", () => {
   const world = createSupermarketWorld(createHost());
 
   assert.deepEqual(world.shelves, [
@@ -40,7 +40,8 @@ test("超市场景提供完整货架、商品、人物和收银区", () => {
   assert.equal(world.customers.length, 14);
   assert.equal(world.couple.length, 2);
   assert.ok(world.checkout instanceof THREE.Group);
-  assert.ok(world.exit instanceof THREE.Mesh);
+  assert.equal("exit" in world, false);
+  assert.equal("setExitOpen" in world, false);
 });
 
 test("货架和收银台使用同一碰撞解析且角色不会留在障碍内部", () => {
@@ -66,7 +67,7 @@ test("货架和收银台使用同一碰撞解析且角色不会留在障碍内�
   assert.equal(position.z, 7.25);
 });
 
-test("遮挡查询覆盖货架且撤离必须进入中央出口", () => {
+test("遮挡查询覆盖货架", () => {
   const world = createSupermarketWorld(createHost());
 
   assert.equal(
@@ -76,17 +77,17 @@ test("遮挡查询覆盖货架且撤离必须进入中央出口", () => {
     ),
     true,
   );
-  assert.equal(world.isInsideExit(new THREE.Vector3(0, 0, 7)), true);
-  assert.equal(world.isInsideExit(new THREE.Vector3(7, 0, 7)), false);
 });
 
-test("出口开放时灯光和通道同时切换为绿色", () => {
+test("场景不再创建顶部白色灯条、悬浮灯牌和红色出口条", () => {
   const world = createSupermarketWorld(createHost());
 
-  world.setExitOpen(true);
-
-  assert.equal(world.exit.material.color.getHex(), 0x22c55e);
-  assert.equal(world.exit.userData.statusLight.color.getHex(), 0x22c55e);
+  const colors = world.scene.children
+    .filter((child) => child.material?.color)
+    .map((child) => child.material.color.getHex());
+  assert.equal(colors.includes(0xfff4cf), false);
+  assert.equal(colors.includes(0xdc2626), false);
+  assert.equal(colors.includes(0x173544), false);
 });
 
 test("超市相机随手机横屏比例更新且不拉伸场景", () => {

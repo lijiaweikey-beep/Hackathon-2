@@ -93,13 +93,6 @@ function addLighting(THREE, scene) {
   key.shadow.mapSize.set(1024, 1024);
   scene.add(key);
 
-  const fixtureMaterial = new THREE.MeshBasicMaterial({ color: 0xfff4cf });
-  [-7.5, -2.5, 2.5, 7.5].forEach((x) => {
-    const fixture = createBox(THREE, [3.2, 0.08, 0.28], fixtureMaterial, [x, 5.2, -0.2]);
-    fixture.castShadow = false;
-    fixture.receiveShadow = false;
-    scene.add(fixture);
-  });
 }
 
 export function createSupermarketWorld(host) {
@@ -159,29 +152,6 @@ export function createSupermarketWorld(host) {
     scene.add(createShelf(THREE, x, z, index, products));
   });
   const checkout = createCheckout(THREE, scene);
-  const exitMaterial = new THREE.MeshStandardMaterial({
-    color: 0xdc2626,
-    emissive: 0x7f1d1d,
-    emissiveIntensity: 0.5,
-    roughness: 0.62,
-  });
-  const exit = createBox(THREE, [4.2, 0.12, 0.8], exitMaterial, [0, 0.08, 7.2]);
-  const statusLight = new THREE.PointLight(0xdc2626, 2.8, 7);
-  statusLight.position.set(0, 2.6, 6.7);
-  const sign = createBox(
-    THREE,
-    [2.4, 0.65, 0.16],
-    new THREE.MeshStandardMaterial({
-      color: 0x173544,
-      emissive: 0x0d2835,
-      emissiveIntensity: 0.8,
-    }),
-    [0, 2.45, 7],
-  );
-  sign.castShadow = false;
-  exit.userData.statusLight = statusLight;
-  scene.add(exit, statusLight, sign);
-
   const cast = createSupermarketCast(scene, host.random?.range);
   cast.customers.forEach((customer, index) => {
     customer.group.rotation.y = index < 7 ? Math.PI : 0;
@@ -212,10 +182,6 @@ export function createSupermarketWorld(host) {
     return false;
   }
 
-  function isInsideExit(position) {
-    return Math.abs(position.x) <= 2.1 && position.z >= 6.65;
-  }
-
   function clampActorPosition(position, velocity) {
     const leftLimit = WALLS[0][0] + WALLS[0][2] + ACTOR_COLLISION_RADIUS;
     const rightLimit = WALLS[1][0] - WALLS[1][2] - ACTOR_COLLISION_RADIUS;
@@ -223,13 +189,6 @@ export function createSupermarketWorld(host) {
     position.x = THREE.MathUtils.clamp(position.x, leftLimit, rightLimit);
     position.z = THREE.MathUtils.clamp(position.z, backLimit, 7.25);
     resolveObstacleCollisions(obstacleState, position, undefined, velocity);
-  }
-
-  function setExitOpen(open) {
-    const color = open ? 0x22c55e : 0xdc2626;
-    exit.material.color.setHex(color);
-    exit.material.emissive.setHex(open ? 0x14532d : 0x7f1d1d);
-    statusLight.color.setHex(color);
   }
 
   return {
@@ -240,7 +199,6 @@ export function createSupermarketWorld(host) {
     interactionPoints,
     products,
     checkout,
-    exit,
     ...cast,
     collidesWithObstacle: (position, radius) =>
       collidesWithObstacle(obstacleState, position, radius),
@@ -248,8 +206,6 @@ export function createSupermarketWorld(host) {
       resolveObstacleCollisions(obstacleState, position, radius, velocity),
     clampActorPosition,
     isLineBlocked,
-    isInsideExit,
     resizeCamera,
-    setExitOpen,
   };
 }
