@@ -23,9 +23,29 @@ test("超市人物阵容包含主角、目标情侣和十四名顾客", () => {
 
   assert.equal(cast.couple.length, 2);
   assert.equal(cast.customers.length, 14);
-  assert.equal(scene.children.includes(cast.player), true);
+  assert.equal(scene.children.includes(cast.player.group), true);
   assert.notEqual(
-    cast.couple[0].userData.colors[0],
-    cast.couple[1].userData.colors[0],
+    cast.couple[0].group.userData.colors[0],
+    cast.couple[1].group.userData.colors[0],
   );
+});
+
+test("超市阵容使用共享标准角色状态以支持移动和步行动画", () => {
+  const cast = createSupermarketCast(new THREE.Scene(), (min) => min);
+
+  assert.equal(cast.player.speed, 3);
+  assert.equal(cast.player.group.userData.role, "player");
+  assert.ok(cast.player.group instanceof THREE.Group);
+  cast.couple.forEach((actor) => {
+    assert.equal(actor.group.userData.role, "target");
+  });
+  cast.customers.forEach((actor) => {
+    assert.equal(actor.group.userData.role, "customer");
+  });
+  [...cast.couple, ...cast.customers].forEach((actor) => {
+    assert.ok(actor.group instanceof THREE.Group);
+    assert.ok(actor.velocity instanceof THREE.Vector2);
+    assert.equal(typeof actor.walking, "boolean");
+    assert.equal(typeof actor.walkCycle, "number");
+  });
 });

@@ -1,5 +1,6 @@
 import { createLowPolyPerson } from "../../entities/lowPolyPerson.js";
 import { LOW_POLY_NPC_PALETTES } from "../../entities/palettes.js";
+import { createNpc, createPlayer } from "../../entities/actors.js";
 
 export const SUPERMARKET_PLAYER_PALETTE = {
   jacket: 0xf97316,
@@ -18,22 +19,49 @@ export function createSupermarketPerson(palette, x, z) {
   return group;
 }
 
-export function createSupermarketCast(scene) {
-  const customers = Array.from({ length: 14 }, (_, index) => {
-    const x = -9 + (index % 7) * 3;
-    const z = index < 7 ? -5.4 : 5.2;
-    return createSupermarketPerson(
-      LOW_POLY_NPC_PALETTES[index % LOW_POLY_NPC_PALETTES.length],
-      x,
-      z,
-    );
-  });
-  const player = createSupermarketPerson(SUPERMARKET_PLAYER_PALETTE, 0, 6.2);
-  const couple = [
-    createSupermarketPerson(LOW_POLY_NPC_PALETTES[1], -1.2, -5.4),
-    createSupermarketPerson(LOW_POLY_NPC_PALETTES[0], 1.2, -5.4),
+export function createSupermarketCast(scene, randomRange) {
+  const customerPositions = [
+    [-9, -4.8], [-6, -4.8], [-3, -4.8], [3, -4.8], [6, -4.8], [9, -4.8],
+    [-9, -0.1], [-3.2, -0.1], [3.2, -0.1], [9, -0.1],
+    [-9, 4.6], [-4.4, 4.6], [4.4, 4.6], [9, 4.6],
   ];
+  const createBody = (palette, x, z) => () => ({
+    group: createSupermarketPerson(palette, x, z),
+  });
+  const customers = customerPositions.map(([x, z], index) => createNpc(
+    index + 2,
+    {
+      createBody: createBody(
+        LOW_POLY_NPC_PALETTES[index % LOW_POLY_NPC_PALETTES.length],
+        x,
+        z,
+      ),
+    },
+    randomRange,
+  ));
+  const player = createPlayer({
+    createBody: createBody(SUPERMARKET_PLAYER_PALETTE, 0, 5.8),
+  });
+  const couple = [
+    createNpc(0, {
+      createBody: createBody(LOW_POLY_NPC_PALETTES[1], -1.2, -0.1),
+    }, randomRange),
+    createNpc(1, {
+      createBody: createBody(LOW_POLY_NPC_PALETTES[0], 1.2, -0.1),
+    }, randomRange),
+  ];
+  player.group.userData.role = "player";
+  couple.forEach(({ group }) => {
+    group.userData.role = "target";
+  });
+  customers.forEach(({ group }) => {
+    group.userData.role = "customer";
+  });
 
-  scene.add(...customers, player, ...couple);
+  scene.add(
+    ...customers.map(({ group }) => group),
+    player.group,
+    ...couple.map(({ group }) => group),
+  );
   return { player, couple, customers };
 }

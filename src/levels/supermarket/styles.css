@@ -72,19 +72,43 @@
   position: absolute;
   top: calc(max(10px, env(safe-area-inset-top)) + 62px);
   left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: min(340px, 42vw);
+  width: min(460px, 52vw);
   padding: 7px 10px;
   transform: translateX(-50%);
 }
 
-.alert-panel > span {
+.alert-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-heading > span {
   color: #d5e3e1;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.alert-heading b {
+  color: #52ddbd;
+}
+
+.alert-panel.caution .alert-heading b {
+  color: #f5c84b;
+}
+
+.alert-panel.danger .alert-heading b {
+  color: #ff6966;
+}
+
+.alert-panel small {
+  display: block;
+  margin-top: 5px;
+  color: #9db1b5;
+  font-size: 9px;
+  text-align: center;
 }
 
 .alert-track {
@@ -115,6 +139,112 @@
   font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.photo-feedback {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 136px);
+  left: 50%;
+  max-width: min(520px, 66vw);
+  margin: 0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  transform: translateX(-50%);
+  background: rgba(7, 18, 28, .72);
+  color: #dce8e6;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.photo-feedback.warning {
+  color: #ffd183;
+  background: rgba(83, 40, 21, .86);
+}
+
+.photo-focus {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 116px;
+  height: 92px;
+  opacity: .22;
+  transform: translate(-50%, -50%);
+  transition: opacity .18s ease, filter .18s ease;
+}
+
+.photo-focus.ready {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px rgba(82, 221, 189, .85));
+}
+
+.photo-focus i {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #52ddbd;
+  border-style: solid;
+}
+
+.photo-focus i:nth-child(1) {
+  left: 0;
+  top: 0;
+  border-width: 3px 0 0 3px;
+}
+
+.photo-focus i:nth-child(2) {
+  right: 0;
+  top: 0;
+  border-width: 3px 3px 0 0;
+}
+
+.photo-focus i:nth-child(3) {
+  left: 0;
+  bottom: 0;
+  border-width: 0 0 3px 3px;
+}
+
+.photo-focus i:nth-child(4) {
+  right: 0;
+  bottom: 0;
+  border-width: 0 3px 3px 0;
+}
+
+.evidence-card {
+  position: absolute;
+  top: 24%;
+  right: max(18px, env(safe-area-inset-right));
+  width: 180px;
+  border: 1px solid rgba(82, 221, 189, .48);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(7, 30, 28, .92);
+  box-shadow: 0 18px 40px rgba(2, 8, 14, .42);
+  opacity: 0;
+  transform: translateX(24px) rotate(2deg);
+}
+
+.evidence-card span,
+.evidence-card strong {
+  display: block;
+}
+
+.evidence-card span {
+  color: #52ddbd;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.evidence-card strong {
+  margin-top: 4px;
+  color: #f4f8f7;
+  font-size: 14px;
+}
+
+.evidence-card.visible {
+  animation: evidence-card 1.9s ease both;
 }
 
 .standalone-controls {
@@ -250,8 +380,12 @@ button {
   pointer-events: none;
 }
 
-.flash.active {
-  animation: flash .25s ease-out;
+.supermarket-game.capturing .flash {
+  animation: flash .38s ease-out;
+}
+
+.supermarket-game.capturing .photo-focus {
+  animation: focus-lock .48s ease-out;
 }
 
 .result-screen {
@@ -260,8 +394,21 @@ button {
 }
 
 @keyframes flash {
-  0% { opacity: .9; }
+  0%, 42% { opacity: 0; }
+  48% { opacity: .94; }
   100% { opacity: 0; }
+}
+
+@keyframes focus-lock {
+  0% { transform: translate(-50%, -50%) scale(1.35); opacity: .2; }
+  60% { transform: translate(-50%, -50%) scale(.92); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: .8; }
+}
+
+@keyframes evidence-card {
+  0%, 18% { opacity: 0; transform: translateX(24px) rotate(2deg); }
+  28%, 78% { opacity: 1; transform: translateX(0) rotate(-1deg); }
+  100% { opacity: 0; transform: translateY(-10px) rotate(-1deg); }
 }
 
 @keyframes ready-pulse {
@@ -302,8 +449,21 @@ button {
   }
 
   .exit-hint {
-    top: calc(max(6px, env(safe-area-inset-top)) + 84px);
+    top: calc(max(6px, env(safe-area-inset-top)) + 102px);
     padding: 4px 8px;
+  }
+
+  .photo-feedback {
+    top: calc(max(6px, env(safe-area-inset-top)) + 130px);
+    padding: 4px 9px;
+    font-size: 10px;
+  }
+
+  .evidence-card {
+    top: 27%;
+    right: max(10px, env(safe-area-inset-right));
+    width: 158px;
+    padding: 8px 10px;
   }
 
   .standalone-controls {

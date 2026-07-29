@@ -1,4 +1,11 @@
-import { createPhotoEvidenceRules } from "./rules.js";
+import * as THREE from "three";
+import { createActorSystem } from "../../systems/createActorSystem.js";
+import {
+  createPhotoEvidenceRules,
+  evaluatePhotoScene,
+  isPlayerObserved,
+} from "./rules.js";
+import { createSupermarketTargetSequence } from "./targetSequence.js";
 import { createSupermarketWorld } from "./world.js";
 
 const ROUND_SECONDS = 90;
@@ -6,31 +13,21 @@ const ROUND_SECONDS = 90;
 export function createSupermarketExperience(host) {
   const direction = { x: 0, z: 0 };
   const keys = new Set();
+  const playerVelocity = new THREE.Vector2();
   let world;
+  let actors;
+  let targetSequence;
+  let rules;
   let active = false;
   let completed = false;
   let elapsed = 0;
-  let interactionTimer = 0;
-  let nextInteraction = 2.5;
   let alert = 0;
-  let rules;
+  let photoPoseTimer = 0;
+  let messageTimer = 0;
   let joystickPointer = null;
 
-  function lineBlocked(from, to) {
-    const steps = 12;
-    for (let step = 1; step < steps; step += 1) {
-      const ratio = step / steps;
-      const x = from.x + (to.x - from.x) * ratio;
-      const z = from.z + (to.z - from.z) * ratio;
-      if (world.shelves.some(([sx, sz, hx, hz]) =>
-        Math.abs(x - sx) < hx && Math.abs(z - sz) < hz)) return true;
-    }
-    return false;
-  }
-
-  function collides(x, z) {
-    return world.shelves.some(([sx, sz, hx, hz]) =>
-      Math.abs(x - sx) < hx + 0.38 && Math.abs(z - sz) < hz + 0.38);
+  function query(selector) {
+    return host.surface.root.querySelector(selector);
   }
 
   function updateDirectionFromKeys() {
@@ -47,8 +44,10 @@ export function createSupermarketExperience(host) {
     const length = Math.max(1, Math.hypot(x, y));
     direction.x = x / length;
     direction.z = y / length;
-    const knob = host.surface.root.querySelector("[data-knob]");
-    if (knob) knob.style.transform = `translate(${direction.x * 28}px, ${direction.z * 28}px)`;
+    const knob = query("[data-knob]");
+    if (knob) {
+      knob.style.transform = `translate(${direction.x * 28}px, ${direction.z * 28}px)`;
+    }
   }
 
   function releaseJoystick() {
@@ -56,22 +55,57 @@ export function createSupermarketExperience(host) {
     direction.x = 0;
     direction.z = 0;
     updateDirectionFromKeys();
-    const knob = host.surface.root.querySelector("[data-knob]");
+    const knob = query("[data-knob]");
     if (knob) knob.style.transform = "translate(0, 0)";
+  }
+
+  function showMessage(text, warning = false, duration = 1.8) {
+    const feedback = query("[data-feedback]");
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle("warning", warning);
+    messageTimer = duration;
+  }
+
+  function contextualMessage(encounter) {
+    if (rules.snapshot().exitOpen) return "证据链完整，前往中央绿色收银通道";
+    if (encounter.interacting) {
+      return rules.canCapture()
+        ? "双目标已确认，立即拍照"
+        : "目标正在互动，调整方向让两人同时入镜";
+    }
+    return encounter.state === "approach"
+      ? "目标正在靠近，保持距离观察"
+      : "目标正在分散，继续跟随";
   }
 
   function updateHud() {
     const state = rules.snapshot();
-    const photos = host.surface.root.querySelector("[data-photos]");
-    const alertBar = host.surface.root.querySelector("[data-alert]");
-    const timer = host.surface.root.querySelector("[data-time]");
-    const photo = host.surface.root.querySelector("[data-photo]");
-    const exitText = host.surface.root.querySelector("[data-exit]");
-    if (photos) photos.textContent = `${"▣".repeat(state.photos)}${"□".repeat(4 - state.photos)} ${state.photos}/4`;
+    const encounter = targetSequence.snapshot();
+    const photos = query("[data-photos]");
+    const alertBar = query("[data-alert]");
+    const alertState = query("[data-alert-state]");
+    const timer = query("[data-time]");
+    const photo = query("[data-photo]");
+    const focus = query("[data-focus]");
+    const exitText = query("[data-exit]");
+    const alertPanel = query(".alert-panel");
+    const ready = rules.canCapture();
+
+    if (photos) {
+      photos.textContent = `${"▣".repeat(state.photos)}${"□".repeat(4 - state.photos)} ${state.photos}/4`;
+    }
     if (alertBar) alertBar.style.width = `${alert}%`;
     if (timer) timer.textContent = String(Math.max(0, Math.ceil(ROUND_SECONDS - elapsed)));
-    photo?.classList.toggle("ready", rules.canCapture());
-    if (exitText) exitText.textContent = state.exitOpen ? "出口已开启，前往绿色收银区" : "收银区封锁中";
+    if (alertState) alertState.textContent = alert >= 70 ? "危险" : alert >= 30 ? "注意" : "安全";
+    alertPanel?.classList.toggle("danger", alert >= 70);
+    alertPanel?.classList.toggle("caution", alert >= 30 && alert < 70);
+    photo?.classList.toggle("ready", ready);
+    focus?.classList.toggle("ready", ready);
+    if (exitText) {
+      exitText.textContent = state.exitOpen ? "中央出口已开启" : "收银区封锁中";
+    }
+    if (messageTimer <= 0) showMessage(contextualMessage(encounter), false, 0);
     world.setExitOpen(state.exitOpen);
   }
 
@@ -79,27 +113,42 @@ export function createSupermarketExperience(host) {
     if (completed) return;
     completed = true;
     active = false;
+    const state = rules.snapshot();
     host.flow.finish({
       won,
       failMessage,
       stats: {
         label: "取证进度",
-        value: `${rules.snapshot().photos} / 4`,
-        attemptsLeft: rules.snapshot().photos,
+        value: `${state.photos} / 4`,
+        attemptsLeft: state.opportunitiesRemaining,
       },
     });
+  }
+
+  function playCaptureAnimation(photoCount) {
+    photoPoseTimer = 0.55;
+    const game = query(".supermarket-game");
+    const evidence = query("[data-evidence]");
+    const evidenceCount = query("[data-evidence-count]");
+    game?.classList.remove("capturing");
+    if (game) void game.offsetWidth;
+    game?.classList.add("capturing");
+    if (evidenceCount) evidenceCount.textContent = `目标确认 · 证据 ${photoCount}/4`;
+    evidence?.classList.remove("visible");
+    if (evidence) void evidence.offsetWidth;
+    evidence?.classList.add("visible");
   }
 
   function takePhoto() {
     if (!active || completed) return;
     const result = rules.capture();
-    if (!result.ok) return;
-    interactionTimer = 0;
-    nextInteraction = 3.5;
-    const flash = host.surface.root.querySelector("[data-flash]");
-    flash?.classList.remove("active");
-    if (flash) void flash.offsetWidth;
-    flash?.classList.add("active");
+    if (!result.ok) {
+      showMessage(result.reason, true);
+      return;
+    }
+    targetSequence.resolveCapture();
+    playCaptureAnimation(result.photos);
+    showMessage(`拍摄成功，目标确认 ${result.photos}/4`, false, 2.2);
     updateHud();
   }
 
@@ -110,7 +159,7 @@ export function createSupermarketExperience(host) {
       if (event.target?.closest?.("[data-photo]")) takePhoto();
       if (event.target?.closest?.("[data-leave]")) host.flow.leave();
     });
-    const joystick = root.querySelector("[data-joystick]");
+    const joystick = query("[data-joystick]");
     if (joystick) {
       host.input.listen(joystick, "pointerdown", (event) => {
         joystickPointer = event.pointerId;
@@ -141,6 +190,38 @@ export function createSupermarketExperience(host) {
     });
   }
 
+  function createActors() {
+    const targetGroup = Symbol("supermarket-targets");
+    world.couple.forEach((actor) => {
+      actor.levelManaged = true;
+      actor.separationGroup = targetGroup;
+    });
+    actors = createActorSystem({
+      getScene: () => world.scene,
+      getPlayer: () => world.player,
+      getLevel: () => ({ legacy: false }),
+      createNpc: () => null,
+      collidesWithObstacle: world.collidesWithObstacle,
+      clampActorPosition: world.clampActorPosition,
+      resolveObstacleCollisions: world.resolveObstacleCollisions,
+      dispatch: () => false,
+      getTotalTime: () => elapsed,
+      randomRange: (...args) => host.random.range(...args),
+      readPlayerInput: (target) => target.set(direction.x, -direction.z),
+      applyInputLock: () => {},
+      getPlayerVelocity: () => playerVelocity,
+      updatePlayerTimers: () => {},
+    });
+    [...world.couple, ...world.customers].forEach(actors.addNpc);
+    targetSequence = createSupermarketTargetSequence({
+      members: world.couple,
+      interactionPoints: world.interactionPoints,
+      moveToward: actors.moveNpcToward,
+      faceToward: actors.faceNpcToward,
+      randomRange: (...args) => host.random.range(...args),
+    });
+  }
+
   return {
     presentation: "standalone",
     mount() {
@@ -152,9 +233,15 @@ export function createSupermarketExperience(host) {
             <div class="hud-block"><span>取证进度</span><strong data-photos>□□□□ 0/4</strong></div>
             <div class="hud-block time"><span>剩余时间</span><strong><b data-time>90</b> 秒</strong></div>
           </header>
-          <div class="alert-panel"><span>警戒</span><div class="alert-track"><i data-alert></i></div></div>
+          <div class="alert-panel">
+            <div class="alert-heading"><span>警戒 · <b data-alert-state>安全</b></span><div class="alert-track"><i data-alert></i></div></div>
+            <small>靠近并进入目标视线会上升 · 远离或借货架遮挡会下降 · 满值即失败</small>
+          </div>
           <p class="exit-hint" data-exit>收银区封锁中</p>
+          <p class="photo-feedback" data-feedback>跟随目标，等待两人互动</p>
+          <div class="photo-focus" data-focus><i></i><i></i><i></i><i></i></div>
           <div class="flash" data-flash></div>
+          <aside class="evidence-card" data-evidence><span>取证成功</span><strong data-evidence-count>目标确认</strong></aside>
           <div class="standalone-controls">
             <div class="standalone-joystick" data-joystick aria-label="移动"><i data-knob></i></div>
             <button type="button" class="photo-button" data-photo aria-label="拍照"><span>📸</span></button>
@@ -162,70 +249,73 @@ export function createSupermarketExperience(host) {
           <section class="briefing">
             <small>人生阶段 · 25 岁</small>
             <h1>25 岁 · 超市取证</h1>
-            <p>抓拍四次亲密互动，再从收银通道撤离。靠太近会提高警戒值。</p>
+            <p>跟随目标并抓拍四次不同互动。让两人同时进入取景框且保持无遮挡，再从中央收银通道撤离。</p>
             <button type="button" data-start>开始跟踪</button>
           </section>
         </main>
       `);
       world = createSupermarketWorld(host);
+      createActors();
       bindInput();
       updateHud();
     },
     start() {
       active = true;
-      host.surface.root.querySelector(".briefing")?.classList.add("hidden");
+      query(".briefing")?.classList.add("hidden");
+      showMessage("跟随目标，等待两人靠近互动", false, 2.5);
     },
     update(deltaSeconds) {
       if (!active || completed) return;
       elapsed += deltaSeconds;
-      const length = Math.hypot(direction.x, direction.z) || 1;
-      const nextX = world.player.position.x + (direction.x / length) * 5.4 * deltaSeconds;
-      const nextZ = world.player.position.z + (direction.z / length) * 5.4 * deltaSeconds;
-      if (!collides(nextX, world.player.position.z)) world.player.position.x = Math.max(-11, Math.min(11, nextX));
-      if (!collides(world.player.position.x, nextZ)) world.player.position.z = Math.max(-7, Math.min(7, nextZ));
+      messageTimer = Math.max(0, messageTimer - deltaSeconds);
+      photoPoseTimer = Math.max(0, photoPoseTimer - deltaSeconds);
 
-      if (interactionTimer > 0) {
-        interactionTimer -= deltaSeconds;
-        world.couple[0].position.x = -0.25;
-        world.couple[1].position.x = 0.25;
-        world.couple[0].position.z = world.couple[1].position.z = -0.2;
-        if (interactionTimer <= 0) {
-          rules.missOpportunity();
-          nextInteraction = 3.2;
-        }
-      } else {
-        nextInteraction -= deltaSeconds;
-        const orbit = elapsed * 0.45;
-        world.couple[0].position.set(Math.sin(orbit) * 7, 0, Math.cos(orbit) * 4.8);
-        world.couple[1].position.set(Math.sin(orbit + 0.45) * 7, 0, Math.cos(orbit + 0.45) * 4.8);
-        if (nextInteraction <= 0 && rules.snapshot().opportunitiesRemaining > 0) {
-          interactionTimer = 2.8;
-        }
+      actors.updatePlayer(deltaSeconds);
+      const sequenceResult = targetSequence.update(deltaSeconds);
+      actors.updateNpcs(deltaSeconds);
+      if (photoPoseTimer > 0) {
+        const { leftArm, rightArm } = world.player.group.userData;
+        leftArm.rotation.x = -1.35;
+        rightArm.rotation.x = -1.35;
       }
 
-      const target = world.couple[0].position;
-      const distance = Math.hypot(
-        world.player.position.x - target.x,
-        world.player.position.z - target.z,
-      );
-      const obstructed = lineBlocked(world.player.position, target);
-      rules.setScene({
-        interacting: interactionTimer > 0,
-        obstructed,
-        distance,
+      const encounter = targetSequence.snapshot();
+      const photoScene = evaluatePhotoScene({
+        player: world.player,
+        couple: world.couple,
+        isLineBlocked: world.isLineBlocked,
       });
-      alert = distance < 3.4 && !obstructed && interactionTimer <= 0
+      rules.setScene({ ...photoScene, ...encounter });
+      if (sequenceResult?.missedEventId != null && !rules.snapshot().exitOpen) {
+        rules.missOpportunity();
+        showMessage("本次互动已结束，继续寻找下一次机会", true);
+      }
+
+      const observed = isPlayerObserved({
+        player: world.player,
+        couple: world.couple,
+        isLineBlocked: world.isLineBlocked,
+      });
+      alert = observed
         ? Math.min(100, alert + deltaSeconds * 34)
         : Math.max(0, alert - deltaSeconds * 18);
-      if (alert >= 100) finish(false, "你被发现了，目标从超市另一侧离开。");
+
+      if (alert >= 100) finish(false, "警戒已满，你被目标发现了。");
       if (rules.snapshot().failed) finish(false, "抓拍机会已经不足，证据链无法完成。");
-      if (rules.snapshot().exitOpen && world.player.position.z > 6.6 && rules.reachExit()) finish(true);
+      if (
+        rules.snapshot().exitOpen
+        && world.isInsideExit(world.player.group.position)
+        && rules.reachExit()
+      ) {
+        finish(true);
+      }
       if (elapsed >= ROUND_SECONDS) finish(false, "超市即将打烊，取证没有完成。");
       updateHud();
     },
     pause() {
       active = false;
       releaseJoystick();
+      playerVelocity.set(0, 0);
     },
     resume() {
       if (!completed) active = true;
@@ -237,26 +327,29 @@ export function createSupermarketExperience(host) {
       if (world) host.rendering.render(world.scene, world.camera);
     },
     getResultStats() {
+      const state = rules?.snapshot();
       return {
         label: "取证进度",
-        value: `${rules?.snapshot().photos ?? 0} / 4`,
-        attemptsLeft: rules?.snapshot().photos ?? 0,
+        value: `${state?.photos ?? 0} / 4`,
+        attemptsLeft: state?.opportunitiesRemaining ?? 0,
       };
     },
     showResult({ won }) {
       host.surface.setContent(`
         <main class="supermarket-game result-screen">
           <section><h1>${won ? "证据到手" : "跟踪失败"}</h1>
-          <p>${won ? "收银通道亮起绿灯，你带着四张照片离开。" : "调整路线，再找一次机会。"}</p>
+          <p>${won ? "四次有效互动已经确认，你从中央收银通道安全离开。" : "观察目标视线和取景提示，再找一次机会。"}</p>
           <button type="button" data-leave>返回人生时间线</button></section>
         </main>
       `);
-      bindInput();
     },
     dispose() {
       active = false;
       keys.clear();
+      actors?.reset();
       if (world) host.rendering.disposeScene(world.scene);
+      actors = null;
+      targetSequence = null;
       world = null;
       host.surface.clear();
     },

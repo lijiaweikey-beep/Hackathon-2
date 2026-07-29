@@ -1,3 +1,8 @@
+import { ACTOR_COLLISION_RADIUS } from "../../config/constants.js";
+import {
+  collidesWithObstacle,
+  resolveObstacleCollisions,
+} from "../../world/obstacles.js";
 import { createSupermarketCast } from "./actors.js";
 
 const SHELVES = [
@@ -7,6 +12,15 @@ const SHELVES = [
   [-6.2, 2.2, 2.4, 0.65],
   [0, 2.2, 2.4, 0.65],
   [6.2, 2.2, 2.4, 0.65],
+];
+const CHECKOUTS = [
+  [-7.4, 6.25, 2.1, 0.58],
+  [7.4, 6.25, 2.1, 0.58],
+];
+const WALLS = [
+  [-11.85, 0, 0.15, 8],
+  [11.85, 0, 0.15, 8],
+  [0, -7.85, 12, 0.15],
 ];
 
 function createBox(THREE, size, material, position) {
@@ -130,11 +144,14 @@ export function createSupermarketWorld(host) {
     color: 0xeee7d7,
     roughness: 0.88,
   });
-  scene.add(
-    createBox(THREE, [24, 3.2, 0.3], wallMaterial, [0, 1.6, -7.85]),
-    createBox(THREE, [0.3, 3.2, 16], wallMaterial, [-11.85, 1.6, 0]),
-    createBox(THREE, [0.3, 3.2, 16], wallMaterial, [11.85, 1.6, 0]),
-  );
+  WALLS.forEach(([x, z, halfW, halfD]) => {
+    scene.add(createBox(
+      THREE,
+      [halfW * 2, 3.2, halfD * 2],
+      wallMaterial,
+      [x, 1.6, z],
+    ));
+  });
   addLighting(THREE, scene);
 
   const products = [];
@@ -165,10 +182,48 @@ export function createSupermarketWorld(host) {
   exit.userData.statusLight = statusLight;
   scene.add(exit, statusLight, sign);
 
-  const cast = createSupermarketCast(scene);
+  const cast = createSupermarketCast(scene, host.random?.range);
   cast.customers.forEach((customer, index) => {
-    customer.rotation.y = index < 7 ? Math.PI : 0;
+    customer.group.rotation.y = index < 7 ? Math.PI : 0;
   });
+  const obstacleState = {
+    obstacles: [...SHELVES, ...CHECKOUTS, ...WALLS].map(([x, z, halfW, halfD]) => ({
+      x,
+      z,
+      halfW,
+      halfD,
+    })),
+  };
+  const interactionPoints = [-7.2, -3.2, 0, 3.2, 7.2].map(
+    (x) => new THREE.Vector3(x, 0, -0.1),
+  );
+
+  function isLineBlocked(from, to) {
+    const distance = Math.hypot(to.x - from.x, to.z - from.z);
+    const steps = Math.max(8, Math.ceil(distance / 0.2));
+    for (let step = 1; step < steps; step += 1) {
+      const ratio = step / steps;
+      const point = {
+        x: from.x + (to.x - from.x) * ratio,
+        z: from.z + (to.z - from.z) * ratio,
+      };
+      if (collidesWithObstacle(obstacleState, point, 0.05)) return true;
+    }
+    return false;
+  }
+
+  function isInsideExit(position) {
+    return Math.abs(position.x) <= 2.1 && position.z >= 6.65;
+  }
+
+  function clampActorPosition(position, velocity) {
+    const leftLimit = WALLS[0][0] + WALLS[0][2] + ACTOR_COLLISION_RADIUS;
+    const rightLimit = WALLS[1][0] - WALLS[1][2] - ACTOR_COLLISION_RADIUS;
+    const backLimit = WALLS[2][1] + WALLS[2][3] + ACTOR_COLLISION_RADIUS;
+    position.x = THREE.MathUtils.clamp(position.x, leftLimit, rightLimit);
+    position.z = THREE.MathUtils.clamp(position.z, backLimit, 7.25);
+    resolveObstacleCollisions(obstacleState, position, undefined, velocity);
+  }
 
   function setExitOpen(open) {
     const color = open ? 0x22c55e : 0xdc2626;
@@ -181,10 +236,19 @@ export function createSupermarketWorld(host) {
     scene,
     camera,
     shelves: SHELVES,
+    obstacles: obstacleState.obstacles,
+    interactionPoints,
     products,
     checkout,
     exit,
     ...cast,
+    collidesWithObstacle: (position, radius) =>
+      collidesWithObstacle(obstacleState, position, radius),
+    resolveObstacleCollisions: (position, radius, velocity) =>
+      resolveObstacleCollisions(obstacleState, position, radius, velocity),
+    clampActorPosition,
+    isLineBlocked,
+    isInsideExit,
     resizeCamera,
     setExitOpen,
   };

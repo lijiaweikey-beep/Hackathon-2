@@ -43,6 +43,43 @@ test("超市场景提供完整货架、商品、人物和收银区", () => {
   assert.ok(world.exit instanceof THREE.Mesh);
 });
 
+test("货架和收银台使用同一碰撞解析且角色不会留在障碍内部", () => {
+  const world = createSupermarketWorld(createHost());
+  const position = new THREE.Vector3(-6.2, 0, -2.5);
+
+  assert.equal(world.collidesWithObstacle(position), true);
+  assert.equal(
+    world.collidesWithObstacle(new THREE.Vector3(-7.4, 0, 6.25)),
+    true,
+  );
+  assert.equal(
+    world.collidesWithObstacle(new THREE.Vector3(-11.75, 0, 0)),
+    true,
+  );
+
+  world.resolveObstacleCollisions(position);
+  assert.equal(world.collidesWithObstacle(position), false);
+
+  position.set(20, 0, 20);
+  world.clampActorPosition(position);
+  assert.ok(Math.abs(position.x - 11.32) < 0.0001);
+  assert.equal(position.z, 7.25);
+});
+
+test("遮挡查询覆盖货架且撤离必须进入中央出口", () => {
+  const world = createSupermarketWorld(createHost());
+
+  assert.equal(
+    world.isLineBlocked(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -5),
+    ),
+    true,
+  );
+  assert.equal(world.isInsideExit(new THREE.Vector3(0, 0, 7)), true);
+  assert.equal(world.isInsideExit(new THREE.Vector3(7, 0, 7)), false);
+});
+
 test("出口开放时灯光和通道同时切换为绿色", () => {
   const world = createSupermarketWorld(createHost());
 
