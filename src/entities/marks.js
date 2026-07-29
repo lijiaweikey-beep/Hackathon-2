@@ -17,3 +17,12 @@ export function setLipstick(npc, intensity) {
     mesh.scale.set(1 + npc.markIntensity * 2.8, 1 + npc.markIntensity * 1.8, 1);
   });
 }
+
+export function setRedTie(npc, intensity) {
+  npc.marked = true;
+  npc.markIntensity = Math.max(npc.markIntensity, intensity);
+  const tie = npc.group.userData.tieMark;
+  if (!tie) return;
+  tie.material.opacity = 0.6 + npc.markIntensity * 0.4;
+  tie.scale.set(1, 1 + npc.markIntensity * 0.3, 1);
+}

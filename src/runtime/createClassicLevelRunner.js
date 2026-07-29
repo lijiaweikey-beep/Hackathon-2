@@ -69,6 +69,7 @@ export function createClassicLevelRunner(dependencies) {
         ui: {
           setBlackEye: dependencies.setBlackEye,
           setLipstick: dependencies.setLipstick,
+          setRedTie: dependencies.setRedTie,
           showOverlay: (...args) => uiController.showOverlay(...args),
           hideOverlay: (...args) => uiController.hideOverlay(...args),
           flashHud: (...args) => uiController.flashHud(...args),

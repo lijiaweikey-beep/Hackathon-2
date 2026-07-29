@@ -8,7 +8,7 @@ import {
   createPlayer as createPlayerEntity,
   createNpc as createNpcEntity,
 } from "../entities/actors.js";
-import { setBlackEye, setLipstick } from "../entities/marks.js";
+import { setBlackEye, setLipstick, setRedTie } from "../entities/marks.js";
 import { saveBestScore } from "../utils/storage.js";
 import { calcRating } from "../utils/format.js";
 import { createFxSystem } from "../systems/FxSystem.js";
@@ -59,6 +59,7 @@ const levelRunner = createClassicLevelRunner({
   npcSpeed: NPC_SPEED,
   setBlackEye,
   setLipstick,
+  setRedTie,
   onError(error, definition) {
     console.error(`关卡运行失败：${definition.id}`, error);
   },

@@ -4,7 +4,15 @@
       "Bash(npm install *)",
       "Bash(npm run *)",
       "Bash(npx vite *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(npx vitest *)",
+      "WebFetch(domain:ycnwgww9etyj.feishu.cn)",
+      "WebSearch",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
