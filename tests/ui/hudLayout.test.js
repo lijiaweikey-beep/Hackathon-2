@@ -15,6 +15,18 @@ test("正式关卡线索条与游戏状态同属顶部状态栏", async () => {
   );
 });
 
+test("顶部目标特征允许换行完整显示", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const clueWrapRule = css.match(/\.clue-bar-wrap\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const clueRule = css.match(/\.clue-bar\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+  assert.match(clueWrapRule, /flex:\s*1 1 auto/);
+  assert.match(clueWrapRule, /min-width:\s*0/);
+  assert.match(clueRule, /white-space:\s*normal/);
+  assert.match(clueRule, /overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(clueRule, /text-overflow:\s*ellipsis/);
+});
+
 test("难度选择位于事件轴右上角且任务卡不展示人数和玩法说明", async () => {
   const html = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   const header = html.match(/<header class="history-header">([\s\S]*?)<\/header>/)?.[1] ?? "";

@@ -37,6 +37,7 @@ function createFakeContext({ npcCount }) {
     created: [],
     target: null,
     environmentUpdates: 0,
+    moveCalls: 0,
   };
   const context = {
     definition: {
@@ -90,6 +91,7 @@ function createFakeContext({ npcCount }) {
         return createPosition(4, 0, 4);
       },
       moveNpcToward() {
+        records.moveCalls += 1;
         return false;
       },
     },
@@ -117,19 +119,20 @@ test("凌晨三点插件生成目标和剩余路人", () => {
 
   assert.deepEqual(records.created.map(({ id }) => id), [0, 1, 2, 3]);
   assert.equal(records.created[0].flags.gamingTarget, true);
-  assert.equal(records.target.levelManaged, true);
+  assert.notEqual(records.target.levelManaged, true);
+  assert.equal(records.target.script, undefined);
   assert.equal(records.target.markIntensity, 0.7);
-  // 目标起始于离开状态，位置设为随机路径点（random.range 返回 min = 4）
   assert.equal(records.target.group.position.x, 4);
 });
 
-test("凌晨三点目标结束打游戏后离开电脑并前往电脑位", () => {
+test("凌晨三点目标交给通用游走系统随机移动", () => {
   const { context, records } = createFakeContext({ npcCount: 2 });
   const level = createGamingLevel(context);
   level.start();
   level.update(3);
 
-  assert.equal(records.target.script.state, "seek");
+  assert.equal(records.target.script, undefined);
+  assert.equal(records.moveCalls, 0);
   assert.equal(records.target.markIntensity, 0.7);
   assert.equal(records.environmentUpdates, 1);
 });

@@ -1,5 +1,5 @@
-const MOVE_SUBTITLE = "凌晨 3 点，寻找哪里的电脑还有游戏声";
-const ATTACK_SUBTITLE = "找到游戏哥，一拳出击！";
+const MOVE_SUBTITLE = "凌晨 3 点，移动到绿色光圈";
+const ATTACK_SUBTITLE = "找到发光舍友，一拳出击！";
 const MISS_HINT = "注意主角的面朝方向，靠近一点再打！";
 
 function subtitleHtml(text, { typing = false } = {}) {

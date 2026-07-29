@@ -16,6 +16,19 @@ test("凌晨三点关卡提供结算等级插画", () => {
   assert.match(gamingDefinition.art?.grades?.C ?? "", /grade-c\.jpg/);
 });
 
+test("凌晨三点提示不再引导玩家找声音", async () => {
+  const viewSource = await readFile(
+    new URL("../../src/levels/gaming/view.js", import.meta.url),
+    "utf8",
+  );
+  const serializedDefinition = JSON.stringify(gamingDefinition);
+
+  assert.doesNotMatch(viewSource, /游戏声/);
+  assert.doesNotMatch(serializedDefinition, /游戏声|打游戏|开黑/);
+  assert.match(viewSource, /移动到绿色光圈/);
+  assert.match(serializedDefinition, /全身发光/);
+});
+
 test("教学摇杆提示在手机横屏短屏中上提", async () => {
   const css = await readFile(
     new URL("../../src/levels/gaming/styles.css", import.meta.url),

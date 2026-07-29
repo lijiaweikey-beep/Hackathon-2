@@ -291,12 +291,14 @@ button {
 }
 
 .clue-bar-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   justify-content: center;
 }
 
 .clue-bar {
-  max-width: 72%;
+  max-width: min(680px, 52vw);
   padding: 6px 16px;
   background: var(--ink);
   color: var(--paper);
@@ -305,9 +307,9 @@ button {
   box-shadow: var(--shadow-sm);
   font-size: 13px;
   font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .clue-bar.hidden {
@@ -2117,10 +2119,11 @@ button {
   }
 
   .clue-bar {
-    max-width: min(46vw, 480px);
+    max-width: min(52vw, 520px);
     padding: 4px 10px;
     border-width: 2px;
     font-size: 12px;
+    line-height: 1.25;
   }
 
   .status-strip {

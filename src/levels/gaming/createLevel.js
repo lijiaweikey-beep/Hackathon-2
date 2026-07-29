@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import {
   TUTORIAL_ATTACK_COOLDOWN,
-  TUTORIAL_COMPUTER_INDEX,
   TUTORIAL_FAN_SECONDS,
   TUTORIAL_MISS_HINT_SECONDS,
   TUTORIAL_MOVE_HOLD_SECONDS,
@@ -68,7 +67,6 @@ export function createGamingLevel(context) {
     steps.moveTargetPos?.z ?? 6.6,
   );
   const moveRadius = steps.moveRadius ?? 1;
-  const computers = resources.computers ?? [];
   const extraNpcCount = Math.max(
     1,
     (context.definition.npcCount ?? context.actors.npcCount ?? 6) - 1,
@@ -119,77 +117,6 @@ export function createGamingLevel(context) {
     refreshHud();
   }
 
-  function pickComputerIndex(preferred) {
-    if (!computers.length) return 0;
-    if (preferred != null && computers[preferred]) return preferred;
-    return Math.floor(context.random.range(0, computers.length));
-  }
-
-  function seatAtComputer(npc, computerIndex) {
-    const computer = computers[computerIndex];
-    if (!computer) return;
-    npc.group.position.copy(computer);
-    npc.group.position.x += 0.15;
-    const facingPoint = computer.clone();
-    facingPoint.z += computer.z > 0 ? -1.1 : 1.1;
-    context.movement.faceNpcToward(npc, facingPoint);
-  }
-
-  function updateTarget(deltaSeconds) {
-    if (!target?.alive) return;
-    const script = target.script;
-    if (!script) return;
-
-    if (script.state === "play") {
-      target.walking = false;
-      script.timer -= deltaSeconds;
-      seatAtComputer(target, script.computerIndex);
-      const progress = 1 - script.timer / (script.playDuration || script.timer || 1);
-      context.ui.setBlackEye(target, 0.62 + progress * 0.28);
-      if (script.timer <= 0) {
-        context.ui.setBlackEye(target, 1);
-        script.state = "leave";
-        script.timer = context.random.range(4.5, 7);
-        script.waypoint = context.movement.randomOpenPosition();
-      }
-      return;
-    }
-
-    if (script.state === "leave") {
-      target.walking = true;
-      const reached = context.movement.moveNpcToward(
-        target,
-        script.waypoint,
-        context.actors.npcSpeed * 1.08,
-        deltaSeconds,
-      );
-      script.timer -= deltaSeconds;
-      if (reached || script.timer <= 0) {
-        script.computerIndex = pickComputerIndex();
-        script.waypoint = computers[script.computerIndex].clone();
-        script.state = "seek";
-      }
-      return;
-    }
-
-    if (script.state === "seek") {
-      target.walking = true;
-      const reached = context.movement.moveNpcToward(
-        target,
-        script.waypoint,
-        context.actors.npcSpeed * 1.12,
-        deltaSeconds,
-      );
-      if (reached) {
-        script.state = "play";
-        script.timer = context.random.range(2.4, 3.8);
-        script.playDuration = script.timer;
-        context.ui.setBlackEye(target, 0.62);
-        seatAtComputer(target, script.computerIndex);
-      }
-    }
-  }
-
   function start() {
     const player = context.actors.getPlayer?.();
     if (player) {
@@ -197,21 +124,12 @@ export function createGamingLevel(context) {
       player.group.position.copy(spawn);
     }
 
-    const computerIndex = pickComputerIndex(TUTORIAL_COMPUTER_INDEX);
     target = context.actors.createNpc(0, {
       gamingTarget: true,
       levelTarget: true,
     });
     target.id = steps.attackTargetId ?? "noisy_roommate";
-    target.levelManaged = true;
-    target.script = {
-      state: "leave",
-      timer: context.random.range(2.5, 4.5),
-      playDuration: 2.8,
-      computerIndex,
-      waypoint: context.movement.randomOpenPosition(),
-    };
-    target.group.position.copy(target.script.waypoint);
+    target.group.position.copy(context.movement.randomOpenPosition());
     context.ui.setBlackEye(target, 0.7);
     context.actors.addNpc(target);
 
@@ -226,7 +144,6 @@ export function createGamingLevel(context) {
 
   function update(deltaSeconds) {
     resources.updateEnvironment?.(deltaSeconds);
-    updateTarget(deltaSeconds);
 
     if (state.missHintTimer > 0) {
       state.missHintTimer -= deltaSeconds;
