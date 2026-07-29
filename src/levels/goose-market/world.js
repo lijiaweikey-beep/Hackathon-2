@@ -38,7 +38,7 @@ export function createWorld(world) {
     roughness: 0.72,
   });
   [-8.5, -4.2, 0, 4.2, 8.5].forEach((x, index) => {
-    const z = index % 2 === 0 ? -4.6 : 7.4;
+    const z = index % 2 === 0 ? -5.1 : 7.4;
     const stall = new THREE.Mesh(
       new THREE.BoxGeometry(2.5, 0.72, 1.25),
       stallMaterial,

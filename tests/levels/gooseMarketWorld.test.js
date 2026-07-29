@@ -50,7 +50,7 @@ test("鹅腿夜市保留低多边形红棚摊位并增加串灯", () => {
   assert.ok(bottomStringLights.length >= 2);
   assert.ok(bottomBulbs.every((bulb) => bulb.position.y <= 2.35));
   assert.ok(bottomBulbs.every((bulb) => bulb.position.z >= 6.35));
-  assert.ok(topAwnings.every((awning) => awning.position.z >= -4.8));
+  assert.ok(topAwnings.every((awning) => awning.position.z === -5.1));
   assert.ok(awnings.every((awning) => awning.material.color.getHex() === 0xd9485f));
 });
 
