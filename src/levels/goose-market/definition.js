@@ -39,6 +39,7 @@ export default {
   resourceLabel: "🥊 挥拳",
   resourceInitial: "∞",
   sceneName: "以鸭戴鹅",
+  axisLabel: "鹅腿阿姨！\n你吓到我了",
   emoji: "🍗",
   art,
   nodes: {
@@ -68,5 +69,10 @@ export default {
     intro: "二十三岁，毕业前的夜市挤满了相似的摊位，真假只在灯光扫过时露馅。",
     success: "鸭腿摊安静下来。两年后，梗哥在超市里撞见了更难直视的真相。",
   },
+  storyIntro: [
+    "二十三岁，毕业前最后一顿夜宵。",
+    "花鹅腿的钱，竟然买到了鸭腿！",
+    "以鸭充鹅？！别让我逮到你！！",
+  ],
   lighting: "night",
 };

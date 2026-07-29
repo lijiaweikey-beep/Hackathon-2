@@ -1,6 +1,7 @@
 import { OFFICE_HP_MAX } from "./constants.js";
 import { createNpc, createPlayer } from "./actors.js";
 import { createOfficeLevel } from "./createLevel.js";
+import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
 const art = {
@@ -20,7 +21,7 @@ export default {
   age: 27,
   legacy: false,
   createLevel: createOfficeLevel,
-  extensions: { createWorld, createPlayer, createNpc },
+  extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
   worldProfile: {
     background: 0x1a2332,
     fog: { color: 0x1a2332, near: 24, far: 50 },
@@ -40,6 +41,7 @@ export default {
   resourceInitial: OFFICE_HP_MAX,
   decoyCount: 15,
   sceneName: "躲老板黑锅",
+  axisLabel: "我不要背黑锅！",
   emoji: "🍳",
   art,
   nodes: {
@@ -63,5 +65,10 @@ export default {
     intro: "二十七岁，职场的锅从不打招呼，总是在你抬头前先落下来。",
     success: "这一拳打停了黑锅雨。三年后，更大的房贷和车贷一起压了下来。",
   },
+  storyIntro: [
+    "二十七岁，加班到深夜。",
+    "天上掉的锅，竟然全往我头上砸！",
+    "甩锅老板！！别让我逮到你！！",
+  ],
   lighting: "day",
 };

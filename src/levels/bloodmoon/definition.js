@@ -41,6 +41,7 @@ export default {
   attackComboExpires: false,
   decoyCount: 6,
   sceneName: "血月街区",
+  axisLabel: "为了你我变成狼人模样",
   emoji: "🌕",
   art,
   nodes: {
@@ -62,5 +63,10 @@ export default {
   difficulty: 3,
   success: "血月退潮，你终于把自己的影子从狼形里拽了回来。",
   failure: "雷声盖过了那句求救，整条街都开始长出狼影。",
+  storyIntro: [
+    "血月当空，整条街都在长出狼影。",
+    "人群里，竟然混着真正的引路人！",
+    "狼人！！别让我逮到你！！",
+  ],
   lighting: "bloodmoon",
 };

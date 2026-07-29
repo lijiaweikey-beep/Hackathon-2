@@ -36,6 +36,7 @@ export default {
     floor: { texture: "gaming", roughness: 0.52 },
   },
   sceneName: "爆金币",
+  axisLabel: "结束吧！房贷车贷",
   emoji: "🪙",
   art,
   nodes: {
@@ -59,5 +60,10 @@ export default {
     intro: "三十岁，房贷和车贷排成一条流水线，等着把每一天盖成欠款。",
     success: "一百金币落袋。回头看去，那些狼狈的年份都亮成了人生坐标。",
   },
+  storyIntro: [
+    "三十岁，房贷车贷排队上门。",
+    "账单竟然自己长了腿，满街乱窜！",
+    "今天必须爆金币！！别让我逮到你！！",
+  ],
   lighting: "day",
 };

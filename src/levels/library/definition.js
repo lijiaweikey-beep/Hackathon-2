@@ -27,6 +27,7 @@ export default {
   actions: ["findHitTarget"],
   decoyCount: 4,
   sceneName: "图书馆",
+  axisLabel: "图书馆禁止亲嘴",
   emoji: "📚",
   art,
   nodes: {
@@ -50,5 +51,10 @@ export default {
     intro: "二十一岁，知识很安静，爱情却总爱在书架后面发出声音。",
     success: "图书馆恢复安静。毕业前的夜市，又飘来一股真假难辨的香味。",
   },
+  storyIntro: [
+    "二十一岁，泡在图书馆备考。",
+    "书架后面，竟然有人在亲嘴！",
+    "还我安静！！别让我逮到你！！",
+  ],
   lighting: "library",
 };

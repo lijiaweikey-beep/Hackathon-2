@@ -106,12 +106,21 @@
             </header>
             <div class="history-detail-body">
               <button id="historyDetailPrev" class="history-detail-nav prev" type="button" aria-label="上一个历史节点">‹</button>
-              <figure id="historyDetailVisual" class="history-detail-visual"></figure>
+              <div class="history-detail-share">
+                <canvas id="historyDetailShareCanvas" class="history-detail-share-canvas" width="540" height="960"></canvas>
+              </div>
+              <div class="history-detail-side">
+                <div id="historyDetailLore" class="history-detail-lore" tabindex="0"></div>
+                <div id="historyDetailStats" class="history-detail-stats"></div>
+              </div>
               <button id="historyDetailNext" class="history-detail-nav next" type="button" aria-label="下一个历史节点">›</button>
-              <div id="historyDetailLore" class="history-detail-lore" tabindex="0"></div>
             </div>
             <footer class="history-detail-footer">
-              <button id="historyDetailClose" class="history-detail-close" type="button">关闭</button>
+              <div class="history-detail-actions">
+                <button id="historyDetailSave" class="history-detail-button" type="button">保存</button>
+                <button id="historyDetailClose" class="history-detail-button ghost" type="button">关闭</button>
+                <button id="historyDetailReplay" class="history-detail-button accent" type="button">再玩一局</button>
+              </div>
               <div id="historyDetailReward" class="history-detail-reward"></div>
             </footer>
           </article>
@@ -122,17 +131,16 @@
     <!-- 关卡进入卡 -->
     <section id="taskModal" class="modal">
       <div class="modal-panel task-panel">
-        <div id="taskEmoji" class="task-emoji">🌙</div>
-        <div id="taskTitle" class="modal-title">任务</div>
+        <div id="taskTitle" class="modal-title task-entry-title">任务</div>
         <div class="target-preview-wrap">
           <canvas id="targetPreviewCanvas" class="target-preview-canvas" width="200" height="220"></canvas>
-          <div id="targetLabel" class="target-label">目标</div>
+          <div class="target-callout">认准这个目标！！</div>
         </div>
-        <p id="taskCopy" class="modal-copy task-mission">任务加载中</p>
-        <div id="taskClue" class="task-clue">🔍 线索加载中</div>
+        <div id="taskTraits" class="task-traits"></div>
         <div class="task-info-row">
           <div class="task-info-chip">⏱ <span id="taskTime">90</span> 秒</div>
           <div class="task-info-chip" id="taskAttemptsChip">❤️ <span id="taskAttempts">❤️❤️❤️</span></div>
+          <div class="task-info-chip" id="taskDifficulty">⚡ 难度 · 新手</div>
         </div>
         <div class="task-actions">
           <button id="backFromTaskButton" class="secondary-button" type="button">返回坐标轴</button>
@@ -141,7 +149,15 @@
       </div>
     </section>
 
-    <!-- 结算弹窗：等级插画铺满全屏，文字压在毛玻璃层上 -->
+    <!-- 进入关卡后的打字机剧情弹窗 -->
+    <section id="storyIntroModal" class="story-intro-modal" aria-label="剧情简报">
+      <div class="story-intro-stage">
+        <div id="storyIntroText" class="story-intro-text" aria-live="polite"></div>
+        <div id="storyIntroHint" class="story-intro-hint" hidden>点击屏幕任意处，开始重拳出击！</div>
+      </div>
+    </section>
+
+    <!-- 结算弹窗：仿分享卡的窄版竖卡，插画+等级+通关数据 -->
     <section id="resultModal" class="modal result-modal">
       <div class="result-stage">
         <div id="resultArt" class="result-art" aria-hidden="true"></div>

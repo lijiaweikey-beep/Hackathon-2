@@ -22,7 +22,7 @@ export function buildShareModel({ level = {}, result = {}, progress = {} }) {
     won,
     theme: GRADE_THEMES[grade] ?? GRADE_THEMES.C,
     age: level.age ?? null,
-    sceneName: level.axisLabel ?? level.sceneName ?? "",
+    sceneName: (level.axisLabel ?? level.sceneName ?? "").replace(/\n/g, ""),
     title: level.nodes?.[grade]?.title ?? "",
     copy: (level.nodes?.[grade]?.verdict
       ?? (won

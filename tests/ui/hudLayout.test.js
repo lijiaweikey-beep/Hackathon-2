@@ -101,18 +101,20 @@ test("电脑横屏结算页与手机横屏使用同一套分区尺寸", async ()
   assert.match(desktopLandscapeRule, /\.result-actions\s+\.primary-button,\n\s*\.result-actions\s+\.secondary-button\s*\{[\s\S]*font-size:\s*13px/);
 });
 
-test("电脑横屏历史揭晓详情页不裁切成顶部大图", async () => {
+test("电脑横屏历史揭晓详情页分享卡不裁切", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
-  const visualRule = css.match(/\.history-detail-visual\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const shareRule = css.match(/\.history-detail-share\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const shareCanvasRule = css.match(/\.history-detail-share-canvas\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const desktopLandscapeRule = css.match(
     /@media\s*\(orientation:\s*landscape\)\s*\{([\s\S]*)\n\}/,
   )?.[1] ?? "";
 
-  assert.match(visualRule, /min-height:\s*0/);
+  assert.match(shareRule, /min-height:\s*0/);
+  assert.match(shareCanvasRule, /height:\s*100%/);
+  assert.match(shareCanvasRule, /max-height:\s*min\(430px,\s*56vh\)/);
+  assert.match(shareCanvasRule, /aspect-ratio:\s*540 \/ 960/);
   assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
-  assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*position:\s*absolute/);
-  assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*inset:\s*0/);
-  assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*object-fit:\s*contain/);
+  assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*overflow:\s*hidden/);
 });
 
 test("事件轴弹层高于结算弹层避免返回时残影压住", async () => {

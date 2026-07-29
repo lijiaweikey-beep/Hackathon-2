@@ -29,6 +29,7 @@ export default {
   decoyCount: 5,
   moonDecoyCount: 3,
   sceneName: "承天寺夜游",
+  axisLabel: "就你喊张怀民起床的？",
   emoji: "🌕",
   art,
   nodes: {
@@ -50,6 +51,11 @@ export default {
   difficulty: 3,
   success: "精准命中，怀民终于能回去睡觉了。",
   failure: "苏轼月下散步爽了，怀民彻底睡不着了",
+  storyIntro: [
+    "元丰六年十月十二日夜，怀民刚要入睡。",
+    "满院苏轼，竟然个个都说自己是真的！",
+    "假苏轼！！别让我逮到你！！",
+  ],
   lighting: "night",
   mechanicHintHtml: `
     <div class="mechanic-hint-row"><span class="mechanic-hint-label">任务</span><span class="mechanic-hint-text">找出真正吵醒怀民的苏轼。</span></div>
