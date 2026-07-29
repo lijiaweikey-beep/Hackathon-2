@@ -119,7 +119,7 @@ test("成功结算推进主线，失败结算不改变进度", () => {
   assert.deepEqual(completed, ["age-19"]);
 });
 
-test("成功结算至少等待命中粒子播放完成再弹卡片", () => {
+test("成功结算等待几秒让命中粒子完整播放再弹卡片", () => {
   const timers = [];
   const session = {
     phase: GAME_PHASES.PLAYING,
@@ -155,5 +155,5 @@ test("成功结算至少等待命中粒子播放完成再弹卡片", () => {
 
   settlement.settle(true, null, 760);
 
-  assert.equal(timers[0].delay >= 1500, true);
+  assert.equal(timers[0].delay >= 2400, true);
 });

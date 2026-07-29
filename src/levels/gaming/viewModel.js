@@ -18,11 +18,11 @@ export function createTutorialViewModel(state) {
     resourceText: "∞",
     clue: getClue(state.phase),
     hideClue: false,
-    attackIcon: "打",
+    attackIcon: "拳",
     theme: "tutorial",
     attackLocked: state.phase === "move",
     attackPulse: state.phase === "attack",
-    joystickGuide: state.phase === "move",
+    joystickGuide: false,
     resultResource: {
       label: "出拳",
       value: "∞",

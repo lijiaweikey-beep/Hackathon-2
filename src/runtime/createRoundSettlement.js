@@ -1,6 +1,6 @@
 import { GAME_PHASES } from "../core/gamePhase.js";
 
-const MIN_WIN_SETTLEMENT_DELAY_MS = 1600;
+const MIN_WIN_SETTLEMENT_DELAY_MS = 2400;
 
 export function createRoundSettlement(dependencies) {
   const timerHost = dependencies.timerHost ?? globalThis;

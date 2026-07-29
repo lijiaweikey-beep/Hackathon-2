@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import gamingDefinition from "../../src/levels/gaming/definition.js";
+import { createTutorialViewModel } from "../../src/levels/gaming/viewModel.js";
 
 test("凌晨三点关卡使用插件生命周期", () => {
   assert.equal(gamingDefinition.legacy, false);
@@ -30,14 +31,18 @@ test("凌晨三点提示不再引导玩家找声音", async () => {
   assert.match(serializedDefinition, /全身发光/);
 });
 
-test("凌晨三点使用绿色移动引导", async () => {
+test("凌晨三点不再显示绿色摇杆引导", async () => {
   const [css, viewSource, createLevelSource] = await Promise.all([
     readFile(new URL("../../src/levels/gaming/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/gaming/view.js", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/gaming/createLevel.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(css, /tutorial-joystick|tutorial-ring|tutorial-finger|tutorial-guide/);
-  assert.match(viewSource, /tutorialJoystickGuide/);
-  assert.match(createLevelSource, /placeWaypoint|showMoveTutorial|TUTORIAL_MOVE_HOLD_SECONDS/);
+  assert.doesNotMatch(css, /tutorial-joystick|tutorial-ring|tutorial-finger|tutorial-guide/);
+  assert.doesNotMatch(viewSource, /showOverlay\("tutorialJoystickGuide"/);
+  assert.match(createLevelSource, /placeWaypoint|TUTORIAL_MOVE_HOLD_SECONDS/);
+});
+
+test("凌晨三点攻击按钮文案使用统一拳按钮", () => {
+  assert.equal(createTutorialViewModel({ phase: "attack" }).attackIcon, "拳");
 });

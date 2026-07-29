@@ -119,19 +119,21 @@ test("凌晨三点插件生成目标和剩余路人", () => {
 
   assert.deepEqual(records.created.map(({ id }) => id), [0, 1, 2, 3]);
   assert.equal(records.created[0].flags.gamingTarget, true);
-  assert.notEqual(records.target.levelManaged, true);
+  assert.equal(records.target.levelManaged, true);
   assert.equal(records.target.script, undefined);
   assert.equal(records.target.markIntensity, 0.7);
-  assert.equal(records.target.group.position.x, 4);
+  assert.equal(records.target.group.position.x, 0.4);
+  assert.equal(records.target.group.position.z, 8.2);
 });
 
-test("凌晨三点目标交给通用游走系统随机移动", () => {
+test("凌晨三点目标固定在可见电脑位不参与通用游走", () => {
   const { context, records } = createFakeContext({ npcCount: 2 });
   const level = createGamingLevel(context);
   level.start();
   level.update(3);
 
   assert.equal(records.target.script, undefined);
+  assert.equal(records.target.levelManaged, true);
   assert.equal(records.moveCalls, 0);
   assert.equal(records.target.markIntensity, 0.7);
   assert.equal(records.environmentUpdates, 1);

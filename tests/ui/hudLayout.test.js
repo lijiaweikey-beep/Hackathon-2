@@ -111,17 +111,16 @@ test("手机横屏短高度事件轴卡片不被底部裁切", async () => {
   assert.match(compactRule, /\.history-node-enter\s*\{[\s\S]*white-space:\s*nowrap/);
 });
 
-test("第一关使用教学攻击按钮动画，其它关卡不覆盖攻击按钮外观", async () => {
+test("关卡主题不覆盖攻击按钮动画和外观", async () => {
   const [gamingCss, officeCss, bloodmoonCss] = await Promise.all([
     readFile(new URL("../../src/levels/gaming/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/office/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/bloodmoon/styles.css", import.meta.url), "utf8"),
   ]);
-  const otherLevelCss = [officeCss, bloodmoonCss].join("\n");
+  const allLevelCss = [gamingCss, officeCss, bloodmoonCss].join("\n");
 
-  assert.match(gamingCss, /\.attack-button\[data-level-theme="tutorial"\]/);
-  assert.match(gamingCss, /tutorial-attack-pulse|tutorial-pulse|tutorial-locked/);
-  assert.doesNotMatch(otherLevelCss, /\.attack-button\[data-level-theme=/);
+  assert.doesNotMatch(allLevelCss, /\.attack-button\[data-level-theme=/);
+  assert.doesNotMatch(allLevelCss, /tutorial-attack-pulse/);
 });
 
 test("电脑横屏结算页与手机横屏使用同一套分区尺寸", async () => {
