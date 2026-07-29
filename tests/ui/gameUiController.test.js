@@ -175,3 +175,30 @@ test("结算页使用关卡等级贴图和节点文案", () => {
   assert.equal(ui.resultCopy.textContent, "宿舍安静了。");
   assert.equal(background.image, 'url("grade-s.jpg")');
 });
+
+test("置顶提示直接显示在上方且不播放中间浮动动画", () => {
+  const clueBar = {
+    textContent: "",
+    classList: createClassList(),
+    offsetWidth: 0,
+  };
+  const controller = createGameUiController({
+    ui: {
+      clueBar,
+      taskModal: { classList: createClassList() },
+      resultModal: { classList: createClassList() },
+      shareModal: { classList: createClassList() },
+    },
+    session: { levelState: { level: {}, remaining: 10, attempts: 3 } },
+    levelViewHost: { clear() {}, setTheme() {} },
+  });
+
+  controller.updateHud({
+    clue: "打我鹅腿阿姨干嘛",
+    cluePlacement: "top",
+  });
+
+  assert.equal(clueBar.textContent, "打我鹅腿阿姨干嘛");
+  assert.equal(clueBar.classList.contains("floated"), true);
+  assert.equal(clueBar.classList.contains("char-pop"), false);
+});

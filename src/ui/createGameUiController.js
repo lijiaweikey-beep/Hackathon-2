@@ -65,6 +65,18 @@ export function createGameUiController(dependencies) {
     }, 110);
   }
 
+  function showClueAtTop(text) {
+    clueTypeTarget = text;
+    if (clueTypeTimer) clearInterval(clueTypeTimer);
+    if (clueFloatTimer) clearTimeout(clueFloatTimer);
+    clueTypeTimer = null;
+    clueFloatTimer = null;
+    if (!ui.clueBar) return;
+    ui.clueBar.textContent = text || "";
+    ui.clueBar.classList.remove("char-pop");
+    ui.clueBar.classList.toggle("floated", Boolean(text));
+  }
+
   function getStoryStats() {
     const mainline = dependencies.levelRegistry?.mainline ?? [];
     return {
@@ -253,7 +265,8 @@ export function createGameUiController(dependencies) {
     if (ui.clueBar) {
       const newClue = viewModel?.clue
         ?? (viewModel?.hideClue ? "" : `🔍 ${level.hudClue || level.clue || ""}`);
-      typeClueCharByChar(newClue);
+      if (viewModel?.cluePlacement === "top") showClueAtTop(newClue);
+      else typeClueCharByChar(newClue);
       ui.clueBar.classList?.toggle(
         "hidden",
         viewModel?.hideClue || (Boolean(mechanicHintHtml) && !mechanicVisible),

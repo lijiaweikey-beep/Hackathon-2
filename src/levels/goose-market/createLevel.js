@@ -19,6 +19,7 @@ export function createGooseMarketLevel(context) {
   let duckCount = 0;
   let remainingDucks = 0;
   let mistakeHintTimer = 0;
+  let defaultClueShouldStayTop = false;
 
   function addVendor(id, isGoose) {
     const npc = context.actors.createNpc(id, {
@@ -36,6 +37,7 @@ export function createGooseMarketLevel(context) {
     duckCount = Math.floor(context.random.range(mix.duckMin, mix.duckMax));
     remainingDucks = duckCount;
     mistakeHintTimer = 0;
+    defaultClueShouldStayTop = false;
     for (let id = 0; id < mix.gooseCount; id += 1) {
       addVendor(id, true);
     }
@@ -69,10 +71,14 @@ export function createGooseMarketLevel(context) {
   }
 
   function createViewModel() {
+    const showingMistakeHint = mistakeHintTimer > 0;
     return {
       resourceLabel: "剩余鸭腿",
       resourceText: String(remainingDucks),
-      clue: mistakeHintTimer > 0 ? MISTAKE_HINT : DEFAULT_CLUE,
+      clue: showingMistakeHint ? MISTAKE_HINT : DEFAULT_CLUE,
+      cluePlacement: showingMistakeHint || defaultClueShouldStayTop
+        ? "top"
+        : undefined,
       resultResource: {
         label: "剩余鸭腿",
         value: `${remainingDucks} 个`,
@@ -98,6 +104,7 @@ export function createGooseMarketLevel(context) {
 
   function handleGooseHit() {
     mistakeHintTimer = MISTAKE_HINT_SECONDS;
+    defaultClueShouldStayTop = true;
     context.combat.triggerShake(0.12, 0.1);
     context.audio.playSound("miss");
     context.ui.refreshHud();
@@ -131,6 +138,7 @@ export function createGooseMarketLevel(context) {
       duckCount = 0;
       remainingDucks = 0;
       mistakeHintTimer = 0;
+      defaultClueShouldStayTop = false;
     },
   };
 }

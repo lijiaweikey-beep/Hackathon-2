@@ -221,6 +221,9 @@ test("误打鹅腿给出提示且只让下一拳延后半秒", () => {
   const level = createGooseMarketLevel(context);
   level.start();
   const goose = records.created.find(({ npc }) => npc.isGoose).npc;
+  const openingHud = level.handleAction({ type: "getHudState" });
+
+  assert.equal(openingHud.cluePlacement, undefined);
 
   const result = level.handleAction({
     type: "hitTarget",
@@ -234,6 +237,14 @@ test("误打鹅腿给出提示且只让下一拳延后半秒", () => {
     level.handleAction({ type: "getHudState" }).clue,
     "打我鹅腿阿姨干嘛",
   );
+  assert.equal(level.handleAction({ type: "getHudState" }).cluePlacement, "top");
+  level.update(3.1);
+  const restoredHud = level.handleAction({ type: "getHudState" });
+  assert.equal(
+    restoredHud.clue,
+    "🔍 探照灯下发绿的是鸭腿阿姨，打爆全部鸭腿才通关，踩中绿色光圈，会触发五盏探照灯",
+  );
+  assert.equal(restoredHud.cluePlacement, "top");
   assert.deepEqual(level.handleAction({ type: "beforeAttack" }), {
     blocked: false,
     cooldown: 2,
