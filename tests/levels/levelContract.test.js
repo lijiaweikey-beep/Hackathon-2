@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { validateLevelDefinition } from "../../src/levels/levelContract.js";
 import { isLevelAction } from "../../src/levels/actions.js";
 
-test("关卡动作契约支持进入正式游戏", () => {
+test("关卡动作契约支持进入正式体验", () => {
   assert.equal(isLevelAction("beginPlay"), true);
 });
 

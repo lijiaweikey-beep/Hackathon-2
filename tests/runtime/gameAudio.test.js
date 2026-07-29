@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createGameAudio } from "../../src/runtime/createGameAudio.js";
 
-test("游戏音频按名称播放并支持延迟", () => {
+test("体验音频按名称播放并支持延迟", () => {
   const calls = [];
   const audio = createGameAudio({
     sounds: {
@@ -22,7 +22,7 @@ test("游戏音频按名称播放并支持延迟", () => {
   assert.deepEqual(calls, [80, "hit", "win"]);
 });
 
-test("游戏音频提供运行时依赖适配对象", () => {
+test("体验音频提供运行时依赖适配对象", () => {
   const calls = [];
   const audio = createGameAudio({
     sounds: {

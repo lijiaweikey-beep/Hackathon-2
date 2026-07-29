@@ -22,7 +22,7 @@ export function canTransition(from, to) {
 
 export function transitionPhase(from, to) {
   if (!canTransition(from, to)) {
-    throw new Error(`非法游戏状态跳转：${from} → ${to}`);
+    throw new Error(`非法体验状态跳转：${from} → ${to}`);
   }
   return to;
 }

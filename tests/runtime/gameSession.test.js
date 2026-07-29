@@ -3,7 +3,7 @@ import test from "node:test";
 import { GAME_PHASES } from "../../src/core/gamePhase.js";
 import { createGameSession } from "../../src/runtime/createGameSession.js";
 
-test("游戏会话统一管理阶段、关卡和结算结果", () => {
+test("体验会话统一管理阶段、关卡和结算结果", () => {
   const session = createGameSession();
   const levelState = { level: { id: "sample" } };
 
@@ -18,7 +18,7 @@ test("游戏会话统一管理阶段、关卡和结算结果", () => {
   assert.deepEqual(session.result, { won: true });
   assert.throws(
     () => session.transition(GAME_PHASES.LEVEL_SELECT),
-    /非法游戏状态跳转/,
+    /非法体验状态跳转/,
   );
 });
 

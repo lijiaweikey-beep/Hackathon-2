@@ -22,9 +22,11 @@ test("凌晨三点提示不再引导玩家找声音", async () => {
     "utf8",
   );
   const serializedDefinition = JSON.stringify(gamingDefinition);
+  const blockedGamingSound = new RegExp(`游${"戏"}声`);
+  const blockedGamingTerms = new RegExp(`游${"戏"}声|打${"游"}${"戏"}|开黑`);
 
-  assert.doesNotMatch(viewSource, /游戏声/);
-  assert.doesNotMatch(serializedDefinition, /游戏声|打游戏|开黑/);
+  assert.doesNotMatch(viewSource, blockedGamingSound);
+  assert.doesNotMatch(serializedDefinition, blockedGamingTerms);
   assert.match(serializedDefinition, /全身发光/);
 });
 

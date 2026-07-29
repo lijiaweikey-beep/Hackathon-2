@@ -17,7 +17,7 @@ test("输入控制器统一提供方向快照和动作节流", () => {
   assert.equal(input.consumeAction(), false);
 });
 
-test("游戏进行中连续反向按键沿用动作间隔限制", () => {
+test("体验进行中连续反向按键沿用动作间隔限制", () => {
   const windowTarget = new EventTarget();
   const joystick = new EventTarget();
   joystick.setPointerCapture = () => {};

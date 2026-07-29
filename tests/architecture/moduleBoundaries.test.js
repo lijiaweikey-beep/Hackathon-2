@@ -27,7 +27,7 @@ async function readTreeSources(root) {
   return sources;
 }
 
-test("游戏入口只负责组装且保持精简", async () => {
+test("体验入口只负责组装且保持精简", async () => {
   const source = await readSource("main.js");
   assert.ok(source.split("\n").length <= 250);
   assert.doesNotMatch(

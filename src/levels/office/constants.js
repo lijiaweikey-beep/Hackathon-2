@@ -9,7 +9,7 @@ export const OFFICE_RAMP_SECONDS = 70;
 
 // 同一时刻并存的黑锅数：每5秒多1口，直到占满80%屏幕
 export const OFFICE_WOK_INCREMENT_SECONDS = 5;
-// 80%屏幕上限：游戏区 20x13=260，单锅影响区 π*1.2²≈4.52 → floor(208/4.52)≈46
+// 80%屏幕上限：互动区 20x13=260，单锅影响区 π*1.2²≈4.52 → floor(208/4.52)≈46
 const PLAY_AREA = 20 * 13;
 const WOK_AREA = Math.PI * 1.2 * 1.2;
 export const OFFICE_MAX_WOKS_CAP = Math.floor(0.8 * PLAY_AREA / WOK_AREA);
@@ -25,4 +25,3 @@ export const OFFICE_WOK_FALL_START = 1.2;
 export const OFFICE_WOK_FALL_END = 0.85;
 
 // 开局：前几秒只掉单口锅，新系统从1开始自然宽松
-

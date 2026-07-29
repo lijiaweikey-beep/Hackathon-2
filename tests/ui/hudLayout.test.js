@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("游戏内隐藏任务和目标特征提示条", async () => {
+test("互动内隐藏任务和目标特征提示条", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const topbarRule = css.match(/\.topbar\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const missionRule = css.match(/\.mission-strip\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
@@ -26,7 +26,7 @@ test("难度选择位于事件轴右上角且任务卡不展示人数和玩法�
   assert.doesNotMatch(taskModal, /class="task-controls-guide"/);
 });
 
-test("隐藏弹窗不拦截游戏内按钮", async () => {
+test("隐藏弹窗不拦截互动内按钮", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const modalRule = css.match(/\.modal\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const visibleRule = css.match(/\.modal\.visible\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
