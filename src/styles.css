@@ -507,55 +507,6 @@ button {
   min-width: 0;
 }
 
-.life-report-entry {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  padding: 0 20px;
-  border: 3px solid var(--ink);
-  border-radius: 12px;
-  background: url("./assets/ui/entry-halflife.jpg") center 58% / cover no-repeat;
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  pointer-events: auto;
-  overflow: hidden;
-  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-}
-
-.life-report-entry:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: var(--shadow);
-}
-
-.life-report-entry:active {
-  transform: translate(1px, 1px);
-  box-shadow: none;
-}
-
-.life-report-entry-text {
-  color: #fff;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  white-space: nowrap;
-  text-shadow:
-    -1px -1px 0 var(--ink),
-    1px -1px 0 var(--ink),
-    -1px 1px 0 var(--ink),
-    1px 1px 0 var(--ink),
-    2px 2px 0 rgba(24, 22, 18, 0.4);
-}
-
-/* 未集齐全 A：入口锁定态 */
-.life-report-entry.locked {
-  filter: grayscale(0.85);
-}
-
-.life-report-entry.locked .life-report-entry-text::before {
-  content: "🔒 ";
-}
-
 .level-section-label {
   margin: 2px 4px 0;
   font-size: 11px;
@@ -778,9 +729,12 @@ button {
   top: var(--axis-center);
   transform: translateY(-50%);
   width: 228px;
-  min-height: 276px;
+  /* 固定卡高，保证事件轴所有卡片尺寸一致 */
+  height: 354px;
   display: grid;
-  align-content: start;
+  /* 固定五行：年龄 / 图片 / 标题 / 文案 / 进入按钮，各组分跨卡片同位对齐 */
+  grid-template-rows: 24px 84px 50px 84px 34px;
+  align-content: center;
   gap: 10px;
   padding: 18px 17px 20px;
   border-radius: 22px;
@@ -832,7 +786,7 @@ button {
 /* ---- 节点入口与二级入口 ---- */
 .history-node-enter {
   justify-self: center;
-  margin-top: 2px;
+  align-self: center;
   padding: 6px 16px;
   border-radius: 999px;
   border: 2px solid var(--ink);
@@ -848,8 +802,8 @@ button {
   position: absolute;
   z-index: 2;
   left: calc(var(--x) + 178px);
-  /* 卡片中心在轴心，卡高 276px：右上角 = 轴心 - 138px + 12px */
-  top: calc(var(--axis-center) - 126px);
+  /* 卡片中心在轴心，卡高 354px：右上角 = 轴心 - 177px + 12px */
+  top: calc(var(--axis-center) - 165px);
   width: 38px;
   height: 38px;
   border-radius: 50%;
@@ -866,7 +820,7 @@ button {
   box-shadow: 0 0 0 var(--ink);
 }
 
-/* ---- 人生之外分隔 ---- */
+/* ---- 半生通关入口（顶替原“人生之外”分隔，形态不变） ---- */
 .history-track-divider {
   position: absolute;
   z-index: 1;
@@ -877,23 +831,33 @@ button {
   place-items: center;
   width: 44px;
   padding: 12px 0;
+  /* button 元素默认边框收干净，只留左右虚线 */
+  border: 0;
   border-left: 3px dashed rgba(37, 36, 42, 0.34);
   border-right: 3px dashed rgba(37, 36, 42, 0.34);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.55);
   color: var(--deep);
+  font-family: inherit;
   font-size: 15px;
   font-weight: 900;
   letter-spacing: 0.3em;
   writing-mode: vertical-rl;
   text-orientation: upright;
   transform: translateX(-50%);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.history-track-divider.unlocked:hover {
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .history-track-divider.locked {
   color: rgba(37, 36, 42, 0.55);
   background: rgba(255, 255, 255, 0.42);
+  cursor: default;
 }
 
 .history-track-divider.locked::after {
@@ -918,6 +882,7 @@ button {
 
 .history-node-age {
   display: inline-block;
+  align-self: center;
   padding: 2px 10px;
   border-radius: 999px;
   background: var(--sun);
@@ -981,6 +946,7 @@ button {
 /* ---- 待解锁徽章 ---- */
 .history-node-badge {
   justify-self: center;
+  align-self: center;
   display: inline-block;
   padding: 2px 10px;
   border-radius: 4px;
@@ -1001,6 +967,8 @@ button {
 
 .history-node-name {
   justify-self: center;
+  /* 标题在固定行带内垂直居中：单行卡与双行卡视觉基线一致 */
+  align-self: center;
   text-align: center;
   white-space: pre-line;
   font-size: 21px;
@@ -1008,6 +976,8 @@ button {
 }
 
 .history-node-copy {
+  /* 文案行带顶部对齐：所有卡片文字起始高度一致 */
+  align-self: start;
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
@@ -2350,15 +2320,8 @@ button {
     letter-spacing: 0.1em;
   }
 
-  .life-report-entry {
-    height: 28px;
-    padding: 0 10px;
-    border-width: 2px;
-  }
-
-  .life-report-entry-text {
-    font-size: 12px;
-    letter-spacing: 0.12em;
+  .history-title-group {
+    gap: 8px;
   }
 
   .history-build-meta {
@@ -2614,17 +2577,6 @@ button {
     letter-spacing: 0.08em;
   }
 
-  .life-report-entry {
-    height: 28px;
-    padding: 0 10px;
-    border-width: 2px;
-  }
-
-  .life-report-entry-text {
-    font-size: 12px;
-    letter-spacing: 0.12em;
-  }
-
   .history-build-meta {
     gap: 1px;
     font-size: 10px;
@@ -2658,6 +2610,8 @@ button {
     width: 144px;
     min-height: 0;
     height: 168px;
+    /* 紧凑五行模板：年龄 / 图片 / 标题 / 文案 / 进入按钮 */
+    grid-template-rows: 20px 42px 30px 14px 26px;
     gap: 5px;
     padding: 8px 9px;
     border-radius: 12px;
@@ -2686,7 +2640,7 @@ button {
   }
 
   .history-node-enter {
-    align-self: end;
+    align-self: center;
     white-space: nowrap;
     padding: 3px 8px;
     font-size: 10px;

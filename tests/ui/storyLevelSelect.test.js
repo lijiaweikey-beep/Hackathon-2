@@ -138,23 +138,22 @@ test("人生事件轴在主线全通后展开番外并允许进入", () => {
   assert.deepEqual(entered, ["extra"]);
 });
 
-test("全部主线完成后半生通关入口出现在标题旁", () => {
+test("全部主线完成且集齐全 A 后事件轴半生通关入口可打开人生线报告", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement };
-  const lifeReportEntry = { hidden: true, classList: createClassList() };
+  const historyTrack = createTrack();
   let opened = 0;
 
   try {
     const controller = createHistoryTimelineController({
       ui: {
         historyTimelineModal: { classList: createClassList(), addEventListener() {} },
-        historyTrack: createTrack(),
+        historyTrack,
         historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
         historyStatusText: { textContent: "" },
         historyNodeDetail: { innerHTML: "" },
-        lifeReportEntry,
       },
-      levels: [level("age-19", 19)],
+      levels: [level("age-19", 19), level("extra", null, "extra")],
       storyProgress: {
         isComplete: () => true,
         isUnlocked: () => true,
@@ -170,20 +169,18 @@ test("全部主线完成后半生通关入口出现在标题旁", () => {
     globalThis.document = previousDocument;
   }
 
-  assert.equal(lifeReportEntry.hidden, false);
-  assert.equal(lifeReportEntry.classList.contains("locked"), false);
-  assert.equal(opened, 0);
+  const divider = historyTrack.querySelectorAll(".history-track-divider")[0];
+  assert.equal(divider.tagName, "button");
+  assert.equal(divider.textContent, "半生通关");
+  assert.match(divider.className, /unlocked/);
+  divider.dispatchEvent({ type: "click", stopPropagation() {} });
+  assert.equal(opened, 1);
 });
 
 test("未集齐全 A 时半生通关入口呈锁定态", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement };
-  const entryListeners = new Map();
-  const lifeReportEntry = {
-    hidden: true,
-    classList: createClassList(),
-    addEventListener: (type, listener) => entryListeners.set(type, listener),
-  };
+  const historyTrack = createTrack();
   const historyStatusText = { textContent: "" };
   let opened = 0;
 
@@ -191,13 +188,12 @@ test("未集齐全 A 时半生通关入口呈锁定态", () => {
     const controller = createHistoryTimelineController({
       ui: {
         historyTimelineModal: { classList: createClassList(), addEventListener() {} },
-        historyTrack: createTrack(),
+        historyTrack,
         historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
         historyStatusText,
         historyNodeDetail: { innerHTML: "" },
-        lifeReportEntry,
       },
-      levels: [level("age-19", 19)],
+      levels: [level("age-19", 19), level("extra", null, "extra")],
       storyProgress: {
         isComplete: () => true,
         isUnlocked: () => true,
@@ -208,15 +204,16 @@ test("未集齐全 A 时半生通关入口呈锁定态", () => {
       isLifeReportReady: () => false,
       onOpenLifeReport: () => { opened += 1; },
     });
-    controller.bind();
     controller.showBrowse();
-    entryListeners.get("click")?.({ stopPropagation() {} });
+    const divider = historyTrack.querySelectorAll(".history-track-divider")[0];
+    assert.equal(divider.textContent, "半生通关");
+    assert.doesNotMatch(divider.className, /unlocked/);
+    assert.match(divider.className, /locked/);
+    divider.dispatchEvent({ type: "click", stopPropagation() {} });
   } finally {
     globalThis.document = previousDocument;
   }
 
-  assert.equal(lifeReportEntry.hidden, false);
-  assert.equal(lifeReportEntry.classList.contains("locked"), true);
   assert.equal(opened, 0);
   assert.match(historyStatusText.textContent, /A 级/);
 });

@@ -290,15 +290,25 @@ export function createHistoryTimelineController({
     ui.historyTrack.appendChild(axis);
 
     if (hasExtra) {
-      const extraUnlocked = isExtraUnlocked();
-      const divider = document.createElement("span");
-      divider.className = `history-track-divider ${extraUnlocked ? "unlocked" : "locked"}`;
-      divider.textContent = "人生之外";
-      divider.setAttribute("aria-label", extraUnlocked ? "人生之外已解锁" : "人生之外未解锁");
+      // “半生通关”入口顶替原“人生之外”分隔：形态不变，锁定/点击走人生报告逻辑。
+      const reportReady = isLifeReportReady?.() ?? true;
+      const divider = document.createElement("button");
+      divider.type = "button";
+      divider.className = `history-track-divider ${reportReady ? "unlocked" : "locked"}`;
+      divider.textContent = "半生通关";
+      divider.setAttribute("aria-label", reportReady ? "查看人生线报告" : "半生通关未解锁");
       divider.style.setProperty(
         "--x",
         `${TRACK_PADDING + firstExtraIndex * NODE_GAP + EXTRA_GAP / 2 + 40}px`,
       );
+      divider.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (isLifeReportReady?.() ?? true) {
+          onOpenLifeReport?.();
+          return;
+        }
+        setStatus("五关全部拿到 A 级以上，才能解锁人生线报告");
+      });
       ui.historyTrack.appendChild(divider);
     }
 
@@ -312,14 +322,6 @@ export function createHistoryTimelineController({
   function renderHeader() {
     if (ui.historyVersionText) ui.historyVersionText.textContent = version;
     if (ui.historyStampText) ui.historyStampText.textContent = formatStamp(clock());
-    if (ui.lifeReportEntry) {
-      // 半生通关入口：主线全通后常驻标题旁；未集齐全 A 时呈锁定态。
-      ui.lifeReportEntry.hidden = !(storyProgress.isComplete?.() ?? false);
-      ui.lifeReportEntry.classList?.toggle(
-        "locked",
-        !(isLifeReportReady?.() ?? true),
-      );
-    }
   }
 
   function render({ mode = "browse" } = {}) {
@@ -393,7 +395,8 @@ export function createHistoryTimelineController({
       progress: getMainlineProgress(),
     };
     renderShareCard(canvas, payload);
-    const artSrc = level.art?.grades?.[best?.grade];
+    // 番外关统一保留手绘卡面（与“超市取证”一致），不再贴等级图。
+    const artSrc = level.track === "extra" ? null : level.art?.grades?.[best?.grade];
     if (!artSrc || typeof Image !== "function") return;
     const image = new Image();
     image.onload = () => {
@@ -563,14 +566,6 @@ export function createHistoryTimelineController({
   }
 
   function bind() {
-    ui.lifeReportEntry?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (isLifeReportReady?.() ?? true) {
-        onOpenLifeReport?.();
-        return;
-      }
-      setStatus("五关全部拿到 A 级以上，才能解锁人生线报告");
-    });
     ui.historyTimelineModal?.addEventListener("click", () => {
       if (ui.historyDetailModal?.classList.contains("visible")) return;
       if (lastPointerMoved) return;

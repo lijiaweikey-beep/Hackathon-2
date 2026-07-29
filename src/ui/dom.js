@@ -9,7 +9,6 @@ export const ui = {
   timerText: document.querySelector("#timerText"),
   attemptText: document.querySelector("#attemptText"),
   clueBar: document.querySelector("#clueBar"),
-  lifeReportEntry: document.querySelector("#lifeReportEntry"),
   historyTimelineModal: document.querySelector("#historyTimelineModal"),
   historyVersionText: document.querySelector("#historyVersionText"),
   historyStampText: document.querySelector("#historyStampText"),
