@@ -6,7 +6,7 @@ export function createClassicExperience(dependencies) {
 
   function update(deltaSeconds) {
     if (dependencies.consumeHitstop?.(deltaSeconds)) {
-      finishEffects(deltaSeconds);
+      dependencies.updateShake?.(deltaSeconds);
       return;
     }
     const frame = dependencies.updateLevel?.(deltaSeconds);

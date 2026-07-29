@@ -27,10 +27,6 @@ export function createFxSystem({
       return [...pixelMaterials.values()].includes(material);
     },
 
-    hasActiveParticles() {
-      return particles.length > 0;
-    },
-
     createPixelBurst(actor) {
       const scene = getScene();
       if (!scene) return;

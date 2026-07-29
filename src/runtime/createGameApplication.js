@@ -288,7 +288,6 @@ export function boot() {
     session,
     getPlayer: () => player,
     hasScene: () => Boolean(experienceManager.active),
-    hasPendingEffects: () => fx?.hasActiveParticles() ?? false,
     getTotalTime: () => totalTime,
     getResultStats: () => experienceManager.getResultStats(),
     calculateRating: calcRating,
