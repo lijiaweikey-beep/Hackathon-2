@@ -74,6 +74,7 @@ export const ui = {
   backFromPauseButton: document.querySelector("#backFromPauseButton"),
   backFromTaskButton: document.querySelector("#backFromTaskButton"),
   attemptLabel: document.querySelector("#attemptLabel"),
+  joystickHitArea: document.querySelector("#joystickHitArea"),
   joystick: document.querySelector("#joystick"),
   joystickKnob: document.querySelector("#joystickKnob"),
   attackButton: document.querySelector("#attackButton"),
