@@ -269,7 +269,8 @@ export function createHistoryTimelineController({
       divider.setAttribute("aria-label", reportReady ? "查看人生线报告" : "半生通关未解锁");
       divider.style.setProperty(
         "--x",
-        `${TRACK_PADDING + firstExtraIndex * NODE_GAP + EXTRA_GAP / 2 + 40}px`,
+        // 胶囊中心落在第五关卡右缘与首张番外卡左缘的正中（卡宽 228）。
+        `${TRACK_PADDING + firstExtraIndex * NODE_GAP + (228 - NODE_GAP + EXTRA_GAP) / 2}px`,
       );
       divider.addEventListener("click", (event) => {
         event.stopPropagation();

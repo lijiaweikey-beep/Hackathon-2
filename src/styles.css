@@ -724,7 +724,8 @@ button {
 }
 
 .history-axis-glyph.start {
-  left: 0;
+  /* 左移少许，避免被第一张关卡卡片左缘遮住 */
+  left: -24px;
 }
 
 .history-axis-glyph.end {
