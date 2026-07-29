@@ -58,7 +58,7 @@ function level(id, age, track = "mainline") {
   };
 }
 
-test("人生事件轴在主线未全通时折叠番外关卡", () => {
+test("人生事件轴在主线未全通时渲染并锁住番外关卡", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement };
   const historyTrack = createTrack();
@@ -90,7 +90,8 @@ test("人生事件轴在主线未全通时折叠番外关卡", () => {
   const cards = historyTrack.querySelectorAll(".history-node-card");
   assert.match(cards[0].className, /open/);
   assert.match(cards[1].className, /fog/);
-  assert.equal(cards.length, 2);
+  assert.equal(cards.length, 3);
+  assert.match(cards[2].className, /fog/);
   assert.match(historyTrack.querySelectorAll(".history-track-divider")[0].className, /locked/);
 });
 

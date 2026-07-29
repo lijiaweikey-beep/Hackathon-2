@@ -292,11 +292,7 @@ export function createHistoryTimelineController({
       ui.historyTrack.appendChild(divider);
     }
 
-    const visibleLevels = isExtraUnlocked()
-      ? levels
-      : levels.filter((level) => level.track === "mainline");
-
-    visibleLevels.forEach((level, index) => {
+    levels.forEach((level, index) => {
       appendNodeCard(level, index, {
         x: TRACK_PADDING + index * NODE_GAP + shiftAt(index),
         y: NODE_ROWS[index % NODE_ROWS.length],
