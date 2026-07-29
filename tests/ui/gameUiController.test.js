@@ -15,11 +15,12 @@ function createClassList() {
   };
 }
 
-test("界面控制器独立切换选关界面并刷新抬头信息", () => {
+test("界面控制器回到首页时交给人生事件轴并刷新抬头信息", () => {
+  let homeShown = false;
   const ui = {
-    levelSelectModal: { classList: createClassList() },
     taskModal: { classList: createClassList() },
     resultModal: { classList: createClassList() },
+    shareModal: { classList: createClassList() },
     missionText: { textContent: "" },
     timerText: { textContent: "" },
   };
@@ -27,66 +28,65 @@ test("界面控制器独立切换选关界面并刷新抬头信息", () => {
     ui,
     session: { levelState: { level: {}, remaining: 10, attempts: 3 } },
     levelViewHost: { clear() {}, setTheme() {} },
+    onHomeShown: () => { homeShown = true; },
   });
 
-  controller.showLevelSelect();
+  controller.showHome();
   controller.updateHud({ mission: "测试任务", timerText: "10" });
 
-  assert.equal(ui.levelSelectModal.classList.contains("visible"), true);
+  assert.equal(homeShown, true);
   assert.equal(ui.missionText.textContent, "测试任务");
   assert.equal(ui.timerText.textContent, "10");
 });
 
-test("选关卡片只用通用类名和关卡数据配色", () => {
-  const previousDocument = globalThis.document;
-  const properties = new Map();
-  const cards = [];
-  globalThis.document = {
-    createElement() {
-      return {
-        className: "",
-        dataset: {},
-        style: {
-          setProperty(name, value) {
-            properties.set(name, value);
-          },
-        },
-        addEventListener() {},
-      };
-    },
-  };
+test("结算页使用关卡等级贴图和节点文案", () => {
+  const background = {};
   const ui = {
-    levelCards: {
-      innerHTML: "",
-      appendChild(card) {
-        cards.push(card);
-      },
+    resultTitle: { textContent: "" },
+    resultCopy: { textContent: "" },
+    resultLevelTag: { textContent: "" },
+    resultAgeTag: { textContent: "" },
+    resultNodeTitle: { textContent: "" },
+    resultUnlock: { textContent: "" },
+    resultArt: {
+      style: { set backgroundImage(value) { background.image = value; } },
+      classList: createClassList(),
     },
-    levelSelectModal: { classList: createClassList() },
-    taskModal: { classList: createClassList() },
+    resultRating: { textContent: "", className: "" },
+    statTime: { textContent: "" },
+    statAttempts: { textContent: "", classList: createClassList() },
+    statAttemptsLabel: { textContent: "" },
+    retryButton: { disabled: true, textContent: "" },
     resultModal: { classList: createClassList() },
+    taskModal: { classList: createClassList() },
   };
   const level = {
-    id: "custom",
-    sceneName: "自定义",
-    emoji: "🎮",
-    difficulty: 1,
-    cardDesc: "不同玩法",
-    cardStyle: { accent: "#123456", glow: "rgba(1, 2, 3, .4)" },
+    id: "gaming",
+    age: 19,
+    sceneName: "凌晨三点",
+    success: "成功",
+    failure: "失败",
+    art: { cover: "cover.jpg", grades: { S: "grade-s.jpg" } },
+    nodes: { S: { title: "作息纠察队长", verdict: "宿舍安静了。" } },
   };
+  const controller = createGameUiController({
+    ui,
+    session: { levelState: { level } },
+    levelRegistry: { mainline: [level] },
+    levelViewHost: { clear() {}, setTheme() {} },
+  });
 
-  try {
-    const controller = createGameUiController({
-      ui,
-      session: { levelState: { level: {} } },
-      levelRegistry: { visible: [level] },
-    });
-    controller.showLevelSelect({ leaveLevel: false });
-  } finally {
-    globalThis.document = previousDocument;
-  }
+  controller.showResult({
+    won: true,
+    timeUsed: 12,
+    attemptsLeft: 2,
+    rating: { grade: "S" },
+    level,
+  });
 
-  assert.equal(cards[0].className, "level-card");
-  assert.equal(properties.get("--card-accent"), "#123456");
-  assert.equal(properties.get("--card-glow"), "rgba(1, 2, 3, .4)");
+  assert.equal(ui.resultLevelTag.textContent, "LV.01");
+  assert.equal(ui.resultAgeTag.textContent, "19岁");
+  assert.equal(ui.resultNodeTitle.textContent, "「作息纠察队长」");
+  assert.equal(ui.resultCopy.textContent, "宿舍安静了。");
+  assert.equal(background.image, 'url("grade-s.jpg")');
 });

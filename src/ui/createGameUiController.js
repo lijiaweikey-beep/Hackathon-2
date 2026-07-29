@@ -8,7 +8,7 @@ import {
   parseNpcCountRaw,
   saveMatchNpcCount,
 } from "../utils/storage.js";
-import { createLevelCardModel } from "./levelCardModel.js";
+import { renderShareCard } from "./shareCard.js";
 import { renderTargetPreview } from "./targetPreview.js";
 import { renderTaskModal } from "./taskModal.js";
 
@@ -19,6 +19,17 @@ export function createGameUiController(dependencies) {
     levelViewHost = { clear() {}, setTheme() {} },
   } = dependencies;
   let npcCount = DEFAULT_NPC_COUNT;
+  let lastResult = null;
+
+  function getStoryStats() {
+    const mainline = dependencies.levelRegistry?.mainline ?? [];
+    return {
+      total: mainline.length,
+      unlocked: mainline.filter(
+        ({ id }) => dependencies.storyProgress?.isCompleted(id) ?? false,
+      ).length,
+    };
+  }
 
   function syncNpcCountInput() {
     if (ui.npcCountInput) ui.npcCountInput.value = String(npcCount);
@@ -35,93 +46,32 @@ export function createGameUiController(dependencies) {
     saveMatchNpcCount(npcCount);
   }
 
-  function createLevelCard(level, { locked = false, showAge = false } = {}) {
-    const model = createLevelCardModel(level, {
-      npcCount: getNpcCountPreview(),
-    });
-    const stars = Array.from({ length: 3 }, (_, index) =>
-      `<span class="level-star${index < level.difficulty ? " is-on" : ""}">★</span>`,
-    ).join("");
-    const completed = dependencies.storyProgress?.isCompleted(level.id) ?? false;
-    const card = document.createElement("button");
-    card.className = `level-card${completed ? " completed" : ""}`;
-    card.type = "button";
-    card.dataset.level = level.id;
-    card.disabled = locked;
-    for (const [name, value] of Object.entries(level.cardStyle ?? {})) {
-      card.style.setProperty(`--card-${name}`, value);
-    }
-    card.innerHTML = `
-      <div class="level-card-accent" aria-hidden="true"></div>
-      <div class="level-card-icon">${level.emoji}</div>
-      <div class="level-card-body">
-        <div class="level-card-name">${showAge ? `${level.age} 岁 · ` : ""}${level.sceneName} <span class="level-card-difficulty ${model.difficulty.className}">${model.difficulty.label}</span></div>
-        <div class="level-card-desc">${locked ? "尚未解锁 · 完成上一阶段后开放" : model.description}</div>
-        <div class="level-card-meta">
-          <span class="level-card-stars" aria-label="难度 ${level.difficulty}">${stars}</span>
-          ${completed ? '<span class="level-card-state">已完成</span>' : ""}
-        </div>
-      </div>
-      <div class="level-card-go" aria-hidden="true"><span>${locked ? "🔒" : "›"}</span></div>
-    `;
-    card.addEventListener("click", () => {
-      if (locked) return;
-      commitNpcCountInput();
-      dependencies.onSelectLevel?.(level.id);
-    });
-    return card;
-  }
-
-  function renderTimeline(mainline) {
-    if (!ui.lifeTimeline) return;
-    ui.lifeTimeline.innerHTML = "";
-    mainline.forEach((level) => {
-      const node = document.createElement("span");
-      const unlocked = dependencies.storyProgress?.isUnlocked(level.id) ?? true;
-      const completed = dependencies.storyProgress?.isCompleted(level.id) ?? false;
-      node.className = `life-stage${completed ? " completed" : unlocked ? " active" : " locked"}`;
-      node.textContent = `${level.age} 岁`;
-      ui.lifeTimeline.appendChild(node);
-    });
-  }
-
-  function buildLevelCards() {
-    if (!ui.levelCards || !dependencies.levelRegistry) return;
-    const registry = dependencies.levelRegistry;
-    const grouped = Array.isArray(registry.mainline)
-      && (registry.mainline.length > 0 || Array.isArray(registry.extra));
-    const mainline = grouped ? registry.mainline : registry.visible;
-    const extra = grouped ? (registry.extra ?? []) : [];
-    ui.levelCards.innerHTML = "";
-    if (ui.extraLevelCards) ui.extraLevelCards.innerHTML = "";
-    mainline.forEach((level) => {
-      const locked = !(dependencies.storyProgress?.isUnlocked(level.id) ?? true);
-      ui.levelCards.appendChild(createLevelCard(level, { locked, showAge: true }));
-    });
-    extra.forEach((level) => {
-      (ui.extraLevelCards ?? ui.levelCards).appendChild(createLevelCard(level));
-    });
-    renderTimeline(mainline);
-    if (ui.storyEnding) {
-      ui.storyEnding.hidden = !(dependencies.storyProgress?.isComplete?.() ?? false);
-    }
-    if (ui.npcCountInput) ui.npcCountInput.disabled = false;
-  }
-
-  function showLevelSelect({ leaveLevel = true } = {}) {
+  function showHome({ leaveLevel = true } = {}) {
     if (leaveLevel) dependencies.onLeaveLevel?.();
     syncNpcCountInput();
-    buildLevelCards();
     levelViewHost.clear();
-    ui.levelSelectModal?.classList.add("visible");
     ui.taskModal?.classList.remove("visible");
     ui.resultModal?.classList.remove("visible");
+    ui.shareModal?.classList.remove("visible");
+    dependencies.onHomeShown?.();
   }
 
   function showTask(level = session.levelState.level) {
     renderTaskModal(ui, { level, npcCount });
     renderTargetPreview(ui.targetPreviewCanvas, level);
     updateHud();
+  }
+
+  function getLevelSlug(level) {
+    const mainline = dependencies.levelRegistry?.mainline ?? [];
+    const index = mainline.findIndex(({ id }) => id === level.id);
+    if (index < 0) {
+      return { levelTag: "番外", ageTag: level.axisLabel ?? level.sceneName ?? "" };
+    }
+    return {
+      levelTag: `LV.${String(index + 1).padStart(2, "0")}`,
+      ageTag: level.age != null ? `${level.age}岁` : "",
+    };
   }
 
   function showResult({
@@ -133,10 +83,29 @@ export function createGameUiController(dependencies) {
     rating,
     level = session.levelState.level,
   }) {
-    ui.resultTitle.textContent = won ? "任务成功" : "任务失败";
-    ui.resultCopy.textContent = won
-      ? (level.transition?.success || level.success)
-      : (failMessage || level.failure);
+    lastResult = { won, timeUsed, rating, level };
+    const node = level.nodes?.[rating.grade];
+    const { levelTag, ageTag } = getLevelSlug(level);
+    // 失败原因放在结果行，判词位统一交给等级文案。
+    ui.resultTitle.textContent = won ? "任务成功" : (failMessage || "任务失败");
+    ui.resultCopy.textContent = node?.verdict
+      ?? (won ? (level.transition?.success || level.success) : level.failure);
+    if (ui.resultLevelTag) ui.resultLevelTag.textContent = levelTag;
+    if (ui.resultAgeTag) ui.resultAgeTag.textContent = ageTag;
+    if (ui.resultNodeTitle) {
+      ui.resultNodeTitle.textContent = node?.title ? `「${node.title}」` : "";
+    }
+    if (ui.resultUnlock) {
+      const nodeName = level.axisLabel ?? level.sceneName ?? "";
+      ui.resultUnlock.textContent = won && nodeName
+        ? `新解锁：【${rating.grade} 级 · ${nodeName}】`
+        : "";
+    }
+    if (ui.resultArt) {
+      const artUrl = level.art?.grades?.[rating.grade] ?? level.art?.cover ?? "";
+      ui.resultArt.style.backgroundImage = artUrl ? `url("${artUrl}")` : "";
+      ui.resultArt.classList.toggle("is-empty", !artUrl);
+    }
     ui.resultRating.textContent = rating.grade;
     ui.resultRating.className = `result-rating rating-${rating.grade.toLowerCase()}`;
     ui.statTime.textContent = `${timeUsed} 秒`;
@@ -216,11 +185,9 @@ export function createGameUiController(dependencies) {
     input.addEventListener("input", () => {
       const digits = input.value.replace(/\D/g, "");
       if (input.value !== digits) input.value = digits;
-      buildLevelCards();
     });
     input.addEventListener("blur", () => {
       commitNpcCountInput();
-      buildLevelCards();
     });
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
@@ -240,23 +207,80 @@ export function createGameUiController(dependencies) {
       npcCount = next;
       syncNpcCountInput();
       saveMatchNpcCount(npcCount);
-      buildLevelCards();
     };
     ui.npcCountUp?.addEventListener("click", () => adjust(1));
     ui.npcCountDown?.addEventListener("click", () => adjust(-1));
+  }
+
+  function bindPrelaunch() {
+    if (!ui.prelaunchScreen) return;
+    ui.prelaunchStartButton?.addEventListener("click", () => {
+      ui.prelaunchScreen.classList.add("is-away");
+      dependencies.onPrelaunchDismissed?.();
+    });
+  }
+
+  function loadArtImage(src) {
+    return new Promise((resolve) => {
+      if (!src || typeof Image !== "function") {
+        resolve(null);
+        return;
+      }
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => resolve(null);
+      image.src = src;
+    });
+  }
+
+  async function openShareCard() {
+    if (!ui.shareCanvas || !lastResult) return;
+    const snapshot = lastResult;
+    const { level, won, timeUsed, rating } = snapshot;
+    const payload = {
+      level,
+      result: { won, timeUsed, rating },
+      progress: getStoryStats(),
+    };
+    // 先出手绘版卡面，避开等图片的空白；贴图到位后再重绘一次。
+    renderShareCard(ui.shareCanvas, payload);
+    ui.shareModal?.classList.add("visible");
+    const art = await loadArtImage(level.art?.grades?.[rating.grade]);
+    if (art && lastResult === snapshot) {
+      renderShareCard(ui.shareCanvas, { ...payload, art });
+    }
+  }
+
+  function saveShareCard() {
+    if (!ui.shareCanvas?.toDataURL) return;
+    const link = document.createElement("a");
+    link.href = ui.shareCanvas.toDataURL("image/png");
+    link.download = `梗哥的半生-${lastResult?.rating?.grade ?? "C"}.png`;
+    link.click();
+  }
+
+  function bindShareCard() {
+    ui.shareButton?.addEventListener("click", openShareCard);
+    ui.saveShareButton?.addEventListener("click", saveShareCard);
+    ui.closeShareButton?.addEventListener("click", () => {
+      ui.shareModal?.classList.remove("visible");
+    });
   }
 
   function bind() {
     npcCount = loadMatchNpcCount();
     syncNpcCountInput();
     bindNpcCountInput();
+    bindPrelaunch();
+    bindShareCard();
     ui.startButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.BRIEFING) return;
+      commitNpcCountInput();
       dependencies.onStart?.();
       ui.taskModal.classList.remove("visible");
     });
     ui.backFromTaskButton?.addEventListener("click", () => {
-      if (session.phase === GAME_PHASES.BRIEFING) showLevelSelect();
+      if (session.phase === GAME_PHASES.BRIEFING) showHome();
     });
     ui.pauseButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.PLAYING) return;
@@ -271,10 +295,13 @@ export function createGameUiController(dependencies) {
     ui.backFromPauseButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.PAUSED) return;
       ui.pauseModal.classList.remove("visible");
-      showLevelSelect();
+      showHome();
     });
     ui.retryButton?.addEventListener("click", () => dependencies.onRetry?.());
-    ui.backToSelectButton?.addEventListener("click", () => showLevelSelect());
+    ui.backToSelectButton?.addEventListener("click", () => {
+      ui.shareModal?.classList.remove("visible");
+      showHome();
+    });
     ui.attackButton?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       dependencies.onAttack?.();
@@ -291,11 +318,10 @@ export function createGameUiController(dependencies) {
 
   return Object.freeze({
     bind,
-    showLevelSelect,
+    showHome,
     showTask,
     showResult,
     updateHud,
-    buildLevelCards,
     getMatchNpcCount: () => npcCount,
     getNpcCountPreview,
     flashHud,

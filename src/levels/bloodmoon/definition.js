@@ -4,6 +4,12 @@ import { createBloodmoonLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const extraCover = new URL("../../assets/extra-cover.jpg", import.meta.url).href;
+const art = {
+  cover: extraCover,
+  grades: { S: extraCover, A: extraCover, B: extraCover, C: extraCover },
+};
+
 export default {
   id: "bloodmoon",
   order: 110,
@@ -36,6 +42,13 @@ export default {
   decoyCount: 6,
   sceneName: "血月街区",
   emoji: "🌕",
+  art,
+  nodes: {
+    S: { title: "血月下的神枪手", verdict: "电光一闪你就出手，狼影当场退潮。" },
+    A: { title: "认得出你", verdict: "理智掉了一些，但你还是赶到了。" },
+    B: { title: "半狼半人", verdict: "人找到了，狼耳朵还没收回去。" },
+    C: { title: "整条街的狼影", verdict: "雷声盖过了那句求救，你还站在血月里。" },
+  },
   cardStyle: {
     accent: "#fb7185",
     glow: "rgba(248, 113, 113, 0.28)",

@@ -55,72 +55,61 @@
     <section id="pauseModal" class="modal">
       <div class="modal-panel">
         <div class="modal-title">⏸ 暂停</div>
-        <p class="modal-copy" style="font-size:15px;color:var(--muted)">游戏已暂停</p>
+        <p class="modal-copy pause-copy">人生暂停，梗哥原地待机</p>
         <div class="task-actions">
           <button id="resumeButton" class="primary-button" type="button">继续游戏</button>
-          <button id="backFromPauseButton" class="secondary-button" type="button">返回选关</button>
+          <button id="backFromPauseButton" class="secondary-button" type="button">返回坐标轴</button>
         </div>
       </div>
     </section>
 
-    <!-- 关卡选择界面 -->
-    <section id="levelSelectModal" class="modal visible">
-      <div id="levelSelectPanel" class="level-select-panel">
-        <header class="level-select-header">
-          <div class="game-kicker"><span aria-hidden="true"></span>一拳解压人生</div>
-          <div id="gameLogo" class="game-logo">梗哥的半生</div>
-          <p class="level-select-tagline">从十九岁的宿舍，一拳打到三十岁的生活</p>
-          <div id="lifeTimeline" class="life-timeline" aria-label="梗哥的人生年龄线"></div>
+    <!-- 人生事件轴（关卡入口） -->
+    <section id="historyTimelineModal" class="modal history-timeline-modal" aria-label="人生事件轴">
+      <div class="history-cosmos">
+        <header class="history-header">
+          <div class="history-kicker">人生事件轴</div>
+          <div class="history-build-meta">
+            <span id="historyVersionText">v0.10.x.1</span>
+            <span id="historyStampText">2026.06.18</span>
+          </div>
+        </header>
+
+        <div id="historyViewport" class="history-viewport" aria-label="历史节点进度">
+          <div id="historyTrack" class="history-track"></div>
+        </div>
+
+        <footer class="history-footer">
+          <div id="historyStatusText" class="history-status-text">历史仍在等待记录……</div>
+          <div id="historyNodeDetail" class="history-node-detail" aria-live="polite"></div>
           <div id="storyEnding" class="story-ending" hidden>
             <strong>半生通关</strong>
             <span>人生是旷野，不是轨道。下一拳，打向你自己选的方向。</span>
           </div>
-          <div class="level-select-tags">
-            <span class="level-tag">单人剧情</span>
-            <span class="level-tag">人生闯关</span>
-            <span class="level-tag">一拳解压</span>
-          </div>
-        </header>
+        </footer>
 
-        <div id="soloModeStack" class="level-select-stack">
-          <div class="match-settings">
-            <div class="match-settings-icon" aria-hidden="true">👥</div>
-            <div class="match-settings-body">
-              <label class="match-settings-label" for="npcCountInput">对局人数</label>
-              <div class="match-settings-row">
-                <div class="match-settings-input-wrap">
-                  <input
-                    id="npcCountInput"
-                    class="match-settings-input"
-                    type="number"
-                    min="10"
-                    max="100"
-                    step="1"
-                    value="20"
-                    inputmode="numeric"
-                    aria-describedby="npcCountHint"
-                  />
-                </div>
-                <span id="npcCountHint" class="match-settings-hint">10–100 人（多点用）</span>
-                <div class="match-settings-arrows">
-                  <button class="match-settings-arrow up" type="button" aria-label="增加人数">↑</button>
-                  <button class="match-settings-arrow down" type="button" aria-label="减少人数">↓</button>
-                </div>
-              </div>
+        <section id="historyDetailModal" class="history-detail-modal" aria-label="历史节点详情">
+          <div id="historyDetailBackdrop" class="history-detail-backdrop" aria-hidden="true"></div>
+          <article id="historyDetailPanel" class="history-detail-panel">
+            <header class="history-detail-header">
+              <h2 id="historyDetailTitle">第1章 - 凌晨三点</h2>
+              <p id="historyDetailSubtitle">历史节点</p>
+            </header>
+            <div class="history-detail-body">
+              <button id="historyDetailPrev" class="history-detail-nav prev" type="button" aria-label="上一个历史节点">‹</button>
+              <figure id="historyDetailVisual" class="history-detail-visual"></figure>
+              <button id="historyDetailNext" class="history-detail-nav next" type="button" aria-label="下一个历史节点">›</button>
+              <div id="historyDetailLore" class="history-detail-lore" tabindex="0"></div>
             </div>
-          </div>
-          <p class="level-section-label">人生主线 · 逐关解锁</p>
-          <div id="levelCards" class="level-cards">
-            <!-- 关卡卡片将通过JavaScript动态生成 -->
-          </div>
-          <div class="level-section-divider">人生之外</div>
-          <p class="level-section-label extra">番外关卡 · 随时可玩</p>
-          <div id="extraLevelCards" class="level-cards"></div>
-        </div>
+            <footer class="history-detail-footer">
+              <button id="historyDetailClose" class="history-detail-close" type="button">关闭</button>
+              <div id="historyDetailReward" class="history-detail-reward"></div>
+            </footer>
+          </article>
+        </section>
       </div>
     </section>
 
-    <!-- 任务简报弹窗 -->
+    <!-- 关卡进入卡 -->
     <section id="taskModal" class="modal">
       <div class="modal-panel task-panel">
         <div id="taskEmoji" class="task-emoji">🌙</div>
@@ -132,35 +121,93 @@
         <p id="taskCopy" class="modal-copy task-mission">任务加载中</p>
         <div id="taskClue" class="task-clue">🔍 线索加载中</div>
         <div class="task-info-row">
-          <div class="task-info-chip">👥 <span id="taskNpcCount">20</span> 人</div>
           <div class="task-info-chip">⏱ <span id="taskTime">90</span> 秒</div>
           <div class="task-info-chip" id="taskAttemptsChip">❤️ <span id="taskAttempts">❤️❤️❤️</span></div>
         </div>
+        <div class="match-settings">
+          <div class="match-settings-icon" aria-hidden="true">👥</div>
+          <div class="match-settings-body">
+            <label class="match-settings-label" for="npcCountInput">对局人数</label>
+            <div class="match-settings-row">
+              <div class="match-settings-input-wrap">
+                <input
+                  id="npcCountInput"
+                  class="match-settings-input"
+                  type="number"
+                  min="10"
+                  max="100"
+                  step="1"
+                  value="20"
+                  inputmode="numeric"
+                  aria-describedby="npcCountHint"
+                />
+              </div>
+              <span id="npcCountHint" class="match-settings-hint">10–100 人</span>
+              <div class="match-settings-arrows">
+                <button class="match-settings-arrow up" type="button" aria-label="增加人数">↑</button>
+                <button class="match-settings-arrow down" type="button" aria-label="减少人数">↓</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="task-controls-guide">
           <div class="guide-item"><span class="guide-icon">🕹</span> 摇杆/WASD 移动</div>
-          <div class="guide-item"><span id="taskActionIcon" class="guide-icon">👊</span> <span id="taskActionGuide">拳按钮/空格 攻击</span></div>
+          <div class="guide-item"><span class="guide-icon">👊</span> 拳按钮/空格 攻击</div>
         </div>
         <div class="task-actions">
-          <button id="backFromTaskButton" class="secondary-button" type="button">返回选关</button>
-          <button id="startButton" class="primary-button" type="button">开始行动</button>
+          <button id="backFromTaskButton" class="secondary-button" type="button">返回坐标轴</button>
+          <button id="startButton" class="primary-button" type="button">开始整活</button>
         </div>
       </div>
     </section>
 
-    <!-- 结算弹窗 -->
-    <section id="resultModal" class="modal">
-      <div class="modal-panel result-panel">
-        <div id="resultRating" class="result-rating">S</div>
-        <div id="resultTitle" class="modal-title">结算</div>
-        <p id="resultCopy" class="modal-copy">结果加载中</p>
-        <div class="result-stats">
-          <div class="stat-row"><span>⏱ 用时</span><strong id="statTime">--</strong></div>
-          <div class="stat-row"><span id="statAttemptsLabel">🥊 剩余出拳</span><strong id="statAttempts">--</strong></div>
+    <!-- 结算弹窗：等级插画铺满全屏，文字压在毛玻璃层上 -->
+    <section id="resultModal" class="modal result-modal">
+      <div class="result-stage">
+        <div id="resultArt" class="result-art" aria-hidden="true"></div>
+        <div class="result-slug">
+          <span id="resultLevelTag" class="result-slug-item">LV.01</span>
+          <span id="resultAgeTag" class="result-slug-item">--</span>
+          <span id="resultRating" class="result-rating">S</span>
         </div>
-        <div class="result-actions">
-          <button id="retryButton" class="primary-button" type="button">再来一局</button>
-          <button id="backToSelectButton" class="secondary-button" type="button">返回选关</button>
+        <div class="result-brief">
+          <div id="resultTitle" class="result-outcome">结算</div>
+          <div id="resultNodeTitle" class="result-node-title"></div>
+          <p id="resultCopy" class="result-verdict">结果加载中</p>
+          <div class="result-stats">
+            <div class="stat-row"><span>⏱ 用时</span><strong id="statTime">--</strong></div>
+            <div class="stat-row"><span id="statAttemptsLabel">🥊 剩余出拳</span><strong id="statAttempts">--</strong></div>
+          </div>
+          <div id="resultUnlock" class="result-unlock"></div>
+          <div class="result-actions">
+            <button id="retryButton" class="primary-button" type="button">再来一局</button>
+            <button id="shareButton" class="secondary-button share-button" type="button">生成分享卡</button>
+            <button id="backToSelectButton" class="secondary-button" type="button">返回坐标轴</button>
+          </div>
         </div>
+      </div>
+    </section>
+
+    <!-- 分享卡弹窗 -->
+    <section id="shareModal" class="modal">
+      <div class="modal-panel share-panel">
+        <div class="modal-title">📤 人生分享卡</div>
+        <div class="share-canvas-wrap">
+          <canvas id="shareCanvas" class="share-canvas" width="540" height="960"></canvas>
+        </div>
+        <div class="task-actions">
+          <button id="saveShareButton" class="primary-button" type="button">保存图片</button>
+          <button id="closeShareButton" class="secondary-button" type="button">关闭</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 进入游戏前的加载页 -->
+    <section id="prelaunchScreen" class="prelaunch-screen">
+      <div class="prelaunch-bottom">
+        <button id="prelaunchStartButton" class="prelaunch-start" type="button">
+          <span class="prelaunch-start-text">开始游戏</span>
+        </button>
       </div>
     </section>
 

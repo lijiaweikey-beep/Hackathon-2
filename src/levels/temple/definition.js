@@ -4,6 +4,12 @@ import { createTempleLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const extraCover = new URL("../../assets/extra-cover.jpg", import.meta.url).href;
+const art = {
+  cover: extraCover,
+  grades: { S: extraCover, A: extraCover, B: extraCover, C: extraCover },
+};
+
 export default {
   id: "temple",
   order: 100,
@@ -24,6 +30,13 @@ export default {
   moonDecoyCount: 3,
   sceneName: "承天寺夜游",
   emoji: "🌕",
+  art,
+  nodes: {
+    S: { title: "怀民亦未寝", verdict: "一眼认出真身，怀民终于能回去睡了。" },
+    A: { title: "月下辨影人", verdict: "等月光转了两回，你才确定是他。" },
+    B: { title: "竹柏影里绕路", verdict: "人是找到了，中庭也被你转了一圈。" },
+    C: { title: "陪苏轼溜达", verdict: "你没找到苏轼，只是陪他溜达到天亮。" },
+  },
   cardStyle: {
     accent: "#fbbf24",
     glow: "rgba(251, 191, 36, 0.28)",

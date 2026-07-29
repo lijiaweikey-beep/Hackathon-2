@@ -3,6 +3,16 @@ import { createDebtSmasherLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const art = {
+  cover: new URL("./assets/cover.jpg", import.meta.url).href,
+  grades: {
+    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
+    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
+    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
+    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
+  },
+};
+
 export default {
   id: "debt-smasher",
   order: 60,
@@ -27,6 +37,13 @@ export default {
   },
   sceneName: "爆金币",
   emoji: "🪙",
+  art,
+  nodes: {
+    S: { title: "提前还清的人", verdict: "一百金币落袋，房贷车贷一起被粉碎。" },
+    A: { title: "勉强够月供", verdict: "凑齐了，只是又透支了一点力气。" },
+    B: { title: "利息刚好还上", verdict: "债少了一点，日子还是紧的。" },
+    C: { title: "被生活压扁", verdict: "债没压扁，你先被生活压扁了。" },
+  },
   cardStyle: {
     accent: "#facc15",
     glow: "rgba(250, 204, 21, 0.28)",

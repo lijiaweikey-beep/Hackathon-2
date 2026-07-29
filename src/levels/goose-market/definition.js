@@ -3,6 +3,16 @@ import { createGooseMarketLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const art = {
+  cover: new URL("./assets/cover.jpg", import.meta.url).href,
+  grades: {
+    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
+    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
+    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
+    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
+  },
+};
+
 export default {
   id: "goose-market",
   order: 30,
@@ -30,6 +40,13 @@ export default {
   resourceInitial: "∞",
   sceneName: "以鸭戴鹅",
   emoji: "🍗",
+  art,
+  nodes: {
+    S: { title: "夜市腿部专家", verdict: "OMG，鹅腿阿姨，你吓到我了！" },
+    A: { title: "灯下辨腿的人", verdict: "灯扫过第三遍，你才敢下手。" },
+    B: { title: "差点买成鸭腿", verdict: "找对了摊，钱包和舌头都在抱怨。" },
+    C: { title: "鸭腿爱好者", verdict: "灯光晃过去，你还是把鸭腿当成了鹅腿。" },
+  },
   cardStyle: {
     accent: "#a3e635",
     glow: "rgba(163, 230, 53, 0.25)",

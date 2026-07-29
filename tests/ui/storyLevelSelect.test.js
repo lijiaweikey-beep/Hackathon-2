@@ -1,117 +1,118 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createGameUiController } from "../../src/ui/createGameUiController.js";
+import { createHistoryTimelineController } from "../../src/ui/createHistoryTimelineController.js";
 
 function createClassList() {
+  const values = new Set();
   return {
-    add() {},
-    remove() {},
-    toggle() {},
+    add: (value) => values.add(value),
+    remove: (value) => values.delete(value),
+    contains: (value) => values.has(value),
   };
 }
 
-function createContainer(cards) {
+function createElement(tagName) {
   return {
+    tagName,
+    className: "",
+    dataset: {},
+    disabled: false,
     innerHTML: "",
-    appendChild(card) {
-      cards.push(card);
-    },
+    textContent: "",
+    style: { setProperty() {} },
+    classList: createClassList(),
+    addEventListener() {},
+    setAttribute() {},
   };
 }
 
-test("人生时间线锁定未开放关卡且番外始终可进入", () => {
-  const previousDocument = globalThis.document;
-  const mainlineCards = [];
-  const extraCards = [];
-  globalThis.document = {
-    createElement() {
-      return {
-        className: "",
-        dataset: {},
-        style: { setProperty() {} },
-        addEventListener() {},
-      };
-    },
-  };
-  const level = (id, age) => ({
+function createTrack() {
+  const track = createElement("div");
+  track.children = [];
+  track.appendChild = (child) => track.children.push(child);
+  track.querySelectorAll = (selector) =>
+    selector === ".history-node-card"
+      ? track.children.filter((child) => String(child.className).includes("history-node-card"))
+      : [];
+  return track;
+}
+
+function level(id, age, track = "mainline") {
+  return {
     id,
     age,
+    track,
     sceneName: id,
     emoji: "🎮",
     difficulty: 1,
     cardDesc: id,
-  });
-  const storyProgress = {
-    isUnlocked: (id) => id === "age-19",
-    isCompleted: () => false,
+    success: `${id} success`,
   };
+}
+
+test("人生事件轴锁定未开放关卡且番外始终可进入", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement };
+  const historyTrack = createTrack();
+  const entered = [];
   const ui = {
-    levelCards: createContainer(mainlineCards),
-    extraLevelCards: createContainer(extraCards),
-    levelSelectModal: { classList: createClassList() },
-    taskModal: { classList: createClassList() },
-    resultModal: { classList: createClassList() },
+    historyTimelineModal: { classList: createClassList(), addEventListener() {} },
+    historyTrack,
+    historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
+    historyStatusText: { textContent: "" },
+    historyNodeDetail: { innerHTML: "" },
   };
 
   try {
-    const controller = createGameUiController({
+    const controller = createHistoryTimelineController({
       ui,
-      session: { levelState: { level: {} } },
-      levelRegistry: {
-        visible: [],
-        mainline: [level("age-19", 19), level("age-21", 21)],
-        extra: [level("extra")],
+      levels: [level("age-19", 19), level("age-21", 21), level("extra", null, "extra")],
+      storyProgress: {
+        isUnlocked: (id) => id !== "age-21",
+        isCompleted: () => false,
       },
-      storyProgress,
+      revealProgress: { isRevealed: () => false, reveal: () => true },
+      onEnterLevel: (id) => entered.push(id),
+      timerHost: {},
     });
-    controller.showLevelSelect({ leaveLevel: false });
+    controller.showBrowse();
   } finally {
     globalThis.document = previousDocument;
   }
 
-  assert.equal(mainlineCards.length, 2);
-  assert.equal(mainlineCards[0].disabled, false);
-  assert.equal(mainlineCards[1].disabled, true);
-  assert.match(mainlineCards[0].innerHTML, /19 岁/);
-  assert.match(mainlineCards[1].innerHTML, /尚未解锁/);
-  assert.equal(extraCards.length, 1);
-  assert.equal(extraCards[0].disabled, false);
+  const cards = historyTrack.querySelectorAll(".history-node-card");
+  assert.match(cards[0].className, /open/);
+  assert.match(cards[1].className, /fog/);
+  assert.match(cards[2].className, /open/);
+  cards[2].dispatchEvent?.({ stopPropagation() {} });
+  assert.deepEqual(entered, []);
 });
 
-test("全部主线完成后选关页展示人生终章", () => {
+test("全部主线完成后人生事件轴展示人生终章", () => {
   const previousDocument = globalThis.document;
-  globalThis.document = {
-    createElement() {
-      return {
-        className: "",
-        dataset: {},
-        style: { setProperty() {} },
-        addEventListener() {},
-      };
-    },
-  };
+  globalThis.document = { createElement };
   const storyEnding = { hidden: true };
-  const ui = {
-    levelCards: createContainer([]),
-    extraLevelCards: createContainer([]),
-    storyEnding,
-    levelSelectModal: { classList: createClassList() },
-    taskModal: { classList: createClassList() },
-    resultModal: { classList: createClassList() },
-  };
 
   try {
-    const controller = createGameUiController({
-      ui,
-      session: { levelState: { level: {} } },
-      levelRegistry: { visible: [], mainline: [], extra: [] },
+    const controller = createHistoryTimelineController({
+      ui: {
+        historyTimelineModal: { classList: createClassList(), addEventListener() {} },
+        historyTrack: createTrack(),
+        historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
+        historyStatusText: { textContent: "" },
+        historyNodeDetail: { innerHTML: "" },
+        storyEnding,
+      },
+      levels: [level("age-19", 19)],
       storyProgress: {
         isComplete: () => true,
         isUnlocked: () => true,
         isCompleted: () => true,
       },
+      revealProgress: { isRevealed: () => true, reveal: () => true },
+      timerHost: {},
     });
-    controller.showLevelSelect({ leaveLevel: false });
+    controller.showBrowse();
   } finally {
     globalThis.document = previousDocument;
   }

@@ -3,6 +3,16 @@ import { createGamingLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const art = {
+  cover: new URL("./assets/cover.jpg", import.meta.url).href,
+  grades: {
+    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
+    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
+    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
+    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
+  },
+};
+
 export default {
   id: "gaming",
   order: 10,
@@ -22,6 +32,13 @@ export default {
   decoyCount: 3,
   sceneName: "凌晨三点",
   emoji: "🌙",
+  art,
+  nodes: {
+    S: { title: "作息纠察队长", verdict: "一拳到位，宿舍的夜终于安静了。" },
+    A: { title: "熄灯前的正义", verdict: "有点狼狈，但你确实把人抓到了。" },
+    B: { title: "摸黑找人的", verdict: "找是找到了，全宿舍也跟着醒了。" },
+    C: { title: "陪打到天亮", verdict: "你没有赢，你只是也熬到了三点。" },
+  },
   cardStyle: {
     accent: "#818cf8",
     glow: "rgba(129, 140, 248, 0.28)",

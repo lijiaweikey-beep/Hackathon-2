@@ -36,13 +36,15 @@ export function renderTaskModal(ui, { level, npcCount }) {
   ui.taskTitle.textContent = level.sceneName;
   ui.taskCopy.textContent = model.briefingText;
   ui.taskClue.textContent = "🔍 " + level.clue;
-  ui.taskNpcCount.textContent = model.npcCount;
+  if (ui.taskNpcCount) ui.taskNpcCount.textContent = model.npcCount;
+  if (ui.npcCountInput) ui.npcCountInput.value = String(model.npcCount);
   ui.taskTime.textContent = model.timeText;
   updateTaskAttemptsChip(ui, model.resourceHtml);
   if (ui.taskActionIcon) ui.taskActionIcon.textContent = model.actionIcon;
   if (ui.taskActionGuide) ui.taskActionGuide.textContent = model.actionGuide;
   ui.targetLabel.textContent = model.targetLabel;
-  ui.levelSelectModal.classList.remove("visible");
+  ui.levelSelectModal?.classList.remove("visible");
+  ui.historyTimelineModal?.classList.remove("visible");
   ui.taskModal.classList.add("visible");
   ui.resultModal.classList.remove("visible");
   ui.retryButton.disabled = false;

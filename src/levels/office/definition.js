@@ -3,6 +3,16 @@ import { createNpc, createPlayer } from "./actors.js";
 import { createOfficeLevel } from "./createLevel.js";
 import { createWorld } from "./world.js";
 
+const art = {
+  cover: new URL("./assets/cover.jpg", import.meta.url).href,
+  grades: {
+    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
+    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
+    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
+    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
+  },
+};
+
 export default {
   id: "office",
   order: 50,
@@ -31,6 +41,13 @@ export default {
   decoyCount: 15,
   sceneName: "躲老板黑锅",
   emoji: "🍳",
+  art,
+  nodes: {
+    S: { title: "反甩锅冠军", verdict: "一拳打停黑锅雨，这个锅终于不用你背。" },
+    A: { title: "工位灵活躲避", verdict: "挨了两下，但老板先倒了。" },
+    B: { title: "锅接得很熟练", verdict: "你把锅接住了，也把它接了下来。" },
+    C: { title: "工伤认定中", verdict: "锅落在你头上，老板还在若无其事地巡逻。" },
+  },
   cardStyle: {
     accent: "#fb7185",
     glow: "rgba(251, 113, 133, 0.28)",

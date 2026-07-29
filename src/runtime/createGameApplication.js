@@ -30,13 +30,14 @@ import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
+import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
-let uiController, gameLoop, rendering, settlement, experienceManager, storyProgress;
+let uiController, gameLoop, rendering, settlement, experienceManager;
+let storyProgress, historyTimelineFlow;
 let totalTime = 0;
 const session = createGameSession();
 const audio = createGameAudio();
-
 const levelRunner = createClassicLevelRunner({
   session,
   getServices: () => ({
@@ -61,10 +62,7 @@ const levelRunner = createClassicLevelRunner({
     console.error(`关卡运行失败：${definition.id}`, error);
   },
 });
-
-function getMatchNpcCount() {
-  return uiController.getMatchNpcCount();
-}
+function getMatchNpcCount() { return uiController.getMatchNpcCount(); }
 
 function createPlayer() {
   return session.levelState?.level.extensions?.createPlayer?.()
@@ -76,17 +74,11 @@ function createNpc(id, flags) {
     ?? createNpcEntity(id, flags, {}, randomRange);
 }
 
-function triggerHitstop(duration) {
-  fx.triggerHitstop(duration);
-}
+function triggerHitstop(duration) { fx.triggerHitstop(duration); }
 
-function triggerShake(intensity, duration) {
-  fx.triggerShake(intensity, duration);
-}
+function triggerShake(intensity, duration) { fx.triggerShake(intensity, duration); }
 
-function updateShake(dt) {
-  fx.updateShake(dt, rendering.camera);
-}
+function updateShake(dt) { fx.updateShake(dt, rendering.camera); }
 
 function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
   settlement.settle(won, failMessage, delayMs);
@@ -156,7 +148,7 @@ function createStandaloneHost({ definition, scope }) {
       resume: resumeExperience,
       finish: ({ won, failMessage, stats } = {}) =>
         settlement.finish(Boolean(won), failMessage, stats),
-      leave: () => uiController.showLevelSelect(),
+      leave: () => uiController.showHome(),
     },
     controls: inputController,
     ui: uiController,
@@ -273,6 +265,7 @@ export function boot() {
     onStart: startExperience,
     onPause: pauseExperience,
     onResume: resumeExperience,
+    onHomeShown: () => historyTimelineFlow?.showHome(),
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
@@ -288,8 +281,15 @@ export function boot() {
     createClassicExperience: createClassicRuntime,
     onError(error, definition) {
       console.error(`关卡体验运行失败：${definition.id}`, error);
-      uiController.showLevelSelect();
+      uiController.showHome();
     },
+  });
+  historyTimelineFlow = createHistoryTimelineFlow({
+    ui,
+    levels: [...levelRegistry.mainline, ...levelRegistry.extra],
+    storage: window.localStorage,
+    storyProgress,
+    onEnterLevel: selectLevelById,
   });
   settlement = createRoundSettlement({
     session,
@@ -302,7 +302,7 @@ export function boot() {
       if (!experienceManager.showResult(result)) uiController.showResult(result);
     },
     saveBestScore,
-    onLevelCompleted: (level) => level.track === "mainline" && storyProgress.complete(level.id),
+    onLevelCompleted: (level) => historyTimelineFlow?.onLevelCompleted(level),
     playWin: audio.win,
     playLose: audio.lose,
   });
@@ -317,6 +317,7 @@ export function boot() {
 
   inputController.bind();
   uiController.bind();
+  historyTimelineFlow.bind();
   createOrientationController({
     windowTarget: window,
     documentTarget: document,
@@ -328,7 +329,7 @@ export function boot() {
     resetInput: inputController.reset,
     onResize: rendering.resize,
   }).bind();
-  uiController.showLevelSelect();
+  uiController.showHome();
   rendering.start((deltaSeconds) => gameLoop.tick(deltaSeconds));
 }
 function disposeClassicScene() {
@@ -360,7 +361,7 @@ function resetLevel(index, options = {}) {
   if (options.skipBriefing) session.transition(GAME_PHASES.PLAYING);
 
   if (level.extensions?.createExperience) {
-    ui.levelSelectModal.classList.remove("visible");
+    ui.historyTimelineModal?.classList.remove("visible");
     ui.taskModal.classList.remove("visible");
     experienceManager.load(level);
     experienceManager.mount();
@@ -387,7 +388,7 @@ function resetLevel(index, options = {}) {
 
   if (options.skipBriefing) {
     session.levelState.startTime = totalTime - (options.elapsed ?? 0);
-    ui.levelSelectModal.classList.remove("visible");
+    ui.historyTimelineModal?.classList.remove("visible");
     ui.taskModal.classList.remove("visible");
     experienceManager.start();
   } else {
