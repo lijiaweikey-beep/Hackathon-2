@@ -123,6 +123,7 @@ export function createSupermarketExperience(host) {
     actors = createActorSystem({
       getScene: () => world.scene,
       getPlayer: () => world.player,
+      getCamera: () => world.camera,
       getLevel: () => ({ legacy: false }),
       createNpc: () => null,
       collidesWithObstacle: world.collidesWithObstacle,
