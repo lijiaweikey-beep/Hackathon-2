@@ -93,8 +93,8 @@ button {
 }
 
 .mission-strip {
+  flex: 0 1 min(34%, 420px);
   min-width: 0;
-  max-width: min(58%, 420px);
   padding: 10px 12px;
   border-radius: 8px;
 }
@@ -436,12 +436,9 @@ button {
 
 /* ---- HUD 顶部线索区 ---- */
 .clue-bar-wrap {
-  position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 66px);
-  left: 12px;
-  right: 12px;
+  flex: 1 1 260px;
+  min-width: 180px;
   pointer-events: none;
-  z-index: 4;
 }
 
 .clue-bar {
@@ -1153,7 +1150,7 @@ button {
   }
 
   .mission-strip {
-    max-width: calc(100% - 152px);
+    flex-basis: calc(100% - 152px);
     padding: 9px 10px;
   }
 
@@ -1266,7 +1263,7 @@ button {
   }
 
   .clue-bar-wrap {
-    top: calc(max(6px, env(safe-area-inset-top)) + 52px);
+    min-width: 140px;
   }
 
   .controls {
