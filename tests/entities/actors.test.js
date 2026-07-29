@@ -29,3 +29,10 @@ test("角色工厂只初始化关卡提供的人物原型和特征", () => {
   assert.equal(player.marker, "player");
   assert.equal(player.decorated, true);
 });
+
+test("默认玩家人物外观按随机数选择不同配色", () => {
+  const first = createPlayer({ randomRange: () => 0 });
+  const last = createPlayer({ randomRange: () => 3.99 });
+
+  assert.notEqual(first.group.userData.colors[0], last.group.userData.colors[0]);
+});

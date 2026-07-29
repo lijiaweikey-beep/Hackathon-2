@@ -15,6 +15,8 @@ export const LOW_POLY_NPC_PALETTES = [
   { jacket: 0xa78bfa, jacketDark: 0x7c3aed, shorts: 0x166534, shortsDark: 0x14532d, cap: 0x0ea5e9, capAccent: 0xfcd34d, sock: 0xbae6fd },
 ];
 
+export const LOW_POLY_PLAYER_PALETTES = Object.freeze([...LOW_POLY_NPC_PALETTES]);
+
 export const LOW_POLY_WOLF_PALETTE = {
   jacket: 0x4b1418,
   jacketDark: 0x1f0a0d,
