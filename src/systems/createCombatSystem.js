@@ -9,8 +9,8 @@ import {
 import { GAME_PHASES } from "../core/gamePhase.js";
 import { getFacingVector } from "../utils/math.js";
 
-const HIT_VIBRATION = [16, 24, 32];
-const MISS_VIBRATION = [18];
+const HIT_VIBRATION = [120, 40, 180, 40, 260];
+const MISS_VIBRATION = [120];
 
 export function createCombatSystem(dependencies) {
   const facing = new THREE.Vector2();

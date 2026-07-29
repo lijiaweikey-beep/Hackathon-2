@@ -97,5 +97,5 @@ test("战斗系统命中和未命中使用不同手机震动", () => {
   combat.triggerAttack();
 
   assert.notDeepEqual(vibrations[0], vibrations[1]);
-  assert.deepEqual(vibrations, [[16, 24, 32], [18]]);
+  assert.deepEqual(vibrations, [[120, 40, 180, 40, 260], [120]]);
 });
