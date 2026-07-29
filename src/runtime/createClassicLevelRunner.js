@@ -17,6 +17,7 @@ export function createClassicLevelRunner(dependencies) {
     npcSpeed,
     createRunner = createLevelRunner,
   } = dependencies;
+  const marks = dependencies.marks ?? dependencies;
 
   return createRunner({
     createContext({ definition, scope }) {
@@ -67,8 +68,9 @@ export function createClassicLevelRunner(dependencies) {
         },
         world: {},
         ui: {
-          setBlackEye: dependencies.setBlackEye,
-          setLipstick: dependencies.setLipstick,
+          setBlackEye: marks.setBlackEye,
+          setLipstick: marks.setLipstick,
+          setRedTie: marks.setRedTie,
           showOverlay: (...args) => uiController.showOverlay(...args),
           hideOverlay: (...args) => uiController.hideOverlay(...args),
           flashHud: (...args) => uiController.flashHud(...args),

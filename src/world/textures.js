@@ -88,6 +88,41 @@ export function makeFloorTexture(kind) {
     for (let i = 0; i < 7; i += 1) {
       ctx.fillRect(90 + i * 128, 96, 70, 730);
     }
+  } else if (kind === "office") {
+    // 灰蓝方块地毯纹理（PRD: 开放式办公室灰蓝地毯）
+    ctx.fillStyle = "#1e2a3a";
+    ctx.fillRect(0, 0, canvasTexture.width, canvasTexture.height);
+    // 方块地毯纹理
+    for (let y = 0; y < 1024; y += 64) {
+      for (let x = 0; x < 1024; x += 64) {
+        ctx.fillStyle = (x + y) % 128 === 0 ? "#243345" : "#1a2838";
+        ctx.fillRect(x, y, 64, 64);
+      }
+    }
+    // 格子分隔线
+    ctx.strokeStyle = "rgba(100, 140, 180, 0.1)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < 1024; x += 64) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 1024);
+      ctx.stroke();
+    }
+    for (let y = 0; y < 1024; y += 64) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(1024, y);
+      ctx.stroke();
+    }
+    // 冷白LED光斑漫射
+    ctx.fillStyle = "rgba(200, 220, 255, 0.05)";
+    for (let i = 0; i < 6; i += 1) {
+      const cx = 170 + i * 140;
+      const cy = 280 + Math.sin(i * 1.8) * 200;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 110, 70, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
     const gradient = ctx.createRadialGradient(512, 500, 90, 512, 500, 690);
     gradient.addColorStop(0, "#dbeafe");
@@ -135,7 +170,7 @@ export function makeWallTexture(kind) {
   canvasTexture.width = 1024;
   canvasTexture.height = 512;
   const ctx = canvasTexture.getContext("2d");
-  ctx.fillStyle = kind === "gaming" ? "#121b2d" : kind === "library" ? "#ead7b5" : kind === "bloodmoon" ? "#17070b" : "#7f90a2";
+  ctx.fillStyle = kind === "gaming" ? "#121b2d" : kind === "library" ? "#ead7b5" : kind === "bloodmoon" ? "#17070b" : kind === "office" ? "#1c2836" : "#7f90a2";
   ctx.fillRect(0, 0, 1024, 512);
 
   if (kind === "gaming") {
@@ -167,6 +202,27 @@ export function makeWallTexture(kind) {
     for (let x = 0; x < 1024; x += 120) {
       ctx.fillRect(x, 120 + Math.sin(x) * 40, 80, 180);
     }
+  } else if (kind === "office") {
+    // 暗色办公室墙壁 — 深灰底 + 窗户高光 + 踢脚线
+    ctx.fillStyle = "#28261f";
+    ctx.fillRect(0, 0, 1024, 512);
+    // 窗户轮廓（暖色微光）
+    for (let x = 80; x < 960; x += 200) {
+      ctx.fillStyle = "#332f28";
+      ctx.fillRect(x, 80, 100, 180);
+      ctx.fillStyle = "rgba(255, 220, 150, 0.08)";
+      ctx.fillRect(x + 10, 96, 80, 148);
+    }
+    // 踢脚线
+    ctx.fillStyle = "#1a1814";
+    ctx.fillRect(0, 420, 1024, 92);
+    // 水平线条分隔
+    ctx.strokeStyle = "rgba(180, 160, 120, 0.08)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 280);
+    ctx.lineTo(1024, 280);
+    ctx.stroke();
   } else {
     ctx.fillStyle = "#273548";
     for (let x = 40; x < 960; x += 160) {
