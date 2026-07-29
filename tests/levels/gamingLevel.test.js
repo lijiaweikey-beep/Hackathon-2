@@ -32,12 +32,14 @@ function createPosition(x = 0, y = 0, z = 0) {
   };
 }
 
-function createFakeContext({ npcCount }) {
+function createFakeContext({ npcCount, openPositions } = {}) {
+  const nextOpenPositions = [...(openPositions ?? [createPosition(4, 0, 4)])];
   const records = {
     created: [],
     target: null,
     environmentUpdates: 0,
     moveCalls: 0,
+    randomOpenPositions: [],
   };
   const context = {
     definition: {
@@ -88,7 +90,9 @@ function createFakeContext({ npcCount }) {
     movement: {
       faceNpcToward() {},
       randomOpenPosition() {
-        return createPosition(4, 0, 4);
+        const position = nextOpenPositions.shift() ?? createPosition(4, 0, 4);
+        records.randomOpenPositions.push(position);
+        return position;
       },
       moveNpcToward() {
         records.moveCalls += 1;
@@ -113,7 +117,13 @@ function createFakeContext({ npcCount }) {
 }
 
 test("凌晨三点插件生成目标和剩余路人", () => {
-  const { context, records } = createFakeContext({ npcCount: 4 });
+  const { context, records } = createFakeContext({
+    npcCount: 4,
+    openPositions: [
+      createPosition(-4, 0, 4),
+      createPosition(3, 0, 5),
+    ],
+  });
   const level = createGamingLevel(context);
   level.start();
 
@@ -122,11 +132,12 @@ test("凌晨三点插件生成目标和剩余路人", () => {
   assert.equal(records.target.levelManaged, true);
   assert.equal(records.target.script, undefined);
   assert.equal(records.target.markIntensity, 0.7);
-  assert.equal(records.target.group.position.x, 0.4);
-  assert.equal(records.target.group.position.z, 8.2);
+  assert.equal(records.target.group.position.x, 3);
+  assert.equal(records.target.group.position.z, 5);
+  assert.equal(records.randomOpenPositions.length, 2);
 });
 
-test("凌晨三点目标固定在可见电脑位不参与通用游走", () => {
+test("凌晨三点教学目标随机生成且不参与通用游走", () => {
   const { context, records } = createFakeContext({ npcCount: 2 });
   const level = createGamingLevel(context);
   level.start();

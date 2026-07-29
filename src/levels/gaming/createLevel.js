@@ -66,11 +66,6 @@ export function createGamingLevel(context) {
     steps.moveTargetPos?.z ?? 6.6,
   );
   const moveRadius = steps.moveRadius ?? 1;
-  const attackPos = new THREE.Vector3(
-    steps.attackTargetPos?.x ?? movePos.x,
-    0,
-    steps.attackTargetPos?.z ?? movePos.z + 1.6,
-  );
   const extraNpcCount = Math.max(
     1,
     (context.definition.npcCount ?? context.actors.npcCount ?? 6) - 1,
@@ -135,7 +130,7 @@ export function createGamingLevel(context) {
     target.id = steps.attackTargetId ?? "noisy_roommate";
     target.levelManaged = true;
     target.walking = false;
-    target.group.position.copy(attackPos);
+    target.group.position.copy(context.movement.randomOpenPosition());
     context.ui.setBlackEye(target, 0.7);
     context.actors.addNpc(target);
 
