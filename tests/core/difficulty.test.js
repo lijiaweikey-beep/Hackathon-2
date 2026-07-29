@@ -13,18 +13,21 @@ test("难度默认从中开始并清洗非法值", () => {
   assert.equal(normalizeDifficulty("unknown"), "medium");
 });
 
-test("找人关与爆金币均随难度增加人数", () => {
+test("找人关随难度增加人数", () => {
   assert.deepEqual(
     ["easy", "medium", "hard"].map((difficulty) =>
       getDifficultyNpcCount({ id: "gaming" }, difficulty)
     ),
     [14, 18, 24],
   );
+});
+
+test("爆金币最难人数最少且最易人数最多", () => {
   assert.deepEqual(
     ["easy", "medium", "hard"].map((difficulty) =>
       getDifficultyNpcCount({ id: "debt-smasher" }, difficulty)
     ),
-    [16, 20, 26],
+    [26, 20, 16],
   );
 });
 

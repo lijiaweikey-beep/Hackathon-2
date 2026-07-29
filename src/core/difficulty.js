@@ -14,7 +14,7 @@ const DEFAULT_COUNTS = Object.freeze({
 
 const LEVEL_COUNTS = Object.freeze({
   office: { easy: 14, medium: 18, hard: 24 },
-  "debt-smasher": { easy: 16, medium: 20, hard: 26 },
+  "debt-smasher": { easy: 26, medium: 20, hard: 16 },
   "goose-market": { easy: 14, medium: 17, hard: 20 },
 });
 

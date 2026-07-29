@@ -120,7 +120,7 @@ test("难度按钮只更新当前关卡人数和选中状态", () => {
   buttons[2].click();
   controller.showTask(level);
 
-  assert.equal(controller.getMatchNpcCount(), 26);
+  assert.equal(controller.getMatchNpcCount(), 16);
   assert.equal(buttons[2].attributes["aria-pressed"], "true");
 });
 
