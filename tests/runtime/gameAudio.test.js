@@ -45,3 +45,25 @@ test("体验音频提供运行时依赖适配对象", () => {
 
   assert.deepEqual(calls, ["hit", "resume", "punch", "hit", "miss", "win", "lose"]);
 });
+
+test("关闭音效后打击相关声音不再播放", () => {
+  const calls = [];
+  let enabled = true;
+  const audio = createGameAudio({
+    sounds: {
+      hit: () => calls.push("hit"),
+      punch: () => calls.push("punch"),
+    },
+    isEnabled: () => enabled,
+  });
+
+  audio.play("hit");
+  audio.punch();
+  audio.combat.playHit();
+  enabled = false;
+  audio.play("hit");
+  audio.punch();
+  audio.combat.playPunch();
+
+  assert.deepEqual(calls, ["hit", "punch", "hit"]);
+});

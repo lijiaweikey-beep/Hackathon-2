@@ -67,4 +67,22 @@ describe("createStoryBgm", () => {
     assert.match(instances[1].src, /audio\/level-1\.mp3$/);
     assert.equal(instances[1].paused, false);
   });
+
+  it("respects global music toggle without losing desired track", () => {
+    const { AudioCtor, instances } = createFakeAudio();
+    let enabled = true;
+    const bgm = createStoryBgm({
+      AudioCtor,
+      documentTarget: null,
+      isEnabled: () => enabled,
+    });
+    bgm.playForAge(27);
+    assert.equal(instances.at(-1).paused, false);
+    enabled = false;
+    bgm.syncEnabled();
+    assert.equal(instances.at(-1).paused, true);
+    enabled = true;
+    bgm.syncEnabled();
+    assert.equal(instances.at(-1).paused, false);
+  });
 });

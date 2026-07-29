@@ -81,8 +81,42 @@
                 <button class="difficulty-option" type="button" data-difficulty="hard" aria-pressed="false">难</button>
               </div>
             </div>
+            <button id="settingsButton" class="settings-button" type="button" aria-expanded="false" aria-controls="settingsPanel">
+              设置
+            </button>
           </div>
         </header>
+
+        <div id="settingsPanel" class="settings-panel" hidden>
+          <button class="settings-panel-backdrop" id="settingsPanelBackdrop" type="button" aria-label="关闭设置"></button>
+          <div class="settings-panel-card" role="dialog" aria-modal="true" aria-label="游戏设置">
+            <div class="settings-panel-title">设置</div>
+            <div class="settings-panel-list">
+              <div class="difficulty-picker preference-picker" aria-label="音效开关">
+                <span class="difficulty-label">音效</span>
+                <div class="difficulty-options" role="group" aria-label="选择音效开关">
+                  <button class="difficulty-option" type="button" data-pref="sfx" data-value="on" aria-pressed="true">on</button>
+                  <button class="difficulty-option" type="button" data-pref="sfx" data-value="off" aria-pressed="false">off</button>
+                </div>
+              </div>
+              <div class="difficulty-picker preference-picker" aria-label="音乐开关">
+                <span class="difficulty-label">音乐</span>
+                <div class="difficulty-options" role="group" aria-label="选择音乐开关">
+                  <button class="difficulty-option" type="button" data-pref="music" data-value="on" aria-pressed="true">on</button>
+                  <button class="difficulty-option" type="button" data-pref="music" data-value="off" aria-pressed="false">off</button>
+                </div>
+              </div>
+              <div class="difficulty-picker preference-picker" aria-label="震动开关">
+                <span class="difficulty-label">震动</span>
+                <div class="difficulty-options" role="group" aria-label="选择震动开关">
+                  <button class="difficulty-option" type="button" data-pref="vibration" data-value="on" aria-pressed="true">on</button>
+                  <button class="difficulty-option" type="button" data-pref="vibration" data-value="off" aria-pressed="false">off</button>
+                </div>
+              </div>
+            </div>
+            <button id="settingsCloseButton" class="secondary-button settings-close-button" type="button">关闭</button>
+          </div>
+        </div>
 
         <div id="historyViewport" class="history-viewport" aria-label="历史节点进度">
           <div id="historyTrack" class="history-track"></div>

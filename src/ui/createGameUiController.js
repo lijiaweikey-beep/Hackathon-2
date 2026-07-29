@@ -3,10 +3,17 @@ import {
   getDifficultyNpcCount,
   normalizeDifficulty,
 } from "../core/difficulty.js";
+import {
+  DEFAULT_PLAYER_PREFERENCES,
+  normalizePlayerPreferences,
+  normalizeToggle,
+} from "../core/playerPreferences.js";
 import { GAME_PHASES } from "../core/gamePhase.js";
 import {
   loadDifficultySetting,
+  loadPlayerPreferences,
   saveDifficultySetting,
+  savePlayerPreferences,
 } from "../utils/storage.js";
 import { renderShareCard } from "./shareCard.js";
 import { createStoryIntroPlayer } from "./storyIntro.js";
@@ -21,6 +28,7 @@ export function createGameUiController(dependencies) {
   } = dependencies;
   const storyIntro = createStoryIntroPlayer({ ui });
   let difficulty = DEFAULT_DIFFICULTY;
+  let preferences = { ...DEFAULT_PLAYER_PREFERENCES };
   let lastResult = null;
   let clueTypeTarget = "";
   let clueTypeTimer = null;
@@ -89,6 +97,28 @@ export function createGameUiController(dependencies) {
     saveDifficultySetting(difficulty);
     syncDifficultyUi();
     dependencies.onDifficultyChanged?.();
+  }
+
+  function syncPreferenceUi() {
+    ui.preferenceButtons?.forEach((button) => {
+      const key = button.dataset.pref;
+      if (!key || !(key in preferences)) return;
+      const enabled = preferences[key];
+      const active = button.dataset.value === (enabled ? "on" : "off");
+      button.classList?.toggle("active", active);
+      button.setAttribute?.("aria-pressed", String(active));
+    });
+  }
+
+  function selectPreference(key, value) {
+    if (!(key in preferences)) return;
+    preferences = normalizePlayerPreferences({
+      ...preferences,
+      [key]: normalizeToggle(value, preferences[key]),
+    });
+    savePlayerPreferences(preferences);
+    syncPreferenceUi();
+    dependencies.onPreferencesChanged?.(preferences);
   }
 
   function showHome({ leaveLevel = true } = {}) {
@@ -257,6 +287,32 @@ export function createGameUiController(dependencies) {
     });
   }
 
+  function bindPreferenceButtons() {
+    ui.preferenceButtons?.forEach((button) => {
+      button.addEventListener("click", () => {
+        selectPreference(button.dataset.pref, button.dataset.value);
+      });
+    });
+  }
+
+  function isSettingsOpen() {
+    return Boolean(ui.settingsPanel && !ui.settingsPanel.hidden);
+  }
+
+  function setSettingsOpen(open) {
+    if (!ui.settingsPanel) return;
+    ui.settingsPanel.hidden = !open;
+    ui.settingsButton?.setAttribute("aria-expanded", String(open));
+  }
+
+  function bindSettingsPanel() {
+    ui.settingsButton?.addEventListener("click", () => {
+      setSettingsOpen(!isSettingsOpen());
+    });
+    ui.settingsPanelBackdrop?.addEventListener("click", () => setSettingsOpen(false));
+    ui.settingsCloseButton?.addEventListener("click", () => setSettingsOpen(false));
+  }
+
   function bindPrelaunch() {
     if (!ui.prelaunchScreen) return;
     ui.prelaunchStartButton?.addEventListener("click", () => {
@@ -314,11 +370,16 @@ export function createGameUiController(dependencies) {
 
   function bind() {
     difficulty = loadDifficultySetting();
+    preferences = loadPlayerPreferences();
     syncDifficultyUi();
+    syncPreferenceUi();
     bindDifficultyButtons();
+    bindPreferenceButtons();
+    bindSettingsPanel();
     bindPrelaunch();
     bindShareCard();
     storyIntro.bind();
+    dependencies.onPreferencesChanged?.(preferences);
     ui.startButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.BRIEFING) return;
       ui.taskModal.classList.remove("visible");

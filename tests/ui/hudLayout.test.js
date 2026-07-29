@@ -14,17 +14,26 @@ test("互动内隐藏左上角任务卡并保留目标提示条", async () => {
   assert.match(clueWrapRule, /inset:\s*0/);
 });
 
-test("难度选择位于事件轴右上角且任务卡不展示人数和玩法说明", async () => {
+test("难度与设置按钮位于事件轴右上角，设置内含音效音乐震动", async () => {
   const html = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   const header = html.match(/<header class="history-header">([\s\S]*?)<\/header>/)?.[1] ?? "";
   const footer = html.match(/<footer class="history-footer">([\s\S]*?)<\/footer>/)?.[1] ?? "";
   const taskModal = html.match(/<section id="taskModal" class="modal">([\s\S]*?)<\/section>/)?.[1] ?? "";
+  const settingsPanel = html.match(/<div id="settingsPanel"[\s\S]*?<\/div>\s*<div id="historyViewport"/)?.[0] ?? "";
 
   assert.match(header, /class="difficulty-picker"/);
+  assert.match(header, /id="settingsButton"/);
+  assert.doesNotMatch(header, /data-pref="sfx"/);
+  assert.match(html, /id="settingsPanel"/);
+  assert.match(html, /data-pref="sfx"/);
+  assert.match(html, /data-pref="music"/);
+  assert.match(html, /data-pref="vibration"/);
+  assert.match(html, /class="settings-panel-list"/);
   assert.doesNotMatch(footer, /class="difficulty-picker"/);
   assert.doesNotMatch(header, /id="difficultyHint"/);
   assert.doesNotMatch(taskModal, /class="match-settings"/);
   assert.doesNotMatch(taskModal, /class="task-controls-guide"/);
+  assert.ok(settingsPanel.includes("settings-panel-list"));
 });
 
 test("隐藏弹窗不拦截互动内按钮", async () => {
