@@ -7,6 +7,7 @@ export function createInputController(dependencies) {
   const playerVelocity = new THREE.Vector2();
   const now = dependencies.now ?? (() => performance.now());
   let pointerId = null;
+  let joystickOrigin = null;
   let lastActionAt = -Infinity;
 
   function setJoystickKnobOffset(x, y) {
@@ -37,6 +38,7 @@ export function createInputController(dependencies) {
 
   function reset() {
     pointerId = null;
+    joystickOrigin = null;
     joystickDirection.set(0, 0);
     keyDirection.set(0, 0);
     playerVelocity.set(0, 0);
@@ -53,10 +55,10 @@ export function createInputController(dependencies) {
   function updateJoystick(event, joystick) {
     if (!isActive()) return;
     const rect = joystick.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const deltaX = event.clientX - centerX;
-    const deltaY = event.clientY - centerY;
+    const originX = joystickOrigin?.x ?? rect.left + rect.width / 2;
+    const originY = joystickOrigin?.y ?? rect.top + rect.height / 2;
+    const deltaX = event.clientX - originX;
+    const deltaY = event.clientY - originY;
     const radius = rect.width * 0.34;
     const distance = Math.hypot(deltaX, deltaY);
     const scale = distance > radius ? radius / distance : 1;
@@ -70,6 +72,7 @@ export function createInputController(dependencies) {
   function releaseJoystick(event) {
     if (event?.pointerId != null && event.pointerId !== pointerId) return;
     pointerId = null;
+    joystickOrigin = null;
     joystickDirection.set(0, 0);
     setJoystickKnobOffset(0, 0);
   }
@@ -84,6 +87,7 @@ export function createInputController(dependencies) {
     hitArea.addEventListener("pointerdown", (event) => {
       if (!isActive()) return;
       pointerId = event.pointerId;
+      joystickOrigin = { x: event.clientX, y: event.clientY };
       hitArea.setPointerCapture(event.pointerId);
       updateJoystick(event, joystick);
     });
