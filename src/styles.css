@@ -1680,28 +1680,30 @@ button {
 
 
 /* ---- 响应式 ---- */
-@media (orientation: landscape) and (min-width: 900px) {
+@media (orientation: landscape) {
   .result-modal {
     align-items: center;
     justify-content: center;
     padding:
-      max(20px, env(safe-area-inset-top))
-      max(20px, env(safe-area-inset-right))
-      max(20px, env(safe-area-inset-bottom))
-      max(20px, env(safe-area-inset-left));
+      max(8px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
     background: rgba(39, 59, 99, 0.82);
   }
 
   .result-stage {
+    --result-stage-width: min(820px, calc(100vw - 24px));
     display: grid;
-    grid-template-columns: minmax(0, 1.06fr) minmax(320px, 0.74fr);
+    grid-template-columns: minmax(0, 1fr) minmax(248px, 0.86fr);
     grid-template-rows: auto minmax(0, 1fr);
-    width: min(1120px, calc(100vw - 40px));
-    height: min(640px, calc(100dvh - 40px));
+    width: var(--result-stage-width);
+    height: min(calc(100dvh - 16px), calc(var(--result-stage-width) * 390 / 844));
+    max-height: calc(100dvh - 16px);
     border: var(--line);
     border-radius: 18px;
     background: var(--paper);
-    box-shadow: 6px 6px 0 var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
   }
 
   .result-art {
@@ -1730,7 +1732,23 @@ button {
   .result-slug {
     grid-column: 2;
     grid-row: 1;
-    padding: 16px 16px 0;
+    gap: 6px;
+    padding: 10px 10px 0;
+  }
+
+  .result-slug-item {
+    padding: 4px 8px;
+    border-width: 2px;
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  .result-rating {
+    width: 34px;
+    height: 34px;
+    border-width: 2px;
+    border-radius: 10px;
+    font-size: 20px;
   }
 
   .result-brief {
@@ -1738,12 +1756,64 @@ button {
     grid-row: 2;
     min-height: 0;
     overflow-y: auto;
-    margin: 14px 16px 16px 0;
+    margin: 8px 10px 10px 0;
+    padding: 10px;
+    border-width: 2px;
+    box-shadow: none;
+  }
+
+  .result-outcome {
+    font-size: 11px;
+  }
+
+  .result-node-title {
+    font-size: 16px;
+    letter-spacing: 0;
+  }
+
+  .result-verdict {
+    margin-top: 5px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .result-stats {
+    margin-top: 8px;
+    border-width: 2px;
+  }
+
+  .stat-row {
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  .stat-row strong {
+    font-size: 12px;
+  }
+
+  .result-unlock {
+    margin-top: 6px;
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  .result-actions {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .result-actions .primary-button,
+  .result-actions .secondary-button {
+    padding: 8px 14px;
+    font-size: 13px;
   }
 
   .history-detail-panel {
-    width: min(960px, calc(100vw - 40px));
-    max-height: calc(100dvh - 40px);
+    width: min(760px, 86vw);
+    max-height: calc(100dvh - 18px);
+    gap: 8px;
+    padding: 12px;
+    border-radius: 14px;
     overflow: hidden;
   }
 

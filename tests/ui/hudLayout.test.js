@@ -84,27 +84,32 @@ test("手机横屏短高度把结算页收纳为插画和信息两区", async ()
   assert.match(compactRule, /\.share-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
 });
 
-test("电脑横屏结算页使用稳定分区而不是全屏裁切", async () => {
+test("电脑横屏结算页与手机横屏使用同一套分区尺寸", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const desktopLandscapeRule = css.match(
-    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(min-width:\s*900px\)\s*\{([\s\S]*)\n\}/,
+    /@media\s*\(orientation:\s*landscape\)\s*\{([\s\S]*)\n\}/,
   )?.[1] ?? "";
 
-  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*grid-template-columns/);
+  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(248px,\s*0\.86fr\)/);
+  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*--result-stage-width:\s*min\(820px,\s*calc\(100vw - 24px\)\)/);
+  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*width:\s*var\(--result-stage-width\)/);
+  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*height:\s*min\(calc\(100dvh - 16px\),\s*calc\(var\(--result-stage-width\) \* 390 \/ 844\)\)/);
   assert.match(desktopLandscapeRule, /\.result-art\s*\{[\s\S]*position:\s*relative/);
   assert.match(desktopLandscapeRule, /\.result-art\s*\{[\s\S]*background-size:\s*contain/);
   assert.match(desktopLandscapeRule, /\.result-brief\s*\{[\s\S]*overflow-y:\s*auto/);
+  assert.match(desktopLandscapeRule, /\.result-node-title\s*\{[\s\S]*font-size:\s*16px/);
+  assert.match(desktopLandscapeRule, /\.result-actions\s+\.primary-button,\n\s*\.result-actions\s+\.secondary-button\s*\{[\s\S]*font-size:\s*13px/);
 });
 
 test("电脑横屏历史揭晓详情页不裁切成顶部大图", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const visualRule = css.match(/\.history-detail-visual\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const desktopLandscapeRule = css.match(
-    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(min-width:\s*900px\)\s*\{([\s\S]*)\n\}/,
+    /@media\s*\(orientation:\s*landscape\)\s*\{([\s\S]*)\n\}/,
   )?.[1] ?? "";
 
   assert.match(visualRule, /min-height:\s*0/);
-  assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 40px\)/);
+  assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
   assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*position:\s*absolute/);
   assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*inset:\s*0/);
   assert.match(desktopLandscapeRule, /\.history-detail-image\s*\{[\s\S]*object-fit:\s*contain/);
