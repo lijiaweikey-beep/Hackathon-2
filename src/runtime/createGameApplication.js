@@ -17,7 +17,6 @@ import { GAME_PHASES } from "../core/gamePhase.js";
 import { createClassicLevelRunner } from "./createClassicLevelRunner.js";
 import { createGameSession } from "./createGameSession.js";
 import { createGameLoop } from "./createGameLoop.js";
-import { createGameAudio } from "./createGameAudio.js";
 import { createClassicGameExperience } from "./createClassicGameExperience.js";
 import { createStandaloneExperienceHost } from "./createExperienceHost.js";
 import { createExperienceManager } from "./createExperienceManager.js";
@@ -28,24 +27,18 @@ import { createActorSystem } from "../systems/createActorSystem.js";
 import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
-import { createStoryBgm } from "../audio/createStoryBgm.js";
-import { loadPlayerPreferences } from "../utils/storage.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
 import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
+import { createPlayerFeedback } from "./createPlayerFeedback.js";
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager;
 let storyProgress, historyTimelineFlow;
 let totalTime = 0;
-let playerPreferences = loadPlayerPreferences();
 const session = createGameSession();
-const audio = createGameAudio({
-  isEnabled: () => playerPreferences.sfx !== false,
-});
-const storyBgm = createStoryBgm({
-  isEnabled: () => playerPreferences.music !== false,
-});
+const playerFeedback = createPlayerFeedback();
+const { audio, storyBgm } = playerFeedback;
 const levelRunner = createClassicLevelRunner({
   session,
   getServices: () => ({
@@ -233,10 +226,7 @@ export function boot() {
     dispatch: (action) => levelRunner.handleAction(action),
     consumeActionInterval: () => inputController.consumeAction(),
     ...audio.combat,
-    vibrate: (pattern) => {
-      if (playerPreferences.vibration === false) return;
-      navigator.vibrate?.(pattern);
-    },
+    vibrate: playerFeedback.vibrate,
     triggerHitstop,
     triggerShake,
     settleRound,
@@ -270,10 +260,7 @@ export function boot() {
     onPrelaunchDismissed: () => storyBgm.playIntro(),
     onHomeShown: () => historyTimelineFlow?.showHome(),
     onDifficultyChanged: () => historyTimelineFlow?.showHome(),
-    onPreferencesChanged(next) {
-      playerPreferences = next;
-      storyBgm.syncEnabled();
-    },
+    onPreferencesChanged: playerFeedback.setPreferences,
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
