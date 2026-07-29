@@ -10,12 +10,15 @@ import {
   clampToWorld,
   lerpAngle,
 } from "../utils/math.js";
+import { steerAwayFromScreenEdge } from "../utils/screenEdge.js";
 import { createActorAnimator } from "./createActorAnimator.js";
 import { createActorNavigation } from "./createActorNavigation.js";
 import { createActorSeparationSystem } from "./createActorSeparationSystem.js";
+import { createPlayerAntiJitter } from "./createPlayerAntiJitter.js";
 
 export function createActorSystem(dependencies) {
   const scratch2 = new THREE.Vector2();
+  const edgeSteer = new THREE.Vector2();
   let npcs = [];
 
   const randomRange = dependencies.randomRange;
@@ -31,11 +34,30 @@ export function createActorSystem(dependencies) {
   const navigation = createActorNavigation({
     randomRange,
     resolveObstacleCollisions: dependencies.resolveObstacleCollisions,
+    getCamera: () => dependencies.getCamera?.() ?? null,
   });
+  const antiJitter = createPlayerAntiJitter();
+
+  /** 屏幕边缘 2% 禁行：立刻朝屏幕中心转向离开，禁止沿边蹭走。 */
+  function steerNpcOffScreenEdge(npc, direction, { keepSpeed = 1 } = {}) {
+    const camera = dependencies.getCamera?.();
+    if (!camera || !direction) return false;
+    if (!steerAwayFromScreenEdge(npc.group.position, camera, edgeSteer)) return false;
+
+    const speed = Math.max(direction.length(), keepSpeed);
+    direction.copy(edgeSteer).multiplyScalar(speed);
+    npc.pauseTimer = 0;
+    npc.walking = true;
+    if (npc.wanderTimer != null) npc.wanderTimer = Math.max(npc.wanderTimer ?? 0, 0.9);
+    npc.group.rotation.y = Math.atan2(direction.x, direction.y);
+    npc.stuckTimer = 0;
+    return true;
+  }
 
   function reset() {
     npcs = [];
     separation.reset();
+    antiJitter.reset();
   }
 
   function getNpcs() {
@@ -148,6 +170,11 @@ export function createActorSystem(dependencies) {
   }
 
   function updateWander(npc, deltaSeconds) {
+    // 停顿中若已在屏幕边缘，立刻取消停顿并离开。
+    if (steerNpcOffScreenEdge(npc, npc.velocity)) {
+      npc.pauseTimer = 0;
+    }
+
     if (npc.pauseTimer > 0) {
       npc.pauseTimer -= deltaSeconds;
       npc.walking = false;
@@ -162,6 +189,7 @@ export function createActorSystem(dependencies) {
     npc.group.position.x += npc.velocity.x * NPC_SPEED * deltaSeconds;
     npc.group.position.z += npc.velocity.y * NPC_SPEED * deltaSeconds;
     dependencies.clampActorPosition(npc.group.position, npc.velocity);
+    steerNpcOffScreenEdge(npc, npc.velocity);
 
     const moved = Math.hypot(
       npc.group.position.x - previousX,
@@ -174,19 +202,34 @@ export function createActorSystem(dependencies) {
       npc.stuckTimer = 0;
     }
 
-    if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.2) npc.velocity.x *= -1;
+    // 世界硬边：整向量朝内，避免单轴反转沿边蹭走。
     if (
-      npc.group.position.z <= PLAY_Z_MIN + 0.2
-      || npc.group.position.z >= WORLD_LIMIT - 0.2
+      !steerNpcOffScreenEdge(npc, npc.velocity)
+      && (
+        Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.2
+        || npc.group.position.z <= PLAY_Z_MIN + 0.2
+        || npc.group.position.z >= WORLD_LIMIT - 0.2
+      )
     ) {
-      npc.velocity.y *= -1;
+      const inwardX = -Math.sign(npc.group.position.x) || npc.velocity.x;
+      const inwardZ = npc.group.position.z <= PLAY_Z_MIN + 0.2
+        ? 1
+        : npc.group.position.z >= WORLD_LIMIT - 0.2
+          ? -1
+          : npc.velocity.y;
+      const speed = Math.max(npc.velocity.length(), 1);
+      npc.velocity.set(inwardX, inwardZ).normalize().multiplyScalar(speed);
+      npc.group.rotation.y = Math.atan2(npc.velocity.x, npc.velocity.y);
     }
 
     const targetRotation = Math.atan2(npc.velocity.x, npc.velocity.y);
     npc.group.rotation.y = lerpAngle(npc.group.rotation.y, targetRotation, 0.08);
     if (npc.wanderTimer <= 0) {
-      npc.pauseTimer = randomRange(0.35, 1.9);
-      npc.velocity.set(0, 0);
+      // 仍在屏幕边缘时不允许停步沿边徘徊，继续离开。
+      if (!steerNpcOffScreenEdge(npc, npc.velocity)) {
+        npc.pauseTimer = randomRange(0.35, 1.9);
+        npc.velocity.set(0, 0);
+      }
     }
   }
 
@@ -235,12 +278,21 @@ export function createActorSystem(dependencies) {
       npc.stuckTimer = 0;
     }
 
-    if (Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.3) npc.decoyDir.x *= -1;
-    if (
-      npc.group.position.z <= PLAY_Z_MIN + 0.3
-      || npc.group.position.z >= WORLD_LIMIT - 0.3
-    ) {
-      npc.decoyDir.y *= -1;
+    if (!steerNpcOffScreenEdge(npc, npc.decoyDir, { keepSpeed: 1 })) {
+      if (
+        Math.abs(npc.group.position.x) >= WORLD_LIMIT - 0.3
+        || npc.group.position.z <= PLAY_Z_MIN + 0.3
+        || npc.group.position.z >= WORLD_LIMIT - 0.3
+      ) {
+        const inwardX = -Math.sign(npc.group.position.x) || npc.decoyDir.x;
+        const inwardZ = npc.group.position.z <= PLAY_Z_MIN + 0.3
+          ? 1
+          : npc.group.position.z >= WORLD_LIMIT - 0.3
+            ? -1
+            : npc.decoyDir.y;
+        npc.decoyDir.set(inwardX, inwardZ).normalize();
+        npc.group.rotation.y = Math.atan2(npc.decoyDir.x, npc.decoyDir.y);
+      }
     }
     const rotation = Math.atan2(npc.decoyDir.x, npc.decoyDir.y);
     npc.group.rotation.y = lerpAngle(npc.group.rotation.y, rotation, 0.14);
@@ -259,24 +311,41 @@ export function createActorSystem(dependencies) {
 
   function updatePlayer(deltaSeconds) {
     const player = dependencies.getPlayer();
+    const velocity = dependencies.getPlayerVelocity();
+
+    if (antiJitter.isLocked()) {
+      antiJitter.tickLock(velocity, deltaSeconds);
+      dependencies.updatePlayerTimers(deltaSeconds);
+      animator.animate(player, deltaSeconds, false);
+      animator.animatePlayerAttack(player);
+      return;
+    }
+
     dependencies.readPlayerInput(scratch2);
     if (scratch2.lengthSq() > 1) scratch2.normalize();
     dependencies.applyInputLock(scratch2);
-    dependencies.getPlayerVelocity().lerp(
+    velocity.lerp(
       scratch2,
       1 - Math.pow(1 - PLAYER_LERP, deltaSeconds * 60),
     );
-    const velocity = dependencies.getPlayerVelocity();
+
     const moving = velocity.lengthSq() > 0.0004;
     if (moving) {
       player.group.position.x += velocity.x * player.speed * deltaSeconds;
       player.group.position.z -= velocity.y * player.speed * deltaSeconds;
-      dependencies.clampActorPosition(player.group.position, velocity);
+      // 玩家速度 y 与世界 z 反向，贴边时需按 invertZ 清零朝外分量。
+      dependencies.clampActorPosition(player.group.position, velocity, { invertZ: true });
+    }
+
+    // 反向检测放在移动/夹紧后：贴边振荡产生的速度翻转会被计入。
+    const anti = antiJitter.observe(player, velocity, deltaSeconds);
+    if (!anti.locked && moving) {
       const rotation = Math.atan2(velocity.x, -velocity.y);
       player.group.rotation.y = lerpAngle(player.group.rotation.y, rotation, 0.24);
     }
+
     dependencies.updatePlayerTimers(deltaSeconds);
-    animator.animate(player, deltaSeconds, moving);
+    animator.animate(player, deltaSeconds, !anti.locked && moving);
     animator.animatePlayerAttack(player);
   }
 
@@ -292,6 +361,12 @@ export function createActorSystem(dependencies) {
       if (npc.attackResolveTimer != null) animator.animateNpcAttack(npc);
     });
     separation.separate();
+    // 分离推挤后可能再次贴边，再扫一遍屏幕边缘驱离。
+    npcs.forEach((npc) => {
+      if (!npc.alive) return;
+      if (npc.velocity) steerNpcOffScreenEdge(npc, npc.velocity);
+      if (npc.decoyDir) steerNpcOffScreenEdge(npc, npc.decoyDir, { keepSpeed: 1 });
+    });
     dependencies.dispatch({ type: "afterNpcUpdate", deltaSeconds });
   }
 

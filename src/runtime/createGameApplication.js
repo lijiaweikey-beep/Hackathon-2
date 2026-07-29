@@ -185,6 +185,7 @@ export function boot() {
   inputController = createInputController({
     isActive: () => session.phase === GAME_PHASES.PLAYING
       && ["classic", "shared"].includes(experienceManager?.presentation),
+    joystickHitArea: ui.joystickHitArea,
     joystick: ui.joystick,
     joystickKnob: ui.joystickKnob,
     primeAudio: audio.resume,
@@ -199,6 +200,7 @@ export function boot() {
   actorSystem = createActorSystem({
     getScene: () => scene,
     getPlayer: () => player,
+    getCamera: () => rendering.camera,
     getLevel: () => session.levelState.level,
     createNpc,
     collidesWithObstacle: (...args) => worldRuntime.collidesWithObstacle(...args),

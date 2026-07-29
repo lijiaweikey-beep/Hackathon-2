@@ -1,9 +1,9 @@
 import { getBestScore } from "../utils/storage.js";
 import { renderShareCard } from "./shareCard.js";
 
-const NODE_GAP = 330;
-const TRACK_PADDING = 130;
-const EXTRA_GAP = 150;
+const NODE_GAP = 260;
+const TRACK_PADDING = 110;
+const EXTRA_GAP = 120;
 const REVEAL_AUTO_DELAY = 2000;
 const REVEAL_ANIMATION_MS = 1250;
 

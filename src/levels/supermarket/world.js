@@ -182,13 +182,30 @@ export function createSupermarketWorld(host) {
     return false;
   }
 
-  function clampActorPosition(position, velocity) {
+  function clampActorPosition(position, velocity, { invertZ = false } = {}) {
     const leftLimit = WALLS[0][0] + WALLS[0][2] + ACTOR_COLLISION_RADIUS;
     const rightLimit = WALLS[1][0] - WALLS[1][2] - ACTOR_COLLISION_RADIUS;
     const backLimit = WALLS[2][1] + WALLS[2][3] + ACTOR_COLLISION_RADIUS;
+    const frontLimit = 7.25;
+    resolveObstacleCollisions(
+      obstacleState,
+      position,
+      undefined,
+      velocity,
+      { invertZ },
+    );
     position.x = THREE.MathUtils.clamp(position.x, leftLimit, rightLimit);
-    position.z = THREE.MathUtils.clamp(position.z, backLimit, 7.25);
-    resolveObstacleCollisions(obstacleState, position, undefined, velocity);
+    position.z = THREE.MathUtils.clamp(position.z, backLimit, frontLimit);
+    if (!velocity) return;
+    if (position.x <= leftLimit && velocity.x < 0) velocity.x = 0;
+    if (position.x >= rightLimit && velocity.x > 0) velocity.x = 0;
+    if (invertZ) {
+      if (position.z <= backLimit && velocity.y > 0) velocity.y = 0;
+      if (position.z >= frontLimit && velocity.y < 0) velocity.y = 0;
+      return;
+    }
+    if (position.z <= backLimit && velocity.y < 0) velocity.y = 0;
+    if (position.z >= frontLimit && velocity.y > 0) velocity.y = 0;
   }
 
   return {

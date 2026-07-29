@@ -100,7 +100,6 @@ export function createWorld(world) {
 
     group.position.set(x, 0, z);
     group.rotation.y = rotY;
-    group.traverse((child) => { if (child.isMesh) child.castShadow = true; });
     scene.add(group);
   }
 
@@ -133,7 +132,6 @@ export function createWorld(world) {
 
     group.position.set(x, 0, z);
     group.rotation.y = rotY;
-    group.traverse((child) => { if (child.isMesh) child.castShadow = true; });
     scene.add(group);
   }
 

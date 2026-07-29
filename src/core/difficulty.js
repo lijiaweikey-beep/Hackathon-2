@@ -7,22 +7,22 @@ export const DIFFICULTIES = Object.freeze([
 ]);
 
 const DEFAULT_COUNTS = Object.freeze({
-  easy: 20,
-  medium: 32,
-  hard: 45,
+  easy: 14,
+  medium: 18,
+  hard: 24,
 });
 
 const LEVEL_COUNTS = Object.freeze({
-  office: { easy: 20, medium: 28, hard: 36 },
-  "debt-smasher": { easy: 50, medium: 40, hard: 35 },
+  office: { easy: 14, medium: 18, hard: 24 },
+  "debt-smasher": { easy: 16, medium: 20, hard: 26 },
   "goose-market": { easy: 14, medium: 17, hard: 20 },
 });
 
 const LEVEL_TEXT = Object.freeze({
   "goose-market": {
     easy: "13–15 人",
-    medium: "15–18 人",
-    hard: "18–22 人",
+    medium: "16–19 人",
+    hard: "19–23 人",
   },
   "staged-director": {
     easy: "14人",
