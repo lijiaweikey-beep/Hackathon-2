@@ -2628,38 +2628,51 @@ button {
   }
 
   .history-detail-panel {
-    width: min(760px, 86vw);
+    width: min(760px, calc(100vw - 72px));
+    height: calc(100dvh - 18px);
     max-height: calc(100dvh - 18px);
-    gap: 8px;
-    padding: 12px;
+    gap: 7px;
+    padding: 10px 12px;
     border-radius: 14px;
   }
 
+  .history-detail-header {
+    gap: 2px;
+  }
+
   .history-detail-header h2 {
-    font-size: 20px;
+    font-size: clamp(16px, 5vh, 20px);
+    line-height: 1;
+  }
+
+  .history-detail-header p {
+    padding: 2px 10px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
   }
 
   .history-detail-body {
-    grid-template-columns: 38px minmax(0, 1fr) 38px;
-    grid-template-rows: minmax(110px, 1fr) minmax(54px, auto);
+    grid-template-columns: 38px minmax(118px, 0.42fr) minmax(0, 0.58fr) 38px;
+    grid-template-rows: minmax(0, 1fr);
     gap: 8px;
   }
 
   .history-detail-share {
     grid-column: 2;
+    grid-row: 1;
   }
 
   .history-detail-share-canvas {
-    max-height: min(38vh, 220px);
+    max-height: 100%;
   }
 
   .history-detail-side {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-column: 3;
+    grid-row: 1;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 8px;
-    max-height: 118px;
+    max-height: none;
     overflow-y: auto;
   }
 
@@ -2670,12 +2683,13 @@ button {
   }
 
   .history-detail-nav.next {
-    grid-column: 3;
+    grid-column: 4;
   }
 
   .history-detail-lore {
-    max-height: 74px;
-    font-size: 12px;
+    max-height: none;
+    padding: 8px 10px;
+    font-size: 11px;
     line-height: 1.45;
   }
 
@@ -2687,6 +2701,27 @@ button {
 
   .history-detail-stat-row strong {
     font-size: 12px;
+  }
+
+  .history-detail-footer {
+    gap: 6px;
+  }
+
+  .history-detail-actions {
+    gap: 8px;
+  }
+
+  .history-detail-button {
+    min-width: 92px;
+    min-height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+  }
+
+  .history-detail-reward {
+    min-height: 16px;
+    font-size: 11px;
   }
 
   .result-modal {
