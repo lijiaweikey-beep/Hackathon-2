@@ -396,13 +396,16 @@ button {
   padding: 16px;
   background: rgba(39, 59, 99, 0.82);
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.18s ease;
+  transition: opacity 0.18s ease, visibility 0s linear 0.18s;
 }
 
 .modal.visible {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .modal-panel {

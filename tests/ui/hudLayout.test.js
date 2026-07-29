@@ -27,3 +27,12 @@ test("难度选择位于事件轴右上角且任务卡不展示人数和玩法�
   assert.doesNotMatch(taskModal, /class="match-settings"/);
   assert.doesNotMatch(taskModal, /class="task-controls-guide"/);
 });
+
+test("隐藏弹窗不拦截游戏内按钮", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const modalRule = css.match(/\.modal\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const visibleRule = css.match(/\.modal\.visible\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+  assert.match(modalRule, /visibility:\s*hidden/);
+  assert.match(visibleRule, /visibility:\s*visible/);
+});
