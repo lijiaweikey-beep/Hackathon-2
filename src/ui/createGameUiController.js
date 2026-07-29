@@ -209,6 +209,7 @@ export function createGameUiController(dependencies) {
     if (!ui.prelaunchScreen) return;
     ui.prelaunchStartButton?.addEventListener("click", () => {
       ui.prelaunchScreen.classList.add("is-away");
+      dependencies.onPrelaunchDismissed?.();
     });
   }
 

@@ -57,8 +57,9 @@ test("界面控制器回到首页时交给人生事件轴并刷新抬头信息",
   assert.equal(ui.timerText.textContent, "10");
 });
 
-test("预启动按钮只关闭启动页，不自动进入关卡流程", () => {
-  let entered = false;
+test("预启动按钮关闭启动页并通知外部，不自动进入关卡流程", () => {
+  let dismissed = false;
+  let started = false;
   const prelaunchScreen = { classList: createClassList() };
   const prelaunchStartButton = createButton();
   const controller = createGameUiController({
@@ -71,14 +72,16 @@ test("预启动按钮只关闭启动页，不自动进入关卡流程", () => {
     },
     session: { levelState: { level: {}, remaining: 10, attempts: 3 } },
     levelViewHost: { clear() {}, setTheme() {} },
-    onPrelaunchDismissed: () => { entered = true; },
+    onPrelaunchDismissed: () => { dismissed = true; },
+    onStart: () => { started = true; },
   });
 
   controller.bind();
   prelaunchStartButton.click();
 
   assert.equal(prelaunchScreen.classList.contains("is-away"), true);
-  assert.equal(entered, false);
+  assert.equal(dismissed, true);
+  assert.equal(started, false);
 });
 
 test("难度按钮只更新当前关卡人数和选中状态", () => {
