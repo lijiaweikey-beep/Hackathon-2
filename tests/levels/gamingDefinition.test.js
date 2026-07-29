@@ -25,31 +25,17 @@ test("凌晨三点提示不再引导玩家找声音", async () => {
 
   assert.doesNotMatch(viewSource, /游戏声/);
   assert.doesNotMatch(serializedDefinition, /游戏声|打游戏|开黑/);
-  assert.match(viewSource, /移动到绿色光圈/);
   assert.match(serializedDefinition, /全身发光/);
 });
 
-test("教学摇杆提示在手机横屏短屏中上提", async () => {
-  const css = await readFile(
-    new URL("../../src/levels/gaming/styles.css", import.meta.url),
-    "utf8",
-  );
+test("凌晨三点不再显示绿色移动引导", async () => {
+  const [css, viewSource, createLevelSource] = await Promise.all([
+    readFile(new URL("../../src/levels/gaming/styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../../src/levels/gaming/view.js", import.meta.url), "utf8"),
+    readFile(new URL("../../src/levels/gaming/createLevel.js", import.meta.url), "utf8"),
+  ]);
 
-  assert.match(css, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)/);
-  assert.match(css, /\.tutorial-joystick-guide/);
-});
-
-test("教学摇杆提示在手机横屏短屏中对齐真实摇杆区域", async () => {
-  const css = await readFile(
-    new URL("../../src/levels/gaming/styles.css", import.meta.url),
-    "utf8",
-  );
-  const compactRule = css.match(
-    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
-  )?.[1] ?? "";
-
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*left:\s*max\(24px/);
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*bottom:\s*max\(58px/);
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*width:\s*92px/);
-  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*height:\s*92px/);
+  assert.doesNotMatch(css, /tutorial-joystick|tutorial-ring|tutorial-finger|tutorial-guide/);
+  assert.doesNotMatch(viewSource, /tutorialJoystickGuide/);
+  assert.doesNotMatch(createLevelSource, /placeWaypoint|showMoveTutorial|TUTORIAL_MOVE_HOLD_SECONDS/);
 });

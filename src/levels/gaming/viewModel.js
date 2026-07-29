@@ -1,7 +1,7 @@
 function getMission(phase) {
   if (phase === "attack") return "击打发光目标";
   if (phase === "done") return "教学完成！";
-  return "走到绿色光圈处";
+  return "靠近发光目标";
 }
 
 export function createTutorialViewModel(state) {
@@ -12,11 +12,11 @@ export function createTutorialViewModel(state) {
     resourceText: "∞",
     clue: "",
     hideClue: true,
-    attackIcon: "打",
+    attackIcon: "拳",
     theme: "tutorial",
-    attackLocked: state.phase === "move",
-    attackPulse: state.phase === "attack",
-    joystickGuide: state.phase === "move",
+    attackLocked: false,
+    attackPulse: false,
+    joystickGuide: false,
     resultResource: {
       label: "出拳",
       value: "∞",

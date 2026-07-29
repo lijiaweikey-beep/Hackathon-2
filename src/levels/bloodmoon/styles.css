@@ -8,15 +8,6 @@
   text-shadow: 0 0 14px rgba(248, 113, 113, 0.55);
 }
 
-.attack-button[data-level-theme="bloodmoon"] {
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28), transparent 34%),
-    linear-gradient(160deg, #7f1d1d, #fb7185 58%, #111116);
-  box-shadow: 0 18px 34px rgba(248, 113, 113, 0.34), 0 20px 36px var(--shadow);
-  color: #fff5f5;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
-}
-
 .clue-bar[data-level-theme="bloodmoon"] {
   color: #fecdd3;
   text-shadow: 0 0 14px rgba(248, 113, 113, 0.42);
