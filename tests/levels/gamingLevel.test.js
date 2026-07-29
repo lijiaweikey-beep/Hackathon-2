@@ -34,7 +34,11 @@ function createPosition(x = 0, y = 0, z = 0) {
   };
 }
 
-function createFakeContext({ npcCount, openPositions, actorFactory } = {}) {
+function createFakeContext({
+  npcCount,
+  openPositions,
+  actorFactory,
+} = {}) {
   const nextOpenPositions = [...(openPositions ?? [createPosition(4, 0, 4)])];
   const records = {
     created: [],
@@ -115,11 +119,7 @@ function createFakeContext({ npcCount, openPositions, actorFactory } = {}) {
     audio: {
       playSound() {},
     },
-    random: {
-      range(min) {
-        return min;
-      },
-    },
+    random: { range: (min) => min },
   };
   return { context, records };
 }
@@ -137,7 +137,7 @@ test("凌晨三点插件生成目标和剩余路人", () => {
 
   assert.deepEqual(records.created.map(({ id }) => id), [0, 1, 2, 3]);
   assert.equal(records.created[0].flags.gamingTarget, true);
-  assert.equal(records.target.levelManaged, true);
+  assert.equal(records.target.levelManaged, false);
   assert.equal(records.target.script, undefined);
   assert.equal(records.target.markIntensity, 0.7);
   assert.equal(records.target.group.position.x, 3);
@@ -145,17 +145,35 @@ test("凌晨三点插件生成目标和剩余路人", () => {
   assert.equal(records.randomOpenPositions.length, 2);
 });
 
-test("凌晨三点教学目标随机生成且不参与通用游走", () => {
+test("凌晨三点教学目标随机生成且交给通用随机游走系统", () => {
   const { context, records } = createFakeContext({ npcCount: 2 });
   const level = createGamingLevel(context);
   level.start();
   level.update(3);
 
   assert.equal(records.target.script, undefined);
-  assert.equal(records.target.levelManaged, true);
+  assert.equal(records.target.levelManaged, false);
   assert.equal(records.moveCalls, 0);
   assert.equal(records.target.markIntensity, 0.7);
   assert.equal(records.environmentUpdates, 1);
+});
+
+test("凌晨三点教学目标开局不会固定刷在玩家周围", () => {
+  const { context, records } = createFakeContext({
+    npcCount: 2,
+    openPositions: [
+      createPosition(0, 0, 7),
+      createPosition(-5, 0, 3),
+    ],
+  });
+  const level = createGamingLevel(context);
+  level.start();
+
+  assert.equal(records.player.group.position.x, 0);
+  assert.equal(records.player.group.position.z, 7);
+  assert.equal(records.target.group.position.x, -5);
+  assert.equal(records.target.group.position.z, 3);
+  assert.equal(records.randomOpenPositions.length, 2);
 });
 
 test("凌晨三点教学目标待机时保持可渲染坐标", () => {

@@ -131,7 +131,7 @@ export function createGamingLevel(context) {
       gamingTarget: true,
       levelTarget: true,
     });
-    target.levelManaged = true;
+    target.levelManaged = false;
     target.walking = false;
     target.group.position.copy(context.movement.randomOpenPosition());
     context.ui.setBlackEye(target, 0.7);
