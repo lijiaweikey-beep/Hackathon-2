@@ -29,6 +29,7 @@ import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
 import { createStoryBgm } from "../audio/createStoryBgm.js";
+import { loadPlayerPreferences } from "../utils/storage.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
 import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
@@ -37,9 +38,14 @@ let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager;
 let storyProgress, historyTimelineFlow;
 let totalTime = 0;
+let playerPreferences = loadPlayerPreferences();
 const session = createGameSession();
-const audio = createGameAudio();
-const storyBgm = createStoryBgm();
+const audio = createGameAudio({
+  isEnabled: () => playerPreferences.sfx !== false,
+});
+const storyBgm = createStoryBgm({
+  isEnabled: () => playerPreferences.music !== false,
+});
 const levelRunner = createClassicLevelRunner({
   session,
   getServices: () => ({
@@ -88,7 +94,7 @@ function leaveLevel() {
   settlement.clearPending();
   experienceManager?.dispose();
   session.reset();
-  storyBgm.stop();
+  storyBgm.playIntro();
 }
 
 function selectLevelById(id) {
@@ -227,7 +233,10 @@ export function boot() {
     dispatch: (action) => levelRunner.handleAction(action),
     consumeActionInterval: () => inputController.consumeAction(),
     ...audio.combat,
-    vibrate: (pattern) => navigator.vibrate?.(pattern),
+    vibrate: (pattern) => {
+      if (playerPreferences.vibration === false) return;
+      navigator.vibrate?.(pattern);
+    },
     triggerHitstop,
     triggerShake,
     settleRound,
@@ -261,6 +270,10 @@ export function boot() {
     onPrelaunchDismissed: () => storyBgm.playIntro(),
     onHomeShown: () => historyTimelineFlow?.showHome(),
     onDifficultyChanged: () => historyTimelineFlow?.showHome(),
+    onPreferencesChanged(next) {
+      playerPreferences = next;
+      storyBgm.syncEnabled();
+    },
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
