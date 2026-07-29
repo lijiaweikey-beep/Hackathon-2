@@ -60,6 +60,9 @@ test("超市体验完成挂载、暂停、恢复和释放生命周期", () => {
   experience.dispose();
 
   assert.equal(experience.presentation, "standalone");
+  const mountedContent = calls.find(([name]) => name === "content")[1];
+  assert.match(mountedContent, /取证进度/);
+  assert.match(mountedContent, /警戒/);
   assert.equal(calls.some(([name]) => name === "render"), true);
   assert.deepEqual(calls.slice(-2).map(([name]) => name), ["dispose-scene", "clear"]);
 });

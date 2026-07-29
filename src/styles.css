@@ -51,6 +51,10 @@ button {
   color: var(--text);
 }
 
+.hud.standalone-active > :not([data-level-surface]) {
+  display: none;
+}
+
 .topbar {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));

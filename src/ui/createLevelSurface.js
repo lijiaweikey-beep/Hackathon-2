@@ -18,6 +18,7 @@ export function createLevelSurface({
   root.dataset.levelRoot = levelId;
   shadow.append(style, root);
   parent.append(host);
+  parent.classList.add("standalone-active");
 
   function setContent(html = "") {
     root.innerHTML = html;
@@ -35,6 +36,7 @@ export function createLevelSurface({
   function dispose() {
     clear();
     host.remove();
+    parent.classList.remove("standalone-active");
   }
 
   scope?.add(dispose);
