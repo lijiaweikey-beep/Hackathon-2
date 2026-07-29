@@ -163,3 +163,151 @@ test("成功结算等待几秒让命中粒子完整播放再弹卡片", () => {
 
   assert.equal(timers[0].delay >= 2400, true);
 });
+
+test("成功结算会等活动粒子结束后再弹卡片", () => {
+  const timers = [];
+  const resultCalls = [];
+  let hasPendingEffects = true;
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "age-19" },
+      startTime: 0,
+      attempts: 3,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult(result) {
+      this.result = result;
+    },
+  };
+  const settlement = createRoundSettlement({
+    session,
+    timerHost: {
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+      clearTimeout() {},
+    },
+    getPlayer: () => null,
+    hasScene: () => true,
+    hasPendingEffects: () => hasPendingEffects,
+    getTotalTime: () => 2,
+    getResultStats: () => ({ attemptsLeft: 3 }),
+    calculateRating: () => ({ grade: "S", rating: 100 }),
+    showResult: (result) => resultCalls.push(result),
+    saveBestScore() {},
+    playWin() {},
+    playLose() {},
+  });
+
+  settlement.settle(true, null, 760);
+  timers[0].callback();
+
+  assert.equal(session.phase, GAME_PHASES.SETTLING);
+  assert.equal(resultCalls.length, 0);
+  assert.equal(timers[1].delay, 100);
+
+  hasPendingEffects = false;
+  timers[1].callback();
+
+  assert.equal(session.phase, GAME_PHASES.RESULT);
+  assert.equal(resultCalls.length, 1);
+});
+
+test("成功结算最多等待到保护时间", () => {
+  const timers = [];
+  const resultCalls = [];
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "age-19" },
+      startTime: 0,
+      attempts: 3,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult(result) {
+      this.result = result;
+    },
+  };
+  const settlement = createRoundSettlement({
+    session,
+    timerHost: {
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+      clearTimeout() {},
+    },
+    getPlayer: () => null,
+    hasScene: () => true,
+    hasPendingEffects: () => true,
+    getTotalTime: () => 2,
+    getResultStats: () => ({ attemptsLeft: 3 }),
+    calculateRating: () => ({ grade: "S", rating: 100 }),
+    showResult: (result) => resultCalls.push(result),
+    saveBestScore() {},
+    playWin() {},
+    playLose() {},
+  });
+
+  settlement.settle(true, null, 760);
+  for (let index = 0; index < 12 && session.phase !== GAME_PHASES.RESULT; index += 1) {
+    timers.at(-1).callback();
+  }
+
+  assert.equal(session.phase, GAME_PHASES.RESULT);
+  assert.equal(resultCalls.length, 1);
+  assert.equal(timers.reduce((sum, timer) => sum + timer.delay, 0), 3200);
+});
+
+test("失败结算不会等待活动粒子", () => {
+  const timers = [];
+  const resultCalls = [];
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "age-19" },
+      startTime: 0,
+      attempts: 0,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult(result) {
+      this.result = result;
+    },
+  };
+  const settlement = createRoundSettlement({
+    session,
+    timerHost: {
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+      clearTimeout() {},
+    },
+    getPlayer: () => null,
+    hasScene: () => true,
+    hasPendingEffects: () => true,
+    getTotalTime: () => 2,
+    getResultStats: () => ({ attemptsLeft: 0 }),
+    calculateRating: () => ({ grade: "C", rating: 0 }),
+    showResult: (result) => resultCalls.push(result),
+    saveBestScore() {},
+    playWin() {},
+    playLose() {},
+  });
+
+  settlement.settle(false, null, 680);
+  timers[0].callback();
+
+  assert.equal(session.phase, GAME_PHASES.RESULT);
+  assert.equal(resultCalls.length, 1);
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].delay, 680);
+});

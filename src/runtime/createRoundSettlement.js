@@ -1,6 +1,8 @@
 import { GAME_PHASES } from "../core/gamePhase.js";
 
 const MIN_WIN_SETTLEMENT_DELAY_MS = 2400;
+const MAX_WIN_SETTLEMENT_DELAY_MS = 3200;
+const WIN_SETTLEMENT_EFFECT_POLL_MS = 100;
 
 export function createRoundSettlement(dependencies) {
   const timerHost = dependencies.timerHost ?? globalThis;
@@ -70,10 +72,27 @@ export function createRoundSettlement(dependencies) {
     const settledDelayMs = won
       ? Math.max(delayMs, MIN_WIN_SETTLEMENT_DELAY_MS)
       : delayMs;
-    pendingTimer = timerHost.setTimeout(() => {
-      pendingTimer = null;
-      finish(won, failMessage);
-    }, settledDelayMs);
+    let waitedMs = settledDelayMs;
+    const scheduleFinish = (nextDelayMs) => {
+      pendingTimer = timerHost.setTimeout(() => {
+        pendingTimer = null;
+        if (
+          won
+          && dependencies.hasPendingEffects?.()
+          && waitedMs < MAX_WIN_SETTLEMENT_DELAY_MS
+        ) {
+          const pollDelayMs = Math.min(
+            WIN_SETTLEMENT_EFFECT_POLL_MS,
+            MAX_WIN_SETTLEMENT_DELAY_MS - waitedMs,
+          );
+          waitedMs += pollDelayMs;
+          scheduleFinish(pollDelayMs);
+          return;
+        }
+        finish(won, failMessage);
+      }, nextDelayMs);
+    };
+    scheduleFinish(settledDelayMs);
   }
 
   return Object.freeze({ clearPending, finish, settle });
