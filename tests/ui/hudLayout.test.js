@@ -36,6 +36,12 @@ test("难度与设置按钮位于事件轴右上角，设置内含音效音乐�
   assert.ok(settingsPanel.includes("settings-panel-list"));
 });
 
+test("浏览器标签页使用新游戏名", async () => {
+  const html = await readFile(new URL("../../index.html", import.meta.url), "utf8");
+
+  assert.match(html, /<title>别让我逮到你!!<\/title>/);
+});
+
 test("隐藏弹窗不拦截互动内按钮", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const modalRule = css.match(/\.modal\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
