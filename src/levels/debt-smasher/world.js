@@ -10,73 +10,109 @@ function addBox(THREE, scene, size, color, position) {
   return mesh;
 }
 
-function createPerson(THREE, scene, color, x, z) {
+function createPressShape(THREE, debtKind) {
   const group = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.3, 0.72, 3, 7),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.72 }),
-  );
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.25, 8, 6),
-    new THREE.MeshStandardMaterial({ color: 0xf0b88c, roughness: 0.8 }),
-  );
-  body.position.y = 0.72;
-  head.position.y = 1.46;
-  group.add(body, head);
-  group.position.set(x, 0, z);
-  scene.add(group);
+  if (debtKind === "car-loan") {
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6f86a8, roughness: 0.62 });
+    const windowMat = new THREE.MeshStandardMaterial({ color: 0x8ee7ff, emissive: 0x1d8cff, emissiveIntensity: 0.8, roughness: 0.28 });
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x070b10, roughness: 0.58 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.48, 1.12), bodyMat);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.46, 0.92), bodyMat);
+    const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.26, 0.06), windowMat);
+    const wheelA = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.16, 10), wheelMat);
+    const wheelB = wheelA.clone();
+    cab.position.y = 0.42;
+    windshield.position.set(0.12, 0.48, 0.5);
+    wheelA.rotation.z = Math.PI / 2;
+    wheelB.rotation.z = Math.PI / 2;
+    wheelA.position.set(-0.72, -0.34, 0.48);
+    wheelB.position.set(0.72, -0.34, 0.48);
+    group.add(body, cab, windshield, wheelA, wheelB);
+  } else {
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x506684, roughness: 0.7 });
+    const litMat = new THREE.MeshStandardMaterial({ color: 0x8ee7ff, emissive: 0x1d8cff, emissiveIntensity: 0.65, roughness: 0.3 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1b2435, roughness: 0.78 });
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.25, 1.55), wallMat);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.22, 0.56, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 0.9;
+    [-0.42, 0.42].forEach((x) => {
+      const window = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.06), litMat);
+      window.position.set(x, 0.3, 0.8);
+      group.add(window);
+    });
+    group.add(tower, roof);
+  }
+  group.traverse((child) => {
+    child.castShadow = true;
+    child.receiveShadow = true;
+  });
   return group;
 }
 
-function createMachine(THREE, scene, x, z, index) {
+function createMachine(THREE, scene, x, z, index, debtKind, registerObstacle) {
   const pad = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.65, 1.65, 0.12, 28),
-    new THREE.MeshStandardMaterial({ color: 0x374151, emissive: 0x000000 }),
+    new THREE.CylinderGeometry(1.68, 1.68, 0.08, 28),
+    new THREE.MeshStandardMaterial({ color: 0x334155, emissive: 0x000000, roughness: 0.64 }),
   );
-  pad.position.set(x, 0.08, z);
-  const press = addBox(THREE, scene, [3.1, 0.72, 3.1], 0x64748b, [x, 4.6, z]);
-  const postX = x < 0 ? x - 2.1 : x + 2.1;
-  addBox(THREE, scene, [0.38, 5.5, 0.38], 0x1f2937, [postX, 2.75, z]);
-  addBox(THREE, scene, [2.3, 0.35, 0.35], 0x1f2937, [(postX + x) / 2, 5.4, z]);
+  pad.position.set(x, 0.055, z);
   scene.add(pad);
-  return { x, z, radius: 1.65, pad, press, phase: "idle", timer: 1.4 + index * 0.65 };
+
+  const press = createPressShape(THREE, debtKind);
+  press.position.set(x, 4.45, z);
+  scene.add(press);
+
+  const postX = x < 0 ? x - 2.1 : x + 2.1;
+  addBox(THREE, scene, [0.32, 5.3, 0.32], 0x111827, [postX, 2.65, z]);
+  addBox(THREE, scene, [2.25, 0.28, 0.28], 0x111827, [(postX + x) / 2, 5.25, z]);
+  registerObstacle?.(postX, z, 0.28, 0.28);
+  return { x, z, radius: 1.68, debtKind, pad, press, phase: "idle", timer: 1.25 + index * 0.7 };
 }
 
-export function createDebtWorld(host) {
-  const THREE = host.rendering.THREE;
-  const scene = host.rendering.createScene();
-  scene.background = new THREE.Color(0x151922);
-  const camera = host.rendering.createCamera({
-    left: -12,
-    right: 12,
-    top: 7.5,
-    bottom: -7.5,
-    position: [0, 20, 14],
-    lookAt: [0, 0, 0],
+export function createWorld(world) {
+  const { THREE, scene, addWall, registerObstacle } = world;
+  const wallTex = world.textures.getWallTexture("gaming");
+  const wallMaterial = new THREE.MeshStandardMaterial({
+    map: wallTex,
+    color: 0x3f5472,
+    roughness: 0.72,
   });
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(24, 16),
-    new THREE.MeshStandardMaterial({ color: 0x262d38, roughness: 0.94 }),
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor, new THREE.HemisphereLight(0xfff7d6, 0x111827, 1.8));
-  const light = new THREE.DirectionalLight(0xffe7a1, 2.2);
-  light.position.set(-5, 13, 8);
-  scene.add(light);
+  addWall(0, -11.8, 0, wallMaterial);
+  addWall(-12.2, 0, Math.PI / 2, wallMaterial);
+  addWall(12.2, 0, -Math.PI / 2, wallMaterial);
+
+  const beltMat = new THREE.MeshStandardMaterial({ color: 0x34445c, roughness: 0.82 });
+  const paperMat = new THREE.MeshStandardMaterial({ color: 0xfffbeb, roughness: 0.86 });
+  [-6, 0, 6].forEach((x) => {
+    addBox(THREE, scene, [2.2, 0.05, 15.5], 0x314158, [x, 0.04, 0]);
+  });
+  [-8.5, -4.2, 0, 4.2, 8.5].forEach((x, index) => {
+    const bill = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.035, 0.48), index % 2 ? paperMat : beltMat);
+    bill.position.set(x, 0.1, -6.9);
+    scene.add(bill);
+  });
 
   const machines = [
-    [-7.5, -3.8], [7.5, -3.8], [-7.5, 3.8], [7.5, 3.8],
-  ].map(([x, z], index) => createMachine(THREE, scene, x, z, index));
-  const player = createPerson(THREE, scene, 0xf59e0b, 0, 0);
-  const positions = [
-    [-4.6, -3.8], [4.6, -3.8], [-4.6, 3.8], [4.6, 3.8],
-    [-7.5, -0.9], [7.5, -0.9], [-7.5, 0.9], [7.5, 0.9],
-    [-2.5, -1.8], [2.5, 1.8],
-  ];
-  const npcs = positions.map(([x, z], index) => {
-    const group = createPerson(THREE, scene, 0x4f73a6 + index * 1900, x, z);
-    return { x, z, group, stunRemaining: 0, flattened: false };
-  });
-  return { scene, camera, player, npcs, machines };
+    [-7.5, -3.8, "car-loan"],
+    [7.5, -3.8, "mortgage"],
+    [-7.5, 3.8, "mortgage"],
+    [7.5, 3.8, "car-loan"],
+  ].map(([x, z, debtKind], index) =>
+    createMachine(THREE, scene, x, z, index, debtKind, registerObstacle));
+
+  function updateEnvironment(deltaSeconds) {
+    machines.forEach((machine) => {
+      if (machine.phase === "warning") {
+        machine.pad.material.color.set(0xef4444);
+        machine.pad.material.emissive.set(0x5b0b0b);
+      } else {
+        machine.pad.material.color.set(0x334155);
+        machine.pad.material.emissive.set(0x000000);
+      }
+      if (machine.phase === "smash") machine.press.position.y = 0.62;
+      else machine.press.position.y += (4.45 - machine.press.position.y) * Math.min(1, deltaSeconds * 9);
+    });
+  }
+
+  return { machines, updateEnvironment };
 }
