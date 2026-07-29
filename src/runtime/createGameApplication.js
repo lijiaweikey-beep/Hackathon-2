@@ -139,10 +139,7 @@ function createStandaloneHost({ definition, scope }) {
       render: rendering.render,
       disposeScene: (targetScene) => rendering.disposeScene(targetScene),
     },
-    audio: {
-      playSound: audio.play,
-      resume: audio.resume,
-    },
+    audio: audio.experience,
     flow: {
       start: startExperience,
       pause: pauseExperience,
@@ -229,10 +226,7 @@ export function boot() {
     getNpcs: () => actorSystem.getNpcs(),
     dispatch: (action) => levelRunner.handleAction(action),
     consumeActionInterval: () => inputController.consumeAction(),
-    playSound: audio.play,
-    playPunch: audio.punch,
-    playHit: audio.hit,
-    playMiss: audio.miss,
+    ...audio.combat,
     vibrate: (pattern) => navigator.vibrate?.(pattern),
     triggerHitstop,
     triggerShake,
@@ -306,8 +300,7 @@ export function boot() {
     },
     saveBestScore,
     onLevelCompleted: (level) => historyTimelineFlow?.onLevelCompleted(level),
-    playWin: audio.win,
-    playLose: audio.lose,
+    ...audio.settlement,
   });
   gameLoop = createGameLoop({
     session,

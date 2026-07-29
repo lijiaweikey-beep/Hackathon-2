@@ -33,6 +33,21 @@ export function createGameAudio({
     else sound();
   }
 
+  const experience = Object.freeze({
+    playSound: play,
+    resume: sounds.resume,
+  });
+  const combat = Object.freeze({
+    playSound: play,
+    playPunch: sounds.punch,
+    playHit: sounds.hit,
+    playMiss: sounds.miss,
+  });
+  const settlement = Object.freeze({
+    playWin: sounds.win,
+    playLose: sounds.lose,
+  });
+
   return Object.freeze({
     play,
     punch: sounds.punch,
@@ -41,5 +56,8 @@ export function createGameAudio({
     win: sounds.win,
     lose: sounds.lose,
     resume: sounds.resume,
+    experience,
+    combat,
+    settlement,
   });
 }
