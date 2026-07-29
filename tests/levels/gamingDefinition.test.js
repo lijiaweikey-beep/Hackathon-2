@@ -30,14 +30,14 @@ test("凌晨三点提示不再引导玩家找声音", async () => {
   assert.match(serializedDefinition, /全身发光/);
 });
 
-test("凌晨三点不再显示绿色移动引导", async () => {
+test("凌晨三点使用绿色移动引导", async () => {
   const [css, viewSource, createLevelSource] = await Promise.all([
     readFile(new URL("../../src/levels/gaming/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/gaming/view.js", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/gaming/createLevel.js", import.meta.url), "utf8"),
   ]);
 
-  assert.doesNotMatch(css, /tutorial-joystick|tutorial-ring|tutorial-finger|tutorial-guide/);
-  assert.doesNotMatch(viewSource, /tutorialJoystickGuide/);
-  assert.doesNotMatch(createLevelSource, /placeWaypoint|showMoveTutorial|TUTORIAL_MOVE_HOLD_SECONDS/);
+  assert.match(css, /tutorial-joystick|tutorial-ring|tutorial-finger|tutorial-guide/);
+  assert.match(viewSource, /tutorialJoystickGuide/);
+  assert.match(createLevelSource, /placeWaypoint|showMoveTutorial|TUTORIAL_MOVE_HOLD_SECONDS/);
 });

@@ -141,12 +141,11 @@ button {
 .topbar {
   display: flex;
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
 }
 
 .mission-strip {
-  display: none;
   max-width: 56%;
   padding: 8px 14px;
   background: var(--paper);
@@ -292,25 +291,38 @@ button {
 }
 
 .clue-bar-wrap {
-  display: none;
-  flex: 1 1 auto;
-  min-width: 0;
-  justify-content: center;
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
 }
 
 .clue-bar {
-  max-width: min(680px, 52vw);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 72%;
   padding: 6px 16px;
-  background: var(--ink);
-  color: var(--paper);
-  border: 3px solid var(--paper);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  font-size: 13px;
+  color: #eef2ff;
+  font-size: clamp(14px, 2.4vw, 18px);
   font-weight: 800;
-  line-height: 1.35;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  text-align: center;
+  transition: top 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.clue-bar.floated {
+  top: max(76px, calc(env(safe-area-inset-top) + 62px));
+  transform: translate(-50%, 0);
+}
+
+.clue-bar.char-pop {
+  animation: char-pop 120ms ease-out;
+}
+
+@keyframes char-pop {
+  0% { filter: brightness(1.6) drop-shadow(0 0 6px rgba(255,255,255,0.5)); }
+  100% { filter: brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)); }
 }
 
 .clue-bar.hidden {

@@ -1,18 +1,22 @@
 import * as THREE from "three";
 import {
   TUTORIAL_ATTACK_COOLDOWN,
+  TUTORIAL_FAN_SECONDS,
   TUTORIAL_MISS_HINT_SECONDS,
+  TUTORIAL_MOVE_HOLD_SECONDS,
   TUTORIAL_PHASES,
 } from "./constants.js";
 import { createTutorialViewModel } from "./viewModel.js";
 import {
   hideMissHint,
   hideTutorialOverlays,
+  showAttackTutorial,
   showMissHint,
+  showMoveTutorial,
 } from "./view.js";
 
 function applyTargetGlow(npc, enabled) {
-  if (!npc?.group?.traverse) return;
+  if (!npc?.group) return;
   npc.group.traverse((child) => {
     if (!child.isMesh || !child.material) return;
     const materials = Array.isArray(child.material) ? child.material : [child.material];
@@ -57,13 +61,21 @@ function applyTargetGlow(npc, enabled) {
 export function createGamingLevel(context) {
   const resources = context.sceneData;
   const steps = context.definition.tutorialSteps ?? {};
+  const movePos = new THREE.Vector3(
+    steps.moveTargetPos?.x ?? 0.4,
+    0,
+    steps.moveTargetPos?.z ?? 6.6,
+  );
+  const moveRadius = steps.moveRadius ?? 1;
   const extraNpcCount = Math.max(
     1,
     (context.definition.npcCount ?? context.actors.npcCount ?? 6) - 1,
   );
 
   const state = {
-    phase: TUTORIAL_PHASES.ATTACK,
+    phase: TUTORIAL_PHASES.MOVE,
+    moveHold: 0,
+    fanTimer: 0,
     missHintTimer: 0,
   };
 
@@ -71,6 +83,38 @@ export function createGamingLevel(context) {
 
   function refreshHud() {
     context.ui.refreshHud?.();
+  }
+
+  function placeWaypoint() {
+    if (!resources.waypointGroup) return;
+    resources.waypointGroup.position.set(movePos.x, 0, movePos.z);
+    resources.waypointGroup.visible = true;
+  }
+
+  function hideWaypoint() {
+    if (!resources.waypointGroup) return;
+    resources.waypointGroup.visible = false;
+  }
+
+  function showFanIndicator() {
+    const fan = resources.fanMesh;
+    const player = context.actors.getPlayer?.();
+    if (!fan || !player) return;
+    fan.visible = true;
+    fan.position.set(player.group.position.x, 0.09, player.group.position.z);
+    fan.rotation.z = -player.group.rotation.y;
+    state.fanTimer = TUTORIAL_FAN_SECONDS;
+  }
+
+  function enterAttackPhase() {
+    if (state.phase !== TUTORIAL_PHASES.MOVE) return;
+    state.phase = TUTORIAL_PHASES.ATTACK;
+    state.moveHold = 0;
+    hideWaypoint();
+    applyTargetGlow(target, true);
+    showAttackTutorial(context.ui);
+    showFanIndicator();
+    refreshHud();
   }
 
   function start() {
@@ -88,13 +132,14 @@ export function createGamingLevel(context) {
     target.group.position.copy(context.movement.randomOpenPosition());
     context.ui.setBlackEye(target, 0.7);
     context.actors.addNpc(target);
-    applyTargetGlow(target, true);
 
     for (let id = 1; id <= extraNpcCount; id += 1) {
       context.actors.addWanderNpc(id);
     }
 
-    refreshHud();
+    placeWaypoint();
+    showMoveTutorial(context.ui);
+    // HUD 刷新推迟到 classic experience start() 中，避免逐字动画被弹窗遮住
   }
 
   function update(deltaSeconds) {
@@ -105,15 +150,39 @@ export function createGamingLevel(context) {
       if (state.missHintTimer <= 0) hideMissHint(context.ui);
     }
 
+    if (state.fanTimer > 0) {
+      state.fanTimer -= deltaSeconds;
+      const fan = resources.fanMesh;
+      const player = context.actors.getPlayer?.();
+      if (fan?.visible && player) {
+        fan.position.set(player.group.position.x, 0.09, player.group.position.z);
+        fan.rotation.z = -player.group.rotation.y;
+        fan.material.opacity = 0.38 * Math.max(0, state.fanTimer / TUTORIAL_FAN_SECONDS);
+      }
+      if (state.fanTimer <= 0 && fan) fan.visible = false;
+    }
+
     if (target?.tutorialAura) {
       target.tutorialAura.rotation.z += deltaSeconds * 1.6;
       target.tutorialAura.material.opacity = 0.7 + Math.sin(performance.now() * 0.006) * 0.2;
     }
 
+    if (state.phase !== TUTORIAL_PHASES.MOVE) return;
+    const player = context.actors.getPlayer?.();
+    if (!player) return;
+    const dx = player.group.position.x - movePos.x;
+    const dz = player.group.position.z - movePos.z;
+    if (Math.hypot(dx, dz) <= moveRadius) {
+      state.moveHold += deltaSeconds;
+      if (state.moveHold >= TUTORIAL_MOVE_HOLD_SECONDS) enterAttackPhase();
+    } else {
+      state.moveHold = 0;
+    }
   }
 
   function handleAction(action) {
     if (action.type === "beginPlay") {
+      showMoveTutorial(context.ui);
       refreshHud();
       return { handled: true };
     }
@@ -188,7 +257,7 @@ export function createGamingLevel(context) {
     update,
     handleAction,
     dispose() {
-      if (resources.waypointGroup) resources.waypointGroup.visible = false;
+      hideWaypoint();
       if (resources.fanMesh) resources.fanMesh.visible = false;
       applyTargetGlow(target, false);
       hideTutorialOverlays(context.ui);

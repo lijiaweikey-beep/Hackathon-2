@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("互动内隐藏任务和目标特征提示条", async () => {
+test("互动内显示任务和目标特征提示条", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const topbarRule = css.match(/\.topbar\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const missionRule = css.match(/\.mission-strip\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const clueWrapRule = css.match(/\.clue-bar-wrap\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-  assert.match(topbarRule, /justify-content:\s*flex-end/);
-  assert.match(missionRule, /display:\s*none/);
-  assert.match(clueWrapRule, /display:\s*none/);
+  assert.match(topbarRule, /justify-content:\s*space-between/);
+  assert.doesNotMatch(missionRule, /display:\s*none/);
+  assert.match(clueWrapRule, /position:\s*fixed/);
+  assert.match(clueWrapRule, /inset:\s*0/);
 });
 
 test("难度选择位于事件轴右上角且任务卡不展示人数和玩法说明", async () => {
@@ -110,16 +111,17 @@ test("手机横屏短高度事件轴卡片不被底部裁切", async () => {
   assert.match(compactRule, /\.history-node-enter\s*\{[\s\S]*white-space:\s*nowrap/);
 });
 
-test("关卡主题不覆盖攻击按钮动画和外观", async () => {
+test("第一关使用教学攻击按钮动画，其它关卡不覆盖攻击按钮外观", async () => {
   const [gamingCss, officeCss, bloodmoonCss] = await Promise.all([
     readFile(new URL("../../src/levels/gaming/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/office/styles.css", import.meta.url), "utf8"),
     readFile(new URL("../../src/levels/bloodmoon/styles.css", import.meta.url), "utf8"),
   ]);
-  const levelCss = [gamingCss, officeCss, bloodmoonCss].join("\n");
+  const otherLevelCss = [officeCss, bloodmoonCss].join("\n");
 
-  assert.doesNotMatch(levelCss, /\.attack-button\[data-level-theme=/);
-  assert.doesNotMatch(levelCss, /tutorial-attack-pulse|tutorial-pulse|tutorial-locked/);
+  assert.match(gamingCss, /\.attack-button\[data-level-theme="tutorial"\]/);
+  assert.match(gamingCss, /tutorial-attack-pulse|tutorial-pulse|tutorial-locked/);
+  assert.doesNotMatch(otherLevelCss, /\.attack-button\[data-level-theme=/);
 });
 
 test("电脑横屏结算页与手机横屏使用同一套分区尺寸", async () => {
