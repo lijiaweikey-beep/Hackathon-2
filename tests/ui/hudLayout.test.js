@@ -111,6 +111,18 @@ test("手机横屏短高度历史详情只保留分享图和数据表", async ()
   assert.match(compactRule, /\.history-detail-nav\.next\s*\{[\s\S]*grid-column:\s*4/);
 });
 
+test("历史详情默认隐藏正文只展示分享图和数据表", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const sideRule = css.match(/\.history-detail-side\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const loreRule = css.match(/\.history-detail-lore\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const statsRule = css.match(/\.history-detail-stats\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+  assert.match(sideRule, /grid-template-rows:\s*minmax\(0,\s*auto\)/);
+  assert.match(sideRule, /align-content:\s*center/);
+  assert.match(loreRule, /display:\s*none/);
+  assert.match(statsRule, /align-self:\s*center/);
+});
+
 test("手机横屏短高度事件轴卡片不被底部裁切", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const compactRule = css.match(
