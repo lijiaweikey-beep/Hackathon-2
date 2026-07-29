@@ -11,9 +11,6 @@
 .clue-bar[data-level-theme="office"] {
   color: #fecdd3;
   text-shadow: 0 0 12px rgba(251, 113, 133, 0.38);
-  border-color: rgba(251, 113, 133, 0.25);
-  background: rgba(159, 18, 57, 0.12);
-  backdrop-filter: blur(16px);
 }
 
 .hud.office-hit::after {
