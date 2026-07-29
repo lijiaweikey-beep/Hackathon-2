@@ -66,6 +66,22 @@ test("玩家踩绿色开关后固定熄灯五秒且移动探照灯继续照明",
   assert.ok(resources.lightPools[0].material.opacity > normalPoolOpacity);
 });
 
+test("暗场期间额外启用两盏探照灯，结束后恢复常态数量", () => {
+  const { resources } = createResources();
+  const switchPosition = new THREE.Vector3(0, 0, 0);
+
+  assert.equal(resources.spotlights.length, 5);
+  assert.equal(resources.lightPools.filter((pool) => pool.visible).length, 3);
+
+  resources.placeSwitch(switchPosition);
+  resources.updateEnvironment(0.1, switchPosition);
+  assert.equal(resources.lightPools.filter((pool) => pool.visible).length, 5);
+
+  resources.updateEnvironment(5, switchPosition);
+  assert.equal(resources.lightPools.filter((pool) => pool.visible).length, 3);
+  assert.equal(resources.spotlights[3].intensity, 0);
+});
+
 test("五秒暗场结束后恢复主灯并请求随机刷新开关", () => {
   const { baseLight, resources } = createResources();
   const switchPosition = new THREE.Vector3(-3, 0, 2);

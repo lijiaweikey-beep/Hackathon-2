@@ -9,10 +9,13 @@ export function createWorld(world) {
   let elapsed = 0;
   let blackoutTimer = 0;
   let darkness = 0;
+  const normalSearchlightCount = 3;
   const lightPositions = [
     new THREE.Vector3(-6, 0, -2),
     new THREE.Vector3(0, 0, 3),
     new THREE.Vector3(6, 0, -1),
+    new THREE.Vector3(-4, 0, 6),
+    new THREE.Vector3(5, 0, -6),
   ];
   const normalBaseIntensity = baseLight?.intensity ?? 0.72;
   const fillLight = new THREE.AmbientLight(0x6f8eaa, 0.58);
@@ -56,6 +59,8 @@ export function createWorld(world) {
     new THREE.Vector3(-10.4, 0, -4),
     new THREE.Vector3(0, 0, -10.5),
     new THREE.Vector3(10.4, 0, 4),
+    new THREE.Vector3(-10.4, 0, 5),
+    new THREE.Vector3(10.4, 0, -5),
   ];
   const lightPools = [];
   const poles = lightPositions.map((position, index) => {
@@ -86,7 +91,7 @@ export function createWorld(world) {
     pool.userData.gameplayRole = "searchlight-pool";
     scene.add(pool);
     lightPools.push(pool);
-    return { spot, baseX: position.x };
+    return { spot, baseX: position.x, baseZ: position.z };
   });
 
   const switches = [new THREE.Vector3()].map((position) => {
@@ -144,7 +149,8 @@ export function createWorld(world) {
   }
 
   function updateLighting(deltaSeconds) {
-    const targetDarkness = blackoutTimer > 0 ? 1 : 0;
+    const blackoutActive = blackoutTimer > 0;
+    const targetDarkness = blackoutActive ? 1 : 0;
     darkness += (targetDarkness - darkness) * Math.min(1, deltaSeconds * 5);
     if (baseLight) {
       baseLight.intensity = THREE.MathUtils.lerp(
@@ -155,7 +161,9 @@ export function createWorld(world) {
     }
     fillLight.intensity = THREE.MathUtils.lerp(0.58, 0.025, darkness);
     poles.forEach(({ spot }, index) => {
-      spot.intensity = THREE.MathUtils.lerp(5.6, 8.2, darkness);
+      const active = index < normalSearchlightCount || blackoutActive;
+      spot.intensity = active ? THREE.MathUtils.lerp(5.6, 8.2, darkness) : 0;
+      lightPools[index].visible = active;
       lightPools[index].material.opacity = THREE.MathUtils.lerp(0.22, 0.52, darkness);
     });
   }
@@ -167,7 +175,7 @@ export function createWorld(world) {
     updateSwitch(playerPosition);
     lightPositions.forEach((position, index) => {
       position.x = poles[index].baseX + Math.sin(elapsed * 0.72 + index * 2.2) * 4;
-      position.z = [-2, 3, -1][index] + Math.cos(elapsed * 0.46 + index) * 2.4;
+      position.z = poles[index].baseZ + Math.cos(elapsed * 0.46 + index) * 2.4;
       poles[index].spot.target.position.copy(position);
       lightPools[index].position.x = position.x;
       lightPools[index].position.z = position.z;
@@ -180,7 +188,10 @@ export function createWorld(world) {
 
   function getLegGlow(position, isGoose) {
     if (isGoose) return 0;
-    return lightPositions.reduce((highest, light) => {
+    const activeLights = blackoutTimer > 0
+      ? lightPositions
+      : lightPositions.slice(0, normalSearchlightCount);
+    return activeLights.reduce((highest, light) => {
       const distance = Math.hypot(position.x - light.x, position.z - light.z);
       return Math.max(highest, Math.max(0, 1 - distance / 3.2));
     }, 0);
@@ -193,6 +204,8 @@ export function createWorld(world) {
       switches: switches.map(({ ready }) => ({ ready })),
     };
   }
+
+  updateLighting(0);
 
   return {
     lightPositions,

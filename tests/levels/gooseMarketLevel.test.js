@@ -126,7 +126,7 @@ test("鹅腿夜市属于二十三岁主线并声明自己的战斗动作", () =>
   ]);
 });
 
-test("每局随机创建三至五个鸭腿目标和一个鹅腿干扰", () => {
+test("每局随机创建三至五个鸭腿目标和十个鹅腿干扰", () => {
   for (const duckCount of [3, 5]) {
     const { context, records } = createFakeContext({ duckCount });
     const level = createGooseMarketLevel(context);
@@ -136,10 +136,10 @@ test("每局随机创建三至五个鸭腿目标和一个鹅腿干扰", () => {
     const ducks = records.created.filter(({ npc }) => npc.isDuckVendor);
     const geese = records.created.filter(({ npc }) => npc.isGoose);
     assert.equal(ducks.length, duckCount);
-    assert.equal(geese.length, 1);
+    assert.equal(geese.length, 10);
     assert.ok(ducks.every(({ npc }) => npc.isLevelTarget));
-    assert.equal(geese[0].npc.isLevelTarget, false);
-    assert.equal(records.randomPositions.length, duckCount + 2);
+    assert.ok(geese.every(({ npc }) => npc.isLevelTarget === false));
+    assert.equal(records.randomPositions.length, duckCount + 11);
   }
 });
 
