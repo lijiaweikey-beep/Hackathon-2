@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import viteConfig, { rewriteFetchCalls } from "../../vite.config.js";
+import viteConfig, {
+  rewriteAssetUrls,
+  rewriteFetchCalls,
+  rewriteModuleScript,
+} from "../../vite.config.js";
 
 test("Vite 配置不会把字符串里的 fetch 提示改成非法脚本", () => {
   const bundle = {
@@ -31,4 +35,22 @@ test("Vite 配置会规避真实 fetch 调用的静态检测", () => {
 
 test("Vite 构建使用相对资源路径适配互动空间包路径", () => {
   assert.equal(viteConfig.base, "./");
+});
+
+test("Vite 构建移除产物中的 import.meta.url 依赖", () => {
+  assert.equal(
+    rewriteAssetUrls('const cover = new URL("cover-a1b2.jpg",import.meta.url).href;'),
+    'const cover = "./assets/cover-a1b2.jpg";',
+  );
+  assert.equal(
+    rewriteAssetUrls('const cover = new URL(""+new URL("cover-a1b2.jpg",import.meta.url).href,import.meta.url).href;'),
+    'const cover = "./assets/cover-a1b2.jpg";',
+  );
+});
+
+test("Vite 构建输出普通脚本入口以兼容扫码容器", () => {
+  assert.equal(
+    rewriteModuleScript('<script type="module" crossorigin src="./assets/index.js"></script>'),
+    '<script defer src="./assets/index.js"></script>',
+  );
 });

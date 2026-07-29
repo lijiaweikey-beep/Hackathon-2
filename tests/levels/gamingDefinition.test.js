@@ -17,3 +17,18 @@ test("教学摇杆提示在手机横屏短屏中上提", async () => {
   assert.match(css, /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)/);
   assert.match(css, /\.tutorial-joystick-guide/);
 });
+
+test("教学摇杆提示在手机横屏短屏中对齐真实摇杆区域", async () => {
+  const css = await readFile(
+    new URL("../../src/levels/gaming/styles.css", import.meta.url),
+    "utf8",
+  );
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*left:\s*max\(24px/);
+  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*bottom:\s*max\(36px/);
+  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*width:\s*92px/);
+  assert.match(compactRule, /\.tutorial-joystick-guide\s*\{[\s\S]*height:\s*92px/);
+});

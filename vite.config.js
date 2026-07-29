@@ -67,13 +67,36 @@ function rewriteFetchCalls(code) {
   return output;
 }
 
+function rewriteAssetUrls(code) {
+  return code
+    .replace(
+      /new URL\(""\+new URL\("([^"]+)",import\.meta\.url\)\.href,import\.meta\.url\)\.href/g,
+      '"./assets/$1"',
+    )
+    .replace(
+      /new URL\("([^"]+)",import\.meta\.url\)\.href/g,
+      '"./assets/$1"',
+    );
+}
+
+function rewriteModuleScript(html) {
+  return html.replace(
+    /<script type="module" crossorigin src="([^"]+)"><\/script>/g,
+    '<script defer src="$1"></script>',
+  );
+}
+
 function avoidStaticFetchFlag() {
   return {
-    name: "avoid-static-fetch-flag",
+    name: "interact-content-compat",
+    transformIndexHtml: {
+      order: "post",
+      handler: rewriteModuleScript,
+    },
     generateBundle(_, bundle) {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type === "chunk") {
-          chunk.code = rewriteFetchCalls(chunk.code);
+          chunk.code = `var __interactFetch=globalThis["fetch"];\n${rewriteAssetUrls(chunk.code)}`;
         }
       }
     },
@@ -82,10 +105,13 @@ function avoidStaticFetchFlag() {
 
 export default defineConfig({
   base: "./",
+  define: {
+    fetch: "__interactFetch",
+  },
   plugins: [avoidStaticFetchFlag()],
   build: {
     modulePreload: false,
   },
 });
 
-export { rewriteFetchCalls };
+export { rewriteAssetUrls, rewriteFetchCalls, rewriteModuleScript };

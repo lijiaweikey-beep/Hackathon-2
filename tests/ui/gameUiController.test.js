@@ -57,6 +57,30 @@ test("界面控制器回到首页时交给人生事件轴并刷新抬头信息",
   assert.equal(ui.timerText.textContent, "10");
 });
 
+test("预启动按钮会触发进入首个关卡流程", () => {
+  let entered = false;
+  const prelaunchScreen = { classList: createClassList() };
+  const prelaunchStartButton = createButton();
+  const controller = createGameUiController({
+    ui: {
+      prelaunchScreen,
+      prelaunchStartButton,
+      taskModal: { classList: createClassList() },
+      resultModal: { classList: createClassList() },
+      shareModal: { classList: createClassList() },
+    },
+    session: { levelState: { level: {}, remaining: 10, attempts: 3 } },
+    levelViewHost: { clear() {}, setTheme() {} },
+    onPrelaunchDismissed: () => { entered = true; },
+  });
+
+  controller.bind();
+  prelaunchStartButton.click();
+
+  assert.equal(prelaunchScreen.classList.contains("is-away"), true);
+  assert.equal(entered, true);
+});
+
 test("难度按钮只更新当前关卡人数和选中状态", () => {
   const buttons = ["easy", "medium", "hard"].map(createButton);
   const ui = {

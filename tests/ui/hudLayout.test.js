@@ -48,3 +48,16 @@ test("手机横屏短高度启用紧凑 HUD、任务弹窗和事件轴布局", a
   assert.match(compactRule, /\.history-footer/);
   assert.match(compactRule, /\.tutorial-joystick-guide/);
 });
+
+test("手机横屏短高度把结算页收纳为插画和信息两区", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(compactRule, /\.result-stage\s*\{[\s\S]*grid-template-columns/);
+  assert.match(compactRule, /\.result-art\s*\{[\s\S]*position:\s*relative/);
+  assert.match(compactRule, /\.result-art\s*\{[\s\S]*background-size:\s*contain/);
+  assert.match(compactRule, /\.result-brief\s*\{[\s\S]*overflow-y:\s*auto/);
+  assert.match(compactRule, /\.share-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
+});
