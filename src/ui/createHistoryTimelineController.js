@@ -1,9 +1,9 @@
 import { getBestScore } from "../utils/storage.js";
 import { renderShareCard } from "./shareCard.js";
 
-const NODE_GAP = 330;
-const TRACK_PADDING = 130;
-const EXTRA_GAP = 150;
+const NODE_GAP = 260;
+const TRACK_PADDING = 110;
+const EXTRA_GAP = 120;
 const REVEAL_AUTO_DELAY = 2000;
 const REVEAL_ANIMATION_MS = 1250;
 
@@ -32,39 +32,9 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function renderHighlightedText(text, terms) {
-  const activeTerms = [...new Set(terms.filter(Boolean))];
-  if (activeTerms.length === 0) return escapeHtml(text);
-  const pattern = new RegExp(`(${activeTerms.map(escapeRegExp).join("|")})`, "g");
-  const termSet = new Set(activeTerms);
-  return String(text).split(pattern).map((part) =>
-    termSet.has(part)
-      ? `<span class="history-lore-highlight">${escapeHtml(part)}</span>`
-      : escapeHtml(part)
-  ).join("");
-}
-
 function getDetailSubtitle(level) {
   return level.history?.subtitle
     ?? (level.difficulty >= 4 ? "杰作" : level.difficulty >= 3 ? "关键节点" : "历史节点");
-}
-
-function getLoreParagraphs(level) {
-  return level.history?.lore
-    ?? [
-      level.transition?.intro,
-      level.transition?.success,
-      level.success,
-    ].filter(Boolean);
-}
-
-function getLoreHighlights(level) {
-  return level.history?.highlights
-    ?? [level.sceneName, level.targetDesc].filter(Boolean);
 }
 
 function getRewardText(level) {
@@ -381,53 +351,65 @@ export function createHistoryTimelineController({
     };
   }
 
-  // 左侧分享卡：先出手绘版，等级贴图加载完成后再重绘一次。
-  function renderDetailShareCard(level, best) {
+  // 历史详情：与结算页共用 result-stage（插画 + slug + brief）架构。
+  function renderDetailCard(level, best) {
+    const grade = best?.grade ?? "C";
+    const failed = best?.won === false;
+    const gradeNode = best && !failed ? level.nodes?.[grade] : null;
+    const globalIndex = levels.findIndex(({ id }) => id === level.id);
+    const artUrl = level.art?.grades?.[grade] ?? level.art?.cover ?? "";
+
+    if (ui.historyDetailArt) {
+      ui.historyDetailArt.style.backgroundImage = artUrl ? `url("${artUrl}")` : "";
+      ui.historyDetailArt.classList.toggle("is-empty", !artUrl);
+    }
+    if (ui.historyDetailLevelTag) {
+      ui.historyDetailLevelTag.textContent = `LV.${String(Math.max(globalIndex, 0) + 1).padStart(2, "0")}`;
+    }
+    if (ui.historyDetailAgeTag) {
+      ui.historyDetailAgeTag.textContent = level.age != null ? `${level.age}岁` : "";
+      ui.historyDetailAgeTag.hidden = level.age == null;
+    }
+    if (ui.historyDetailRating) {
+      ui.historyDetailRating.textContent = failed ? "—" : grade;
+      ui.historyDetailRating.className = failed
+        ? "result-rating"
+        : `result-rating rating-${String(grade).toLowerCase()}`;
+    }
+    if (ui.historyDetailCopy) {
+      ui.historyDetailCopy.textContent = gradeNode?.verdict
+        ?? (failed ? (level.failure ?? "暂无通关记录") : (level.success ?? ""));
+    }
+
     const canvas = ui.historyDetailShareCanvas;
-    if (!canvas?.getContext) return;
     const payload = {
       level,
       result: {
-        won: best?.won !== false,
+        won: !failed,
         timeUsed: best?.time,
-        rating: { grade: best?.grade ?? "C", rating: best?.rating ?? 0 },
+        rating: { grade, rating: best?.rating ?? 0 },
       },
       progress: getMainlineProgress(),
     };
-    renderShareCard(canvas, payload);
-    // 番外关统一保留手绘卡面（与“超市取证”一致），不再贴等级图。
-    const artSrc = level.track === "extra" ? null : level.art?.grades?.[best?.grade];
-    if (!artSrc || typeof Image !== "function") return;
-    const image = new Image();
-    image.onload = () => {
-      if (detailId === level.id) renderShareCard(canvas, { ...payload, art: image });
-    };
-    image.src = artSrc;
+    if (canvas?.getContext) {
+      renderShareCard(canvas, payload);
+      // 番外关统一保留手绘卡面（与“超市取证”一致），不再贴等级图。
+      const artSrc = level.track === "extra" ? null : artUrl;
+      if (artSrc && typeof Image === "function") {
+        const image = new Image();
+        image.onload = () => {
+          if (detailId === level.id) renderShareCard(canvas, { ...payload, art: image });
+        };
+        image.src = artSrc;
+      }
+    }
   }
 
-  // 右上：对应等级的剧情文案。
-  function renderDetailLore(level, best) {
-    if (!ui.historyDetailLore) return;
-    const highlights = getLoreHighlights(level);
-    // 失败记录没有等级结局，只展示背景剧情。
-    const gradeNode = best && best.won !== false ? level.nodes?.[best.grade] : null;
-    const parts = [];
-    if (gradeNode?.title) {
-      parts.push(`<p class="history-detail-grade-title">「${escapeHtml(gradeNode.title)}」</p>`);
-    }
-    if (gradeNode?.verdict) {
-      parts.push(`<p>${renderHighlightedText(gradeNode.verdict, highlights)}</p>`);
-    }
-    parts.push(...getLoreParagraphs(level)
-      .map((paragraph) => `<p>${renderHighlightedText(paragraph, highlights)}</p>`));
-    ui.historyDetailLore.innerHTML = parts.join("");
-  }
-
-  // 右下：历史数据（最佳评级、完成用时、剩余出拳、完成时间）。
+  // 右侧数据：复用结算页 result-stats / stat-row。
   function renderDetailStats(best) {
     if (!ui.historyDetailStats) return;
     if (!best) {
-      ui.historyDetailStats.innerHTML = '<p class="history-detail-stats-empty">暂无历史数据</p>';
+      ui.historyDetailStats.innerHTML = "";
       return;
     }
     const failed = best.won === false;
@@ -441,7 +423,7 @@ export function createHistoryTimelineController({
     ].filter(Boolean);
     ui.historyDetailStats.innerHTML = rows
       .map(([label, value]) =>
-        `<div class="history-detail-stat-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
+        `<div class="stat-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
       .join("");
   }
 
@@ -461,11 +443,13 @@ export function createHistoryTimelineController({
     const globalIndex = levels.findIndex(({ id }) => id === level.id);
     const best = getBestScore(level.id);
     const title = level.history?.title ?? `第${globalIndex + 1}章 - ${level.sceneName}`;
+    const gradeNode = best && best.won !== false ? level.nodes?.[best.grade] : null;
 
-    if (ui.historyDetailTitle) ui.historyDetailTitle.textContent = title;
     if (ui.historyDetailSubtitle) ui.historyDetailSubtitle.textContent = getDetailSubtitle(level);
-    renderDetailShareCard(level, best);
-    renderDetailLore(level, best);
+    if (ui.historyDetailTitle) {
+      ui.historyDetailTitle.textContent = gradeNode?.title ? `「${gradeNode.title}」` : title;
+    }
+    renderDetailCard(level, best);
     renderDetailStats(best);
     if (ui.historyDetailReward) ui.historyDetailReward.textContent = getRewardText(level);
     if (ui.historyDetailPrev) ui.historyDetailPrev.hidden = detailIndex <= 0;

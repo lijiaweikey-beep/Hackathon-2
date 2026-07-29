@@ -13,7 +13,7 @@ export function addFacetedBox(parent, w, h, d, material, x, y, z, rx = 0, ry = 0
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   mesh.position.set(x, y, z);
   mesh.rotation.set(rx, ry, rz);
-  mesh.castShadow = true;
+  mesh.castShadow = false;
   parent.add(mesh);
   return mesh;
 }

@@ -91,36 +91,34 @@ test("手机横屏短高度把结算页收纳为插画和信息两区", async ()
   assert.match(compactRule, /\.share-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
 });
 
-test("手机横屏短高度历史详情只保留分享图和数据表", async () => {
+test("手机横屏短高度历史详情复用结算卡架构", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const compactRule = css.match(
     /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
   )?.[1] ?? "";
 
-  assert.match(compactRule, /\.history-detail-body\s*\{[\s\S]*grid-template-columns:\s*38px minmax\(118px,\s*0\.42fr\) minmax\(0,\s*0\.58fr\) 38px/);
-  assert.match(compactRule, /\.history-detail-body\s*\{[\s\S]*grid-template-rows:\s*minmax\(0,\s*1fr\)/);
-  assert.match(compactRule, /\.history-detail-share\s*\{[\s\S]*grid-column:\s*2/);
-  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-column:\s*3/);
-  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-row:\s*1/);
-  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
-  assert.match(compactRule, /\.history-detail-side\s*\{[\s\S]*overflow:\s*visible/);
-  assert.match(compactRule, /\.history-detail-lore\s*\{[\s\S]*display:\s*none/);
-  assert.match(compactRule, /\.history-detail-stats\s*\{[\s\S]*align-self:\s*center/);
-  assert.match(compactRule, /\.history-detail-reward\s*\{[\s\S]*display:\s*none/);
-  assert.match(compactRule, /\.history-detail-share-canvas\s*\{[\s\S]*max-height:\s*100%/);
-  assert.match(compactRule, /\.history-detail-nav\.next\s*\{[\s\S]*grid-column:\s*4/);
+  assert.match(compactRule, /\.history-detail-stage\s*\{[\s\S]*--result-stage-width/);
+  assert.match(compactRule, /\.history-detail-stage\s*\{[\s\S]*max-height:\s*calc\(100dvh - 16px\)/);
+  assert.match(compactRule, /\.history-detail-nav\s*\{[\s\S]*width:\s*34px/);
+  assert.match(compactRule, /\.history-detail-stage\s+\.result-unlock\s*\{[\s\S]*display:\s*none/);
 });
 
-test("历史详情默认隐藏正文只展示分享图和数据表", async () => {
+test("历史详情与结算页共用 result-stage 架构", async () => {
+  const html = await readFile(new URL("../../index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
-  const sideRule = css.match(/\.history-detail-side\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-  const loreRule = css.match(/\.history-detail-lore\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-  const statsRule = css.match(/\.history-detail-stats\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-  assert.match(sideRule, /grid-template-rows:\s*minmax\(0,\s*auto\)/);
-  assert.match(sideRule, /align-content:\s*center/);
-  assert.match(loreRule, /display:\s*none/);
-  assert.match(statsRule, /align-self:\s*center/);
+  assert.match(html, /id="historyDetailPanel"\s+class="result-stage history-detail-stage"/);
+  assert.match(html, /id="historyDetailArt"\s+class="result-art/);
+  assert.match(html, /class="result-slug"/);
+  assert.match(html, /id="historyDetailRating"\s+class="result-rating"/);
+  assert.match(html, /class="result-brief"/);
+  assert.match(html, /id="historyDetailStats"\s+class="result-stats"/);
+  assert.match(html, /class="result-actions"/);
+
+  assert.match(css, /\.history-detail-frame\s*\{[\s\S]*grid-template-columns:\s*auto minmax\(0,\s*1fr\) auto/);
+  assert.match(css, /\.history-detail-stage\s*\{[\s\S]*grid-column:\s*2/);
+  assert.doesNotMatch(css, /\.history-share-card\s*\{/);
+  assert.doesNotMatch(css, /\.history-detail-body\s*\{/);
 });
 
 test("手机横屏短高度事件轴卡片不被底部裁切", async () => {
@@ -165,20 +163,17 @@ test("电脑横屏结算页与手机横屏使用同一套分区尺寸", async ()
   assert.match(desktopLandscapeRule, /\.result-actions\s+\.primary-button,\n\s*\.result-actions\s+\.secondary-button\s*\{[\s\S]*font-size:\s*13px/);
 });
 
-test("电脑横屏历史揭晓详情页分享卡不裁切", async () => {
+test("电脑横屏历史详情卡采用结算页横屏尺寸", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
-  const shareRule = css.match(/\.history-detail-share\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-  const shareCanvasRule = css.match(/\.history-detail-share-canvas\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
   const desktopLandscapeRule = css.match(
     /@media\s*\(orientation:\s*landscape\)\s*\{([\s\S]*)\n\}/,
   )?.[1] ?? "";
 
-  assert.match(shareRule, /min-height:\s*0/);
-  assert.match(shareCanvasRule, /height:\s*100%/);
-  assert.match(shareCanvasRule, /max-height:\s*min\(430px,\s*56vh\)/);
-  assert.match(shareCanvasRule, /aspect-ratio:\s*540 \/ 960/);
-  assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*max-height:\s*calc\(100dvh - 18px\)/);
-  assert.match(desktopLandscapeRule, /\.history-detail-panel\s*\{[\s\S]*overflow:\s*hidden/);
+  assert.match(desktopLandscapeRule, /\.history-detail-stage\s*\{[\s\S]*--result-stage-width:\s*min\(760px/);
+  assert.match(desktopLandscapeRule, /\.history-detail-stage\s*\{[\s\S]*height:\s*min\(calc\(100dvh - 18px\)/);
+  assert.match(desktopLandscapeRule, /\.result-stage\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(248px,\s*0\.86fr\)/);
+  assert.match(desktopLandscapeRule, /\.result-art\s*\{[\s\S]*position:\s*relative/);
+  assert.match(desktopLandscapeRule, /\.result-brief\s*\{[\s\S]*overflow-y:\s*auto/);
 });
 
 test("事件轴弹层高于结算弹层避免返回时残影压住", async () => {

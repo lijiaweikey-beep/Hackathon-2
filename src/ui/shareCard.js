@@ -3,7 +3,17 @@ const CARD_H = 960;
 // 主人公贴图约占卡面 72% 高，符合分享卡“主人公 65%~75%”的版式要求。
 const ART_H = Math.round(CARD_H * 0.72);
 
-const GRADE_THEMES = {
+// 叠加层相对卡面比例（与历史详情 DOM/CSS 共用同一套相对坐标）。
+export const SHARE_OVERLAY_LAYOUT = Object.freeze({
+  padX: 0.044,
+  padY: 0.032,
+  brand: { w: 0.56, h: 0.056 },
+  age: { w: 0.22, h: 0.056 },
+  grade: { w: 0.17, h: 0.096 },
+  scene: { w: 0.42, h: 0.05, gapX: 0.024 },
+});
+
+export const GRADE_THEMES = {
   S: { main: "#F4B942", soft: "#FBE3AC", tag: "S 级 · 这次居然像个专业人士" },
   A: { main: "#8F7AD8", soft: "#D8CFF3", tag: "A 级 · 有点狼狈，但能拿出去说" },
   B: { main: "#55BFA8", soft: "#C4E9E0", tag: "B 级 · 问题没解决，但你很会操作" },
@@ -13,6 +23,10 @@ const GRADE_THEMES = {
 const INK = "#25242A";
 const PAPER = "#FFF6DF";
 const SKIN = "#F5C9A6";
+
+function px(ratio, total) {
+  return Math.round(ratio * total);
+}
 
 export function buildShareModel({ level = {}, result = {}, progress = {} }) {
   const grade = result.rating?.grade ?? "C";
@@ -57,10 +71,8 @@ function drawHero(ctx, model, centerX, topY, height) {
   ctx.translate(centerX, topY);
   if (grade === "C") ctx.rotate(-0.09);
 
-  // 头发与头
   blockRect(ctx, -unit * 1.9, 0, unit * 3.8, unit * 1.1, INK, 4);
   blockRect(ctx, -unit * 1.7, unit * 0.9, unit * 3.4, unit * 2.6, SKIN, 5);
-  // 眼睛：C 级画成 ><
   ctx.fillStyle = INK;
   if (grade === "C") {
     ctx.font = `900 ${unit * 0.9}px sans-serif`;
@@ -70,9 +82,7 @@ function drawHero(ctx, model, centerX, topY, height) {
     ctx.fillRect(-unit * 0.95, unit * 1.9, unit * 0.42, unit * 0.62);
     ctx.fillRect(unit * 0.53, unit * 1.9, unit * 0.42, unit * 0.62);
   }
-  // 身体
   blockRect(ctx, -bodyW / 2, unit * 3.7, bodyW, unit * 3.4, theme.main, 6);
-  // 手臂姿势：S 双手举起 / A 单手举起 / B 垂下 / C 摊开
   const armW = unit * 0.95;
   const armH = unit * 2.6;
   if (grade === "S") {
@@ -88,7 +98,6 @@ function drawHero(ctx, model, centerX, topY, height) {
     blockRect(ctx, -bodyW / 2 - armW - 4, unit * 4.0, armW, armH, SKIN, 4);
     blockRect(ctx, bodyW / 2 + 4, unit * 4.0, armW, armH, SKIN, 4);
   }
-  // 腿
   blockRect(ctx, -bodyW / 2 + unit * 0.3, unit * 7.1, unit * 1.5, unit * 2.4, "#3A3E52", 5);
   blockRect(ctx, bodyW / 2 - unit * 1.8, unit * 7.1, unit * 1.5, unit * 2.4, "#3A3E52", 5);
   ctx.restore();
@@ -101,12 +110,10 @@ function drawCover(ctx, image, x, y, w, h) {
   ctx.drawImage(image, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
 }
 
-// 等级插画占卡面上部：先铺一层放大的毛玻璃底层，再把清晰贴图内缩一圈压上去，
-// 四边再用米白渐变蒙版收边，避开硬邦邦的图片轮廓。
 function drawArtHero(ctx, image) {
   const artH = ART_H;
-  const bleed = 30;
-  const inset = 24;
+  const bleed = CARD_W * 0.055;
+  const inset = CARD_W * 0.044;
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, CARD_W, artH);
@@ -117,29 +124,30 @@ function drawArtHero(ctx, image) {
   drawCover(ctx, image, inset, inset * 0.8, CARD_W - inset * 2, artH - inset * 1.6);
   ctx.restore();
 
-  const bottomFade = ctx.createLinearGradient(0, artH - 200, 0, artH);
+  const bottomFade = ctx.createLinearGradient(0, artH - CARD_H * 0.21, 0, artH);
   bottomFade.addColorStop(0, "rgba(255, 246, 223, 0)");
   bottomFade.addColorStop(0.72, "rgba(255, 246, 223, 0.72)");
   bottomFade.addColorStop(1, PAPER);
   ctx.fillStyle = bottomFade;
-  ctx.fillRect(0, artH - 200, CARD_W, 200);
+  ctx.fillRect(0, artH - CARD_H * 0.21, CARD_W, CARD_H * 0.21);
 
-  const topFade = ctx.createLinearGradient(0, 0, 0, 96);
+  const topFade = ctx.createLinearGradient(0, 0, 0, CARD_H * 0.1);
   topFade.addColorStop(0, "rgba(255, 246, 223, 0.85)");
   topFade.addColorStop(1, "rgba(255, 246, 223, 0)");
   ctx.fillStyle = topFade;
-  ctx.fillRect(0, 0, CARD_W, 96);
+  ctx.fillRect(0, 0, CARD_W, CARD_H * 0.1);
 
-  const leftFade = ctx.createLinearGradient(0, 0, 40, 0);
+  const edge = CARD_W * 0.074;
+  const leftFade = ctx.createLinearGradient(0, 0, edge, 0);
   leftFade.addColorStop(0, "rgba(255, 246, 223, 0.9)");
   leftFade.addColorStop(1, "rgba(255, 246, 223, 0)");
   ctx.fillStyle = leftFade;
-  ctx.fillRect(0, 0, 40, artH);
-  const rightFade = ctx.createLinearGradient(CARD_W, 0, CARD_W - 40, 0);
+  ctx.fillRect(0, 0, edge, artH);
+  const rightFade = ctx.createLinearGradient(CARD_W, 0, CARD_W - edge, 0);
   rightFade.addColorStop(0, "rgba(255, 246, 223, 0.9)");
   rightFade.addColorStop(1, "rgba(255, 246, 223, 0)");
   ctx.fillStyle = rightFade;
-  ctx.fillRect(CARD_W - 40, 0, 40, artH);
+  ctx.fillRect(CARD_W - edge, 0, edge, artH);
 }
 
 export function renderShareCard(canvas, { level, result, progress, art = null }) {
@@ -148,91 +156,109 @@ export function renderShareCard(canvas, { level, result, progress, art = null })
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const { theme } = model;
-  const titleY = art ? 700 : 760;
-  const copyY = art ? 790 : 856;
+  const titleY = art ? CARD_H * 0.73 : CARD_H * 0.79;
+  const copyY = art ? CARD_H * 0.82 : CARD_H * 0.89;
+  const layout = SHARE_OVERLAY_LAYOUT;
+  const padX = px(layout.padX, CARD_W);
+  const padY = px(layout.padY, CARD_H);
+  const brandW = px(layout.brand.w, CARD_W);
+  const brandH = px(layout.brand.h, CARD_H);
+  const ageW = px(layout.age.w, CARD_W);
+  const ageH = px(layout.age.h, CARD_H);
+  const gradeW = px(layout.grade.w, CARD_W);
+  const gradeH = px(layout.grade.h, CARD_H);
+  const sceneGap = px(layout.scene.gapX, CARD_W);
+  const sceneH = px(layout.scene.h, CARD_H);
+  const midY = padY + brandH + px(0.022, CARD_H);
 
   ctx.fillStyle = PAPER;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
   if (art) {
     drawArtHero(ctx, art);
   } else {
-    // 无贴图时回落等级色块地面
     ctx.fillStyle = theme.soft;
     ctx.fillRect(0, CARD_H * 0.62, CARD_W, CARD_H * 0.38);
     ctx.fillStyle = theme.main;
     ctx.fillRect(0, CARD_H * 0.62 - 10, CARD_W, 10);
   }
 
-  // 顶部标识
-  blockRect(ctx, 30, 28, 300, 54, "#FFD447", 6);
+  // 顶部标识（相对卡面百分比）
+  blockRect(ctx, padX, padY, brandW, brandH, "#FFD447", 6);
   ctx.fillStyle = INK;
-  ctx.font = "900 24px sans-serif";
+  ctx.font = `900 ${Math.round(CARD_H * 0.025)}px sans-serif`;
   ctx.textAlign = "left";
-  ctx.fillText("梗哥的半生 · 人生坐标", 48, 63);
+  ctx.textBaseline = "middle";
+  ctx.fillText("梗哥的半生 · 人生坐标", padX + brandW * 0.06, padY + brandH / 2);
 
-  // 年龄章
   if (model.age != null) {
-    blockRect(ctx, CARD_W - 150, 28, 120, 54, theme.main, 6);
+    const ageX = CARD_W - padX - ageW;
+    blockRect(ctx, ageX, padY, ageW, ageH, theme.main, 6);
     ctx.fillStyle = INK;
     ctx.textAlign = "center";
-    ctx.fillText(`${model.age} 岁`, CARD_W - 90, 63);
+    ctx.fillText(`${model.age} 岁`, ageX + ageW / 2, padY + ageH / 2);
   }
 
-  // 大等级字
   if (!art) {
     ctx.fillStyle = INK;
-    ctx.font = "900 150px sans-serif";
+    ctx.font = `900 ${Math.round(CARD_H * 0.156)}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(model.grade, CARD_W / 2 + 8, 248 + 8);
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(model.grade, CARD_W / 2 + 8, CARD_H * 0.258 + 8);
     ctx.fillStyle = theme.main;
-    ctx.fillText(model.grade, CARD_W / 2, 248);
+    ctx.fillText(model.grade, CARD_W / 2, CARD_H * 0.258);
     ctx.fillStyle = INK;
-    ctx.font = "900 30px sans-serif";
-    ctx.fillText(model.theme.tag, CARD_W / 2, 300);
-
-    // 主人公（约占卡面 45% 高度，落在色块地面上）
-    drawHero(ctx, model, CARD_W / 2, 330, CARD_H * 0.42);
+    ctx.font = `900 ${Math.round(CARD_H * 0.031)}px sans-serif`;
+    ctx.fillText(model.theme.tag, CARD_W / 2, CARD_H * 0.312);
+    drawHero(ctx, model, CARD_W / 2, CARD_H * 0.344, CARD_H * 0.42);
   } else {
-    // 贴图模式：等级收成左上角小徽章，旁边接关卡名
-    blockRect(ctx, 30, 100, 92, 92, theme.main, 6);
+    blockRect(ctx, padX, midY, gradeW, gradeH, theme.main, 6);
     ctx.fillStyle = INK;
-    ctx.font = "900 56px sans-serif";
+    ctx.font = `900 ${Math.round(CARD_H * 0.058)}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(model.grade, 76, 164);
+    ctx.textBaseline = "middle";
+    ctx.fillText(model.grade, padX + gradeW / 2, midY + gradeH / 2);
     if (model.sceneName) {
-      const chipW = Math.min(320, model.sceneName.length * 24 + 40);
-      blockRect(ctx, 134, 122, chipW, 48, "#FFFFFF", 5);
+      const sceneX = padX + gradeW + sceneGap;
+      const sceneW = Math.min(
+        px(layout.scene.w, CARD_W),
+        Math.max(px(0.22, CARD_W), model.sceneName.length * Math.round(CARD_W * 0.028) + px(0.06, CARD_W)),
+      );
+      blockRect(ctx, sceneX, midY + (gradeH - sceneH) / 2, sceneW, sceneH, "#FFFFFF", 5);
       ctx.fillStyle = INK;
-      ctx.font = "900 22px sans-serif";
-      ctx.fillText(model.sceneName, 134 + chipW / 2, 153);
+      ctx.font = `900 ${Math.round(CARD_H * 0.023)}px sans-serif`;
+      ctx.fillText(model.sceneName, sceneX + sceneW / 2, midY + gradeH / 2);
     }
   }
 
-  // 称号
   if (model.title) {
-    blockRect(ctx, CARD_W / 2 - 170, titleY, 340, 58, "#FFD447", 6);
+    const titleW = CARD_W * 0.63;
+    const titleH = CARD_H * 0.06;
+    blockRect(ctx, CARD_W / 2 - titleW / 2, titleY, titleW, titleH, "#FFD447", 6);
     ctx.fillStyle = INK;
-    ctx.font = "900 28px sans-serif";
+    ctx.font = `900 ${Math.round(CARD_H * 0.029)}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText(`「${model.title}」`, CARD_W / 2, titleY + 40);
+    ctx.textBaseline = "middle";
+    ctx.fillText(`「${model.title}」`, CARD_W / 2, titleY + titleH / 2);
   }
 
-  // 玩梗文案（≤35 字，单行截断）
   ctx.fillStyle = INK;
-  ctx.font = "700 24px sans-serif";
+  ctx.font = `700 ${Math.round(CARD_H * 0.025)}px sans-serif`;
   ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
   const copy = model.copy.length > 35 ? `${model.copy.slice(0, 34)}…` : model.copy;
   ctx.fillText(copy, CARD_W / 2, copyY);
 
-  // 数据条（最多 3 项）
-  const chipW = 150;
-  const startX = CARD_W / 2 - (model.stats.length * chipW + (model.stats.length - 1) * 12) / 2;
+  const chipW = CARD_W * 0.278;
+  const chipH = CARD_H * 0.054;
+  const chipY = CARD_H * 0.92;
+  const startX = CARD_W / 2 - (model.stats.length * chipW + (model.stats.length - 1) * CARD_W * 0.022) / 2;
   model.stats.forEach((stat, index) => {
-    const x = startX + index * (chipW + 12);
-    blockRect(ctx, x, 884, chipW, 52, "#FFFFFF", 5);
+    const x = startX + index * (chipW + CARD_W * 0.022);
+    blockRect(ctx, x, chipY, chipW, chipH, "#FFFFFF", 5);
     ctx.fillStyle = INK;
-    ctx.font = "700 18px sans-serif";
-    ctx.fillText(`${stat.label} ${stat.value}`, x + chipW / 2, 918);
+    ctx.font = `700 ${Math.round(CARD_H * 0.019)}px sans-serif`;
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${stat.label} ${stat.value}`, x + chipW / 2, chipY + chipH / 2);
   });
   return model;
 }

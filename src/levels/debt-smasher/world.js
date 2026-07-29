@@ -4,8 +4,6 @@ function addBox(THREE, scene, size, color, position, gameplayRole) {
     new THREE.MeshStandardMaterial({ color, roughness: 0.72 }),
   );
   mesh.position.set(...position);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
   if (gameplayRole) mesh.userData.gameplayRole = gameplayRole;
   scene.add(mesh);
   return mesh;
@@ -44,10 +42,6 @@ function createPressShape(THREE, debtKind) {
     });
     group.add(tower, roof);
   }
-  group.traverse((child) => {
-    child.castShadow = true;
-    child.receiveShadow = true;
-  });
   return group;
 }
 

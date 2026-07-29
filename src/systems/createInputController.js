@@ -76,21 +76,22 @@ export function createInputController(dependencies) {
 
   function bind() {
     const joystick = dependencies.joystick;
+    const hitArea = dependencies.joystickHitArea ?? joystick;
     const windowTarget = dependencies.windowTarget ?? window;
     const primeAudio = dependencies.primeAudio ?? (() => {});
-    joystick.addEventListener("pointerdown", primeAudio, { once: true });
+    hitArea.addEventListener("pointerdown", primeAudio, { once: true });
     windowTarget.addEventListener("keydown", primeAudio, { once: true });
-    joystick.addEventListener("pointerdown", (event) => {
+    hitArea.addEventListener("pointerdown", (event) => {
       if (!isActive()) return;
       pointerId = event.pointerId;
-      joystick.setPointerCapture(event.pointerId);
+      hitArea.setPointerCapture(event.pointerId);
       updateJoystick(event, joystick);
     });
-    joystick.addEventListener("pointermove", (event) => {
+    hitArea.addEventListener("pointermove", (event) => {
       if (event.pointerId === pointerId) updateJoystick(event, joystick);
     });
     ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
-      joystick.addEventListener(type, releaseJoystick);
+      hitArea.addEventListener(type, releaseJoystick);
     });
     windowTarget.addEventListener("pointerup", releaseJoystick);
     windowTarget.addEventListener("pointercancel", releaseJoystick);

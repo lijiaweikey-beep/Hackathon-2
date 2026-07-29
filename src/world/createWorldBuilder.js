@@ -57,7 +57,7 @@ export function createWorldBuilder(ctx) {
   );
   sun.position.set(-5, 12, 8);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.mapSize.set(512, 512);
   sun.shadow.camera.left = -16;
   sun.shadow.camera.right = 16;
   sun.shadow.camera.top = 16;
