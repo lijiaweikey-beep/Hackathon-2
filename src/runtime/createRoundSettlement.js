@@ -46,6 +46,8 @@ export function createRoundSettlement(dependencies) {
         grade: rating.grade,
         rating: rating.rating,
         time: timeUsed,
+        attemptsLeft,
+        completedAt: Date.now(),
       });
       dependencies.onLevelCompleted?.(session.levelState.level);
       return;

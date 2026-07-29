@@ -1,19 +1,19 @@
 import * as THREE from "three";
-import { ACTION_INTERVAL_MS } from "../config/constants.js";
+import {
+  ACTION_INTERVAL_MS,
+  REVERSE_INPUT_DOT_THRESHOLD,
+  REVERSE_INPUT_LOCK_MS,
+} from "../config/constants.js";
 
 export function createInputController(dependencies) {
   const joystickDirection = new THREE.Vector2();
   const keyDirection = new THREE.Vector2();
   const playerVelocity = new THREE.Vector2();
+  const acceptedDirection = new THREE.Vector2();
   const now = dependencies.now ?? (() => performance.now());
   let pointerId = null;
+  let acceptedAt = -Infinity;
   let lastActionAt = -Infinity;
-
-  function setJoystickKnobOffset(x, y) {
-    if (!dependencies.joystickKnob?.style) return;
-    dependencies.joystickKnob.style.transform =
-      `translate(-50%, -50%) translate(${x}px, ${y}px)`;
-  }
 
   function isActive() {
     return dependencies.isActive?.() ?? true;
@@ -24,7 +24,22 @@ export function createInputController(dependencies) {
   }
 
   function applyReverseLock(nextDirection) {
-    return nextDirection;
+    if (!isActive()) return;
+    const length = nextDirection.length();
+    if (length < 0.0001) return;
+    const timestamp = now();
+    if (acceptedDirection.lengthSq() > 0.0001) {
+      const dot = acceptedDirection.dot(nextDirection) / length;
+      if (
+        dot < REVERSE_INPUT_DOT_THRESHOLD
+        && timestamp - acceptedAt < REVERSE_INPUT_LOCK_MS
+      ) {
+        nextDirection.copy(acceptedDirection).multiplyScalar(length);
+        return;
+      }
+    }
+    acceptedDirection.copy(nextDirection).normalize();
+    acceptedAt = timestamp;
   }
 
   function consumeAction() {
@@ -40,8 +55,12 @@ export function createInputController(dependencies) {
     joystickDirection.set(0, 0);
     keyDirection.set(0, 0);
     playerVelocity.set(0, 0);
+    acceptedDirection.set(0, 0);
+    acceptedAt = -Infinity;
     lastActionAt = -Infinity;
-    setJoystickKnobOffset(0, 0);
+    if (dependencies.joystickKnob?.style) {
+      dependencies.joystickKnob.style.transform = "translate(0px, 0px)";
+    }
   }
 
   function setKeyAxis(axis, value) {
@@ -52,6 +71,7 @@ export function createInputController(dependencies) {
 
   function updateJoystick(event, joystick) {
     if (!isActive()) return;
+    if (!consumeAction()) return;
     const rect = joystick.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -62,7 +82,7 @@ export function createInputController(dependencies) {
     const scale = distance > radius ? radius / distance : 1;
     const x = deltaX * scale;
     const y = deltaY * scale;
-    setJoystickKnobOffset(x, y);
+    dependencies.joystickKnob.style.transform = `translate(${x}px, ${y}px)`;
     joystickDirection.set(x / radius, -y / radius);
     if (joystickDirection.lengthSq() > 1) joystickDirection.normalize();
   }
@@ -71,7 +91,7 @@ export function createInputController(dependencies) {
     if (event?.pointerId != null && event.pointerId !== pointerId) return;
     pointerId = null;
     joystickDirection.set(0, 0);
-    setJoystickKnobOffset(0, 0);
+    dependencies.joystickKnob.style.transform = "translate(0px, 0px)";
   }
 
   function bind() {

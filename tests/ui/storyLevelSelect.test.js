@@ -12,7 +12,6 @@ function createClassList() {
 }
 
 function createElement(tagName) {
-  const listeners = new Map();
   return {
     tagName,
     className: "",
@@ -22,12 +21,7 @@ function createElement(tagName) {
     textContent: "",
     style: { setProperty() {} },
     classList: createClassList(),
-    addEventListener(type, listener) {
-      listeners.set(type, listener);
-    },
-    dispatchEvent(event) {
-      listeners.get(event.type)?.(event);
-    },
+    addEventListener() {},
     setAttribute() {},
   };
 }
@@ -39,8 +33,6 @@ function createTrack() {
   track.querySelectorAll = (selector) =>
     selector === ".history-node-card"
       ? track.children.filter((child) => String(child.className).includes("history-node-card"))
-      : selector === ".history-track-divider"
-        ? track.children.filter((child) => String(child.className).includes("history-track-divider"))
       : [];
   return track;
 }
@@ -58,10 +50,11 @@ function level(id, age, track = "mainline") {
   };
 }
 
-test("人生事件轴在主线未全通时折叠番外关卡", () => {
+test("人生事件轴锁定未开放关卡且番外始终可进入", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement };
   const historyTrack = createTrack();
+  const entered = [];
   const ui = {
     historyTimelineModal: { classList: createClassList(), addEventListener() {} },
     historyTrack,
@@ -77,9 +70,9 @@ test("人生事件轴在主线未全通时折叠番外关卡", () => {
       storyProgress: {
         isUnlocked: (id) => id !== "age-21",
         isCompleted: () => false,
-        isComplete: () => false,
       },
       revealProgress: { isRevealed: () => false, reveal: () => true },
+      onEnterLevel: (id) => entered.push(id),
       timerHost: {},
     });
     controller.showBrowse();
@@ -90,46 +83,9 @@ test("人生事件轴在主线未全通时折叠番外关卡", () => {
   const cards = historyTrack.querySelectorAll(".history-node-card");
   assert.match(cards[0].className, /open/);
   assert.match(cards[1].className, /fog/);
-  assert.equal(cards.length, 2);
-  assert.match(historyTrack.querySelectorAll(".history-track-divider")[0].className, /locked/);
-});
-
-test("人生事件轴在主线全通后展开番外并允许进入", () => {
-  const previousDocument = globalThis.document;
-  globalThis.document = { createElement };
-  const historyTrack = createTrack();
-  const entered = [];
-
-  try {
-    const controller = createHistoryTimelineController({
-      ui: {
-        historyTimelineModal: { classList: createClassList(), addEventListener() {} },
-        historyTrack,
-        historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
-        historyStatusText: { textContent: "" },
-        historyNodeDetail: { innerHTML: "" },
-      },
-      levels: [level("age-19", 19), level("extra", null, "extra")],
-      storyProgress: {
-        isComplete: () => true,
-        isUnlocked: () => true,
-        isCompleted: (id) => id === "age-19",
-      },
-      revealProgress: { isRevealed: () => true, reveal: () => true },
-      onEnterLevel: (id) => entered.push(id),
-      timerHost: {},
-    });
-    controller.showBrowse();
-  } finally {
-    globalThis.document = previousDocument;
-  }
-
-  const cards = historyTrack.querySelectorAll(".history-node-card");
-  assert.equal(cards.length, 2);
-  assert.match(cards[1].className, /open/);
-  assert.match(historyTrack.querySelectorAll(".history-track-divider")[0].className, /unlocked/);
-  cards[1].dispatchEvent({ type: "click", stopPropagation() {} });
-  assert.deepEqual(entered, ["extra"]);
+  assert.match(cards[2].className, /open/);
+  cards[2].dispatchEvent?.({ stopPropagation() {} });
+  assert.deepEqual(entered, []);
 });
 
 test("全部主线完成后人生事件轴展示人生终章", () => {

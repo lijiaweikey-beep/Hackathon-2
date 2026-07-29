@@ -31,7 +31,6 @@ import { createStoryProgress } from "../progression/createStoryProgress.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
 import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
-import { selectInitialLevelId } from "./selectInitialLevel.js";
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager;
@@ -64,6 +63,7 @@ const levelRunner = createClassicLevelRunner({
   },
 });
 function getMatchNpcCount() { return uiController.getMatchNpcCount(); }
+
 function createPlayer() {
   return session.levelState?.level.extensions?.createPlayer?.()
     ?? createPlayerEntity();
@@ -75,6 +75,7 @@ function createNpc(id, flags) {
 }
 
 function triggerHitstop(duration) { fx.triggerHitstop(duration); }
+
 function triggerShake(intensity, duration) { fx.triggerShake(intensity, duration); }
 
 function updateShake(dt) { fx.updateShake(dt, rendering.camera); }
@@ -255,15 +256,16 @@ export function boot() {
     levelViewHost,
     storyProgress,
     getHudState: () => levelRunner.handleAction({ type: "getHudState" }),
-    getCooldown: () => ({ cooldown: combatSystem.cooldown, cooldownMax: combatSystem.cooldownMax }),
+    getCooldown: () => ({
+      cooldown: combatSystem.cooldown,
+      cooldownMax: combatSystem.cooldownMax,
+    }),
     onSelectLevel: selectLevelById,
     onLeaveLevel: leaveLevel,
     onStart: startExperience,
     onPause: pauseExperience,
     onResume: resumeExperience,
     onHomeShown: () => historyTimelineFlow?.showHome(),
-    onDifficultyChanged: () => historyTimelineFlow?.showHome(),
-    onPrelaunchDismissed: () => selectLevelById(selectInitialLevelId(levelRegistry.mainline, storyProgress)),
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
@@ -288,7 +290,6 @@ export function boot() {
     storage: window.localStorage,
     storyProgress,
     onEnterLevel: selectLevelById,
-    getNpcCount: (level) => uiController.getMatchNpcCount(level),
   });
   settlement = createRoundSettlement({
     session,

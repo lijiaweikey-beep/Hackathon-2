@@ -2,7 +2,6 @@ export const DEFAULT_NPC_COUNT = 20;
 export const MIN_NPC_COUNT = 10;
 export const MAX_NPC_COUNT = 100;
 export const NPC_COUNT_STORAGE_KEY = "nightAction_npcCount";
-export const DIFFICULTY_STORAGE_KEY = "nightAction_difficulty";
 export const BEST_SCORE_STORAGE_KEY = "nightAction_best";
 
 export const WORLD_LIMIT = 10.8;

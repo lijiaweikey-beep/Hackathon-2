@@ -8,5 +8,3 @@ serve.out.log
 serve.err.log
 vite.out.log
 vite.err.log
-.vercel
-.env*

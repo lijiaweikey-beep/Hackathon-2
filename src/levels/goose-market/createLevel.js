@@ -2,16 +2,7 @@ const NORMAL_PUNCH_COOLDOWN = 2;
 const MISTAKE_LOCK_SECONDS = 2.5;
 const MISTAKE_HINT_SECONDS = 1.5;
 const MISTAKE_HINT = "打我鹅腿阿姨干嘛";
-
-function getVendorMix(npcCount) {
-  if (npcCount >= 20) {
-    return { gooseCount: 15, duckMin: 3, duckMax: 8 };
-  }
-  if (npcCount >= 17) {
-    return { gooseCount: 12, duckMin: 3, duckMax: 7 };
-  }
-  return { gooseCount: 10, duckMin: 3, duckMax: 6 };
-}
+const GOOSE_VENDOR_COUNT = 10;
 
 export function createGooseMarketLevel(context) {
   let vendors = [];
@@ -31,14 +22,13 @@ export function createGooseMarketLevel(context) {
 
   function start() {
     vendors = [];
-    const mix = getVendorMix(context.actors.npcCount);
-    duckCount = Math.floor(context.random.range(mix.duckMin, mix.duckMax));
+    duckCount = Math.floor(context.random.range(3, 6));
     remainingDucks = duckCount;
     mistakeHintTimer = 0;
-    for (let id = 0; id < mix.gooseCount; id += 1) {
+    for (let id = 0; id < GOOSE_VENDOR_COUNT; id += 1) {
       addVendor(id, true);
     }
-    for (let id = mix.gooseCount; id < mix.gooseCount + duckCount; id += 1) {
+    for (let id = GOOSE_VENDOR_COUNT; id < GOOSE_VENDOR_COUNT + duckCount; id += 1) {
       addVendor(id, false);
     }
     context.sceneData.placeSwitch(context.movement.randomOpenPosition());

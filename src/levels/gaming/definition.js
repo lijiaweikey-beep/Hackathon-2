@@ -3,6 +3,16 @@ import { createGamingLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const art = {
+  cover: new URL("./assets/cover.jpg", import.meta.url).href,
+  grades: {
+    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
+    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
+    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
+    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
+  },
+};
+
 export default {
   id: "gaming",
   order: 10,
@@ -30,7 +40,15 @@ export default {
   ],
   decoyCount: 0,
   sceneName: "宿舍教学",
+  entryTitle: "凌晨三点",
   emoji: "⌨️",
+  art,
+  nodes: {
+    S: { title: "作息纠察队长", verdict: "一拳到位，宿舍在三点零一分恢复安静。" },
+    A: { title: "熄灯前的正义", verdict: "稍微绕了点路，但游戏声总算停了。" },
+    B: { title: "摸黑找人的", verdict: "人是找到了，天也快亮了。" },
+    C: { title: "陪打到天亮", verdict: "你没抓到人，反而看完了整局游戏。" },
+  },
   cardStyle: {
     accent: "#818cf8",
     glow: "rgba(129, 140, 248, 0.28)",
@@ -39,6 +57,7 @@ export default {
   mission: "学习移动与出拳：走到光圈处，教训发光的舍友！",
   hudMission: "走到绿色光圈处",
   clue: "新手提示：根据画面指示进行操作",
+  traits: ["全身发光", "凌晨三点开黑"],
   targetDesc: "发光的舍友",
   difficulty: 0,
   success: "宿舍终于安静了。新手报到完成！",
@@ -47,6 +66,11 @@ export default {
     intro: "十九岁，第一次离开家住进宿舍，也第一次发现青春会在凌晨三点吵得人睡不着。",
     success: "宿舍终于安静。两年后，梗哥走进了图书馆。",
   },
+  storyIntro: [
+    "十九岁，第一次离家住进宿舍。",
+    "凌晨三点，竟然有人还在打游戏！",
+    "岂有此理！！别让我逮到你！！",
+  ],
   lighting: "night",
   mode: "tutorial",
   tutorialSteps: {

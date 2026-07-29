@@ -46,17 +46,6 @@ export function createWorld(world) {
       shelf.castShadow = true;
       shelf.receiveShadow = true;
       scene.add(shelf);
-      for (let index = 0; index < 8; index += 1) {
-        const book = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08, 0.42 + Math.random() * 0.2, 0.16),
-          new THREE.MeshStandardMaterial({
-            color: bookColors[index % bookColors.length],
-            roughness: 0.82,
-          }),
-        );
-        book.position.set(x + (x < 0 ? 0.39 : -0.39), 1, z - 0.84 + index * 0.24);
-        scene.add(book);
-      }
       registerObstacle(x, z, 0.37, 1.1);
     });
   });

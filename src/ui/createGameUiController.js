@@ -1,14 +1,15 @@
 import {
-  DEFAULT_DIFFICULTY,
-  getDifficultyNpcCount,
-  normalizeDifficulty,
-} from "../core/difficulty.js";
+  DEFAULT_NPC_COUNT,
+} from "../config/constants.js";
 import { GAME_PHASES } from "../core/gamePhase.js";
 import {
-  loadDifficultySetting,
-  saveDifficultySetting,
+  clampNpcCount,
+  loadMatchNpcCount,
+  parseNpcCountRaw,
+  saveMatchNpcCount,
 } from "../utils/storage.js";
 import { renderShareCard } from "./shareCard.js";
+import { createStoryIntroPlayer } from "./storyIntro.js";
 import { renderTargetPreview } from "./targetPreview.js";
 import { renderTaskModal } from "./taskModal.js";
 
@@ -18,7 +19,8 @@ export function createGameUiController(dependencies) {
     session,
     levelViewHost = { clear() {}, setTheme() {} },
   } = dependencies;
-  let difficulty = DEFAULT_DIFFICULTY;
+  const storyIntro = createStoryIntroPlayer({ ui });
+  let npcCount = DEFAULT_NPC_COUNT;
   let lastResult = null;
 
   function getStoryStats() {
@@ -31,33 +33,24 @@ export function createGameUiController(dependencies) {
     };
   }
 
-  function getCurrentLevel() {
-    return session.levelState?.level ?? null;
+  function syncNpcCountInput() {
+    if (ui.npcCountInput) ui.npcCountInput.value = String(npcCount);
   }
 
-  function getActiveNpcCount(level = getCurrentLevel()) {
-    return getDifficultyNpcCount(level, difficulty);
+  function getNpcCountPreview() {
+    const parsed = parseNpcCountRaw(ui.npcCountInput?.value);
+    return parsed == null ? npcCount : clampNpcCount(parsed);
   }
 
-  function syncDifficultyUi() {
-    const normalized = normalizeDifficulty(difficulty);
-    ui.difficultyButtons?.forEach((button) => {
-      const active = button.dataset.difficulty === normalized;
-      button.classList?.toggle("active", active);
-      button.setAttribute?.("aria-pressed", String(active));
-    });
-  }
-
-  function selectDifficulty(nextDifficulty) {
-    difficulty = normalizeDifficulty(nextDifficulty);
-    saveDifficultySetting(difficulty);
-    syncDifficultyUi();
-    dependencies.onDifficultyChanged?.();
+  function commitNpcCountInput() {
+    npcCount = getNpcCountPreview();
+    syncNpcCountInput();
+    saveMatchNpcCount(npcCount);
   }
 
   function showHome({ leaveLevel = true } = {}) {
     if (leaveLevel) dependencies.onLeaveLevel?.();
-    syncDifficultyUi();
+    syncNpcCountInput();
     levelViewHost.clear();
     ui.taskModal?.classList.remove("visible");
     ui.resultModal?.classList.remove("visible");
@@ -66,11 +59,9 @@ export function createGameUiController(dependencies) {
   }
 
   function showTask(level = session.levelState.level) {
-    renderTaskModal(ui, {
-      level,
-      npcCount: getActiveNpcCount(level),
-    });
-    syncDifficultyUi();
+    const mainline = dependencies.levelRegistry?.mainline ?? [];
+    const mainlineIndex = mainline.findIndex(({ id }) => id === level.id);
+    renderTaskModal(ui, { level, npcCount, mainlineIndex });
     renderTargetPreview(ui.targetPreviewCanvas, level);
     updateHud();
   }
@@ -192,12 +183,37 @@ export function createGameUiController(dependencies) {
     updateCooldown();
   }
 
-  function bindDifficultyButtons() {
-    ui.difficultyButtons?.forEach((button) => {
-      button.addEventListener("click", () => {
-        selectDifficulty(button.dataset.difficulty);
-      });
+  function bindNpcCountInput() {
+    const input = ui.npcCountInput;
+    if (!input) return;
+    input.addEventListener("input", () => {
+      const digits = input.value.replace(/\D/g, "");
+      if (input.value !== digits) input.value = digits;
     });
+    input.addEventListener("blur", () => {
+      commitNpcCountInput();
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      } else if (["e", "E", "+", "-", "."].includes(event.key)) {
+        event.preventDefault();
+      }
+    });
+    input.addEventListener("wheel", (event) => {
+      if (document.activeElement === input) event.preventDefault();
+    }, { passive: false });
+
+    const adjust = (offset) => {
+      const next = clampNpcCount(npcCount + offset);
+      if (next === npcCount) return;
+      npcCount = next;
+      syncNpcCountInput();
+      saveMatchNpcCount(npcCount);
+    };
+    ui.npcCountUp?.addEventListener("click", () => adjust(1));
+    ui.npcCountDown?.addEventListener("click", () => adjust(-1));
   }
 
   function bindPrelaunch() {
@@ -256,15 +272,21 @@ export function createGameUiController(dependencies) {
   }
 
   function bind() {
-    difficulty = loadDifficultySetting();
-    syncDifficultyUi();
-    bindDifficultyButtons();
+    npcCount = loadMatchNpcCount();
+    syncNpcCountInput();
+    bindNpcCountInput();
     bindPrelaunch();
     bindShareCard();
+    storyIntro.bind();
     ui.startButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.BRIEFING) return;
-      dependencies.onStart?.();
+      commitNpcCountInput();
       ui.taskModal.classList.remove("visible");
+      // 打字机剧情播完、玩家点击任意处后才真正开局。
+      storyIntro.play(session.levelState?.level, () => {
+        if (session.phase !== GAME_PHASES.BRIEFING) return;
+        dependencies.onStart?.();
+      });
     });
     ui.backFromTaskButton?.addEventListener("click", () => {
       if (session.phase === GAME_PHASES.BRIEFING) showHome();
@@ -309,7 +331,8 @@ export function createGameUiController(dependencies) {
     showTask,
     showResult,
     updateHud,
-    getMatchNpcCount: (level) => getActiveNpcCount(level),
+    getMatchNpcCount: () => npcCount,
+    getNpcCountPreview,
     flashHud,
     showOverlay: (...args) => levelViewHost.showOverlay?.(...args),
     hideOverlay: (...args) => levelViewHost.hideOverlay?.(...args),
