@@ -46,4 +46,5 @@ test("手机横屏短高度启用紧凑 HUD、任务弹窗和事件轴布局", a
   assert.match(compactRule, /\.topbar/);
   assert.match(compactRule, /\.task-panel/);
   assert.match(compactRule, /\.history-footer/);
+  assert.match(compactRule, /\.tutorial-joystick-guide/);
 });

@@ -1,18 +1,12 @@
 import * as THREE from "three";
-import {
-  ACTION_INTERVAL_MS,
-  REVERSE_INPUT_DOT_THRESHOLD,
-  REVERSE_INPUT_LOCK_MS,
-} from "../config/constants.js";
+import { ACTION_INTERVAL_MS } from "../config/constants.js";
 
 export function createInputController(dependencies) {
   const joystickDirection = new THREE.Vector2();
   const keyDirection = new THREE.Vector2();
   const playerVelocity = new THREE.Vector2();
-  const acceptedDirection = new THREE.Vector2();
   const now = dependencies.now ?? (() => performance.now());
   let pointerId = null;
-  let acceptedAt = -Infinity;
   let lastActionAt = -Infinity;
 
   function setJoystickKnobOffset(x, y) {
@@ -30,22 +24,7 @@ export function createInputController(dependencies) {
   }
 
   function applyReverseLock(nextDirection) {
-    if (!isActive()) return;
-    const length = nextDirection.length();
-    if (length < 0.0001) return;
-    const timestamp = now();
-    if (acceptedDirection.lengthSq() > 0.0001) {
-      const dot = acceptedDirection.dot(nextDirection) / length;
-      if (
-        dot < REVERSE_INPUT_DOT_THRESHOLD
-        && timestamp - acceptedAt < REVERSE_INPUT_LOCK_MS
-      ) {
-        nextDirection.copy(acceptedDirection).multiplyScalar(length);
-        return;
-      }
-    }
-    acceptedDirection.copy(nextDirection).normalize();
-    acceptedAt = timestamp;
+    return nextDirection;
   }
 
   function consumeAction() {
@@ -61,8 +40,6 @@ export function createInputController(dependencies) {
     joystickDirection.set(0, 0);
     keyDirection.set(0, 0);
     playerVelocity.set(0, 0);
-    acceptedDirection.set(0, 0);
-    acceptedAt = -Infinity;
     lastActionAt = -Infinity;
     setJoystickKnobOffset(0, 0);
   }
@@ -75,7 +52,6 @@ export function createInputController(dependencies) {
 
   function updateJoystick(event, joystick) {
     if (!isActive()) return;
-    if (!consumeAction()) return;
     const rect = joystick.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;

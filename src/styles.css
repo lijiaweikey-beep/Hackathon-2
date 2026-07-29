@@ -1840,7 +1840,7 @@ button {
     padding:
       0
       max(14px, env(safe-area-inset-right))
-      max(6px, env(safe-area-inset-bottom))
+      max(28px, calc(env(safe-area-inset-bottom) + 22px))
       max(14px, env(safe-area-inset-left));
   }
 
@@ -1862,6 +1862,10 @@ button {
     border-width: 2px;
     box-shadow: var(--shadow-sm);
     font-size: 24px;
+  }
+
+  .tutorial-joystick-guide {
+    bottom: max(28px, calc(env(safe-area-inset-bottom) + 22px));
   }
 
   .modal {

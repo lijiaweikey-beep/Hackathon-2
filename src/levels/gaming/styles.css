@@ -171,6 +171,12 @@
   45%, 60% { transform: translateY(-28px); opacity: 1; }
 }
 
+@media (orientation: landscape) and (max-height: 520px) {
+  .tutorial-joystick-guide {
+    bottom: max(28px, calc(env(safe-area-inset-bottom) + 22px));
+  }
+}
+
 .tutorial-miss-host {
   display: grid;
   place-items: center;
