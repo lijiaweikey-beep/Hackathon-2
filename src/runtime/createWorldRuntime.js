@@ -33,8 +33,8 @@ export function createWorldRuntime(dependencies) {
     );
   }
 
-  function clampActorPosition(position, velocity) {
-    clampActorPositionInLevel(getLevelState(), position, velocity);
+  function clampActorPosition(position, velocity, options) {
+    clampActorPositionInLevel(getLevelState(), position, velocity, options);
   }
 
   const builder = createWorldBuilder({

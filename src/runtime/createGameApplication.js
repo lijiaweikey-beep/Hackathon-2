@@ -199,6 +199,7 @@ export function boot() {
   actorSystem = createActorSystem({
     getScene: () => scene,
     getPlayer: () => player,
+    getCamera: () => rendering.camera,
     getLevel: () => session.levelState.level,
     createNpc,
     collidesWithObstacle: (...args) => worldRuntime.collidesWithObstacle(...args),
