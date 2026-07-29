@@ -327,11 +327,35 @@ export function createGameUiController(dependencies) {
     ui.settingsCloseButton?.addEventListener("click", () => setSettingsOpen(false));
   }
 
+  // P0 漫画序章：每次点击揭开下一格，最后一格再点进入封面。
+  function bindComicIntro() {
+    if (!ui.comicIntroScreen) return;
+    const frames = [...ui.comicIntroScreen.querySelectorAll(".comic-intro-frame")];
+    let shownCount = frames.filter((frame) => frame.classList.contains("shown")).length;
+    ui.comicIntroScreen.addEventListener("click", () => {
+      if (shownCount < frames.length) {
+        frames[shownCount].classList.add("shown");
+        shownCount += 1;
+        return;
+      }
+      ui.comicIntroScreen.classList.add("is-away");
+    });
+  }
+
+  const PRELAUNCH_GUIDE = {
+    storyIntro: [
+      "接下来，打爆每个人生阶段的愤怒，一步一步解锁关卡吧！",
+      "全A以上会解锁人生之外·番外篇哦",
+    ],
+  };
+
   function bindPrelaunch() {
     if (!ui.prelaunchScreen) return;
     ui.prelaunchStartButton?.addEventListener("click", () => {
       ui.prelaunchScreen.classList.add("is-away");
       dependencies.onPrelaunchDismissed?.();
+      // 进入前先弹一段引导文字流，点击后落到事件轴。
+      storyIntro.play(PRELAUNCH_GUIDE);
     });
   }
 
@@ -390,6 +414,7 @@ export function createGameUiController(dependencies) {
     bindDifficultyButtons();
     bindPreferenceButtons();
     bindSettingsPanel();
+    bindComicIntro();
     bindPrelaunch();
     bindShareCard();
     storyIntro.bind();

@@ -79,6 +79,7 @@ export const ui = {
   attackButton: document.querySelector("#attackButton"),
   cooldownOverlay: document.querySelector("#cooldownOverlay"),
   orientationOverlay: document.querySelector("#orientationOverlay"),
+  comicIntroScreen: document.querySelector("#comicIntroScreen"),
   prelaunchScreen: document.querySelector("#prelaunchScreen"),
   prelaunchStartButton: document.querySelector("#prelaunchStartButton"),
   storyIntroModal: document.querySelector("#storyIntroModal"),

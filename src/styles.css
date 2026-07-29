@@ -2019,6 +2019,58 @@ button {
 }
 
 
+/* ---- P0 漫画序章：逐格点击揭开 ---- */
+.comic-intro-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: #f7f1e4;
+  cursor: pointer;
+  transition: opacity 0.42s ease, visibility 0.42s ease;
+}
+
+.comic-intro-screen.is-away {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.comic-intro-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* 只占约七成屏幕，完整露出漫画外围 */
+  width: min(70vw, calc(70dvh * 1376 / 768));
+  aspect-ratio: 1376 / 768;
+  object-fit: contain;
+  border-radius: 10px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(1.015);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.comic-intro-frame.shown {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.comic-intro-hint {
+  position: absolute;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: rgba(255, 246, 223, 0.9);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  animation: storyIntroHintPulse 1.4s ease-in-out infinite;
+}
+
+
 /* ---- 进入体验前的加载页 ---- */
 .prelaunch-screen {
   position: fixed;
