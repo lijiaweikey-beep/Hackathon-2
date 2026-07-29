@@ -16,7 +16,10 @@ export function createGooseMarketLevel(context) {
   }
 
   function update(deltaSeconds) {
-    context.sceneData.updateEnvironment(deltaSeconds);
+    context.sceneData.updateEnvironment(
+      deltaSeconds,
+      context.actors.getPlayer?.()?.group.position,
+    );
     vendors.forEach((vendor) => {
       if (!vendor.alive) return;
       const glow = context.sceneData.getLegGlow(
