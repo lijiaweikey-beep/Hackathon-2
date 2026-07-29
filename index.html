@@ -136,31 +136,31 @@
 
         <section id="historyDetailModal" class="history-detail-modal" aria-label="历史节点详情">
           <div id="historyDetailBackdrop" class="history-detail-backdrop" aria-hidden="true"></div>
-          <article id="historyDetailPanel" class="history-detail-panel">
-            <header class="history-detail-header">
-              <h2 id="historyDetailTitle">第1章 - 凌晨三点</h2>
-              <p id="historyDetailSubtitle">历史节点</p>
-            </header>
-            <div class="history-detail-body">
-              <button id="historyDetailPrev" class="history-detail-nav prev" type="button" aria-label="上一个历史节点">‹</button>
-              <div class="history-detail-share">
-                <canvas id="historyDetailShareCanvas" class="history-detail-share-canvas" width="540" height="960"></canvas>
+          <div class="history-detail-frame">
+            <button id="historyDetailPrev" class="history-detail-nav prev" type="button" aria-label="上一个历史节点">‹</button>
+            <article id="historyDetailPanel" class="result-stage history-detail-stage">
+              <div id="historyDetailArt" class="result-art is-empty" aria-hidden="true"></div>
+              <div class="result-slug">
+                <span id="historyDetailLevelTag" class="result-slug-item">LV.01</span>
+                <span id="historyDetailAgeTag" class="result-slug-item">--</span>
+                <span id="historyDetailRating" class="result-rating">S</span>
               </div>
-              <div class="history-detail-side">
-                <div id="historyDetailLore" class="history-detail-lore" tabindex="0"></div>
-                <div id="historyDetailStats" class="history-detail-stats"></div>
+              <div class="result-brief">
+                <div id="historyDetailSubtitle" class="result-outcome">历史节点</div>
+                <div id="historyDetailTitle" class="result-node-title"></div>
+                <p id="historyDetailCopy" class="result-verdict"></p>
+                <div id="historyDetailStats" class="result-stats"></div>
+                <div id="historyDetailReward" class="result-unlock"></div>
+                <div class="result-actions">
+                  <button id="historyDetailSave" class="secondary-button" type="button">保存</button>
+                  <button id="historyDetailClose" class="secondary-button" type="button">关闭</button>
+                  <button id="historyDetailReplay" class="primary-button" type="button">再玩一局</button>
+                </div>
               </div>
-              <button id="historyDetailNext" class="history-detail-nav next" type="button" aria-label="下一个历史节点">›</button>
-            </div>
-            <footer class="history-detail-footer">
-              <div class="history-detail-actions">
-                <button id="historyDetailSave" class="history-detail-button" type="button">保存</button>
-                <button id="historyDetailClose" class="history-detail-button ghost" type="button">关闭</button>
-                <button id="historyDetailReplay" class="history-detail-button accent" type="button">再玩一局</button>
-              </div>
-              <div id="historyDetailReward" class="history-detail-reward"></div>
-            </footer>
-          </article>
+            </article>
+            <button id="historyDetailNext" class="history-detail-nav next" type="button" aria-label="下一个历史节点">›</button>
+            <canvas id="historyDetailShareCanvas" class="history-detail-share-canvas" width="540" height="960" hidden aria-hidden="true"></canvas>
+          </div>
         </section>
       </div>
     </section>
