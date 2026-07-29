@@ -2,8 +2,11 @@ import * as THREE from "three";
 import { createDebtRules } from "./rules.js";
 
 const HIT_PUSH_DISTANCE = 2.4;
+const HIT_MAX_TARGETS = 3;
+const PUSH_HOLD_SECONDS = 2;
 const ROUND_SECONDS = 100;
 const DEBT_TYPES = ["mortgage", "car-loan"];
+const DEFAULT_PLAY_BOUNDS = { minX: -9.2, maxX: 9.2, minZ: -7.4, maxZ: 7.4 };
 
 export function createDebtSmasherLevel(context) {
   const rules = createDebtRules({
@@ -39,9 +42,42 @@ export function createDebtSmasherLevel(context) {
     refillDebtNpcs();
   }
 
+  function clampToDebtFactory(position, velocity) {
+    const bounds = context.sceneData.playBounds ?? DEFAULT_PLAY_BOUNDS;
+    if (position.x < bounds.minX) {
+      position.x = bounds.minX;
+      if (velocity) velocity.x = Math.abs(velocity.x);
+    } else if (position.x > bounds.maxX) {
+      position.x = bounds.maxX;
+      if (velocity) velocity.x = -Math.abs(velocity.x);
+    }
+    if (position.z < bounds.minZ) {
+      position.z = bounds.minZ;
+      if (velocity) velocity.y = Math.abs(velocity.y);
+    } else if (position.z > bounds.maxZ) {
+      position.z = bounds.maxZ;
+      if (velocity) velocity.y = -Math.abs(velocity.y);
+    }
+  }
+
+  function isInsideMachine(position) {
+    return context.sceneData.machines.some((machine) =>
+      Math.hypot(position.x - machine.x, position.z - machine.z) <= machine.radius);
+  }
+
+  function holdNpc(npc) {
+    npc.levelManaged = true;
+    npc.walking = false;
+    npc.velocity?.set?.(0, 0);
+    npc.pushedHoldRemaining = PUSH_HOLD_SECONDS;
+    npc.holdPosition = npc.group.position.clone();
+    if (isInsideMachine(npc.group.position)) {
+      npc.trapHoldPosition = npc.group.position.clone();
+    }
+  }
+
   function findHitTarget({ playerPos, facing }) {
-    let best = null;
-    let bestDistance = Infinity;
+    const candidates = [];
     context.actors.getNpcs().forEach((npc) => {
       if (!npc.alive || !npc.isDebtTarget) return;
       const dx = npc.group.position.x - playerPos.x;
@@ -51,35 +87,42 @@ export function createDebtSmasherLevel(context) {
       if (
         distance <= 2.1
         && context.combat.isFacingTarget(facing, direction)
-        && distance < bestDistance
       ) {
-        best = npc;
-        bestDistance = distance;
+        candidates.push({ npc, distance });
       }
     });
-    return best ? { npc: best, correct: true } : null;
+    candidates.sort((a, b) => a.distance - b.distance);
+    const npcs = candidates.slice(0, HIT_MAX_TARGETS).map((entry) => entry.npc);
+    return npcs.length ? { npc: npcs[0], npcs, correct: true } : null;
   }
 
   function pushNpc(npc, facing) {
     const position = npc.group.position;
+    delete npc.holdPosition;
+    delete npc.trapHoldPosition;
     const source = { x: position.x, z: position.z, flattened: !npc.alive };
     if (!rules.push(source, { x: facing.x, z: facing.y })) return false;
-    position.x = Math.max(-10.8, Math.min(10.8, source.x));
-    position.z = Math.max(-10.8, Math.min(10.8, source.z));
+    position.x = source.x;
+    position.z = source.z;
+    clampToDebtFactory(position, npc.velocity);
     npc.pushedByPlayer = true;
     npc.walking = false;
+    holdNpc(npc);
     return true;
   }
 
   function hitTarget({ hit }) {
-    const npc = hit?.npc;
-    if (!npc?.alive || completed) return { handled: true };
+    const targets = (hit?.npcs?.length ? hit.npcs : [hit?.npc]).filter((target) => target?.alive);
+    if (targets.length === 0 || completed) return { handled: true };
     const player = context.actors.getPlayer();
     const facing = new THREE.Vector2(Math.sin(player.group.rotation.y), Math.cos(player.group.rotation.y));
 
-    if (pushNpc(npc, facing)) {
-      npc.group.rotation.z = -0.35;
-      npc.group.scale.set(1.08, 0.92, 1.08);
+    const pushed = targets.filter((target) => pushNpc(target, facing));
+    if (pushed.length > 0) {
+      pushed.forEach((target) => {
+        target.group.rotation.z = -0.35;
+        target.group.scale.set(1.08, 0.92, 1.08);
+      });
       context.combat.triggerShake(0.16, 0.12);
       context.audio.playSound?.("hit");
       return { handled: true, cooldown: 0.22 };
@@ -152,6 +195,13 @@ export function createDebtSmasherLevel(context) {
     rules.update(deltaSeconds, context.actors.getNpcs());
     context.actors.getNpcs().forEach((npc) => {
       if (!npc.alive) return;
+      if (npc.pushedHoldRemaining > 0) {
+        npc.pushedHoldRemaining = Math.max(0, npc.pushedHoldRemaining - deltaSeconds);
+        if (npc.pushedHoldRemaining <= 0 && !npc.trapHoldPosition) {
+          npc.levelManaged = false;
+          delete npc.holdPosition;
+        }
+      }
       if (!npc.pushedByPlayer) {
         npc.group.rotation.z = 0;
         npc.group.scale.set(1, 1, 1);
@@ -166,8 +216,29 @@ export function createDebtSmasherLevel(context) {
   }
 
   function keepUnpushedNpcsOutOfTraps() {
+    clampToDebtFactory(context.actors.getPlayer().group.position);
     context.actors.getNpcs().forEach((npc) => {
-      if (!npc.alive || npc.pushedByPlayer) return;
+      if (!npc.alive) return;
+      if (npc.trapHoldPosition) {
+        npc.group.position.copy(npc.trapHoldPosition);
+        npc.levelManaged = true;
+        npc.walking = false;
+        npc.velocity?.set?.(0, 0);
+        return;
+      }
+      if (npc.holdPosition && npc.pushedHoldRemaining > 0) {
+        npc.group.position.copy(npc.holdPosition);
+        npc.levelManaged = true;
+        npc.walking = false;
+        npc.velocity?.set?.(0, 0);
+        return;
+      }
+      clampToDebtFactory(npc.group.position, npc.velocity);
+      if (npc.pushedByPlayer && isInsideMachine(npc.group.position)) {
+        holdNpc(npc);
+        return;
+      }
+      if (npc.pushedByPlayer) return;
       const position = npc.group.position;
       context.sceneData.machines.forEach((machine) => {
         const dx = position.x - machine.x;

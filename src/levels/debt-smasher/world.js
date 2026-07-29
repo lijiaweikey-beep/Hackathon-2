@@ -1,8 +1,3 @@
-const DEBT_LABELS = {
-  mortgage: "房贷",
-  "car-loan": "车贷",
-};
-
 function addBox(THREE, scene, size, color, position, gameplayRole) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(...size),
@@ -14,28 +9,6 @@ function addBox(THREE, scene, size, color, position, gameplayRole) {
   if (gameplayRole) mesh.userData.gameplayRole = gameplayRole;
   scene.add(mesh);
   return mesh;
-}
-
-function createLabelMaterial(THREE, text) {
-  if (globalThis.document?.createElement) {
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 96;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "rgba(8,13,24,0.88)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#facc15";
-    ctx.lineWidth = 8;
-    ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
-    ctx.fillStyle = "#fff7cc";
-    ctx.font = "bold 40px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-    const texture = new THREE.CanvasTexture(canvas);
-    return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
-  }
-  return new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.9 });
 }
 
 function createPressShape(THREE, debtKind) {
@@ -78,45 +51,69 @@ function createPressShape(THREE, debtKind) {
   return group;
 }
 
-function createConveyorLine(THREE, scene, x, laneIndex) {
+function createConveyorLine(THREE, scene, config, laneIndex) {
+  const { x, z, orientation } = config;
+  const isHorizontal = orientation === "horizontal";
   const direction = laneIndex % 2 === 0 ? 1 : -1;
-  const belt = addBox(THREE, scene, [2.28, 0.12, 15.8], 0x6d829c, [x, 0.08, 0], "conveyor-belt");
+  const belt = addBox(
+    THREE,
+    scene,
+    isHorizontal ? [20.6, 0.12, 1.28] : [1.28, 0.12, 17.2],
+    0x6d829c,
+    [x, 0.08, z],
+    "conveyor-belt",
+  );
   const railMat = new THREE.MeshStandardMaterial({ color: 0xe0e7ef, roughness: 0.5 });
   const cargoMat = [
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.68 }),
-    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.56 }),
     new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.62 }),
+    new THREE.MeshStandardMaterial({ color: 0xa7f3d0, roughness: 0.56 }),
+    new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.62 }),
+    new THREE.MeshStandardMaterial({ color: 0xfca5a5, roughness: 0.58 }),
   ][laneIndex];
-  const rails = [-1.22, 1.22].map((offsetX) => {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 15.9), railMat);
-    rail.position.set(x + offsetX, 0.24, 0);
+  const rails = [-0.76, 0.76].map((offset) => {
+    const rail = new THREE.Mesh(
+      new THREE.BoxGeometry(...(isHorizontal ? [20.7, 0.22, 0.08] : [0.08, 0.22, 17.3])),
+      railMat,
+    );
+    rail.position.set(x + (isHorizontal ? 0 : offset), 0.24, z + (isHorizontal ? offset : 0));
     rail.castShadow = true;
     rail.receiveShadow = true;
     rail.userData.gameplayRole = "conveyor-rail";
     scene.add(rail);
     return rail;
   });
-  const rollers = [-6.8, -4.4, -2, 0.4, 2.8, 5.2, 7].map((z) => {
-    const roller = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.18, 12), railMat);
-    roller.rotation.z = Math.PI / 2;
-    roller.position.set(x, 0.23, z);
+  const rollerStops = isHorizontal
+    ? [-9.4, -6.3, -3.2, -0.1, 3, 6.1, 9.2]
+    : [-7.5, -4.5, -1.5, 1.5, 4.5, 7.5];
+  const rollers = rollerStops.map((offset) => {
+    const roller = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, isHorizontal ? 1.18 : 1.18, 12),
+      railMat,
+    );
+    roller.rotation.z = isHorizontal ? 0 : Math.PI / 2;
+    roller.position.set(x + (isHorizontal ? offset : 0), 0.23, z + (isHorizontal ? 0 : offset));
     roller.castShadow = true;
     roller.receiveShadow = true;
     roller.userData.gameplayRole = "conveyor-roller";
     scene.add(roller);
     return roller;
   });
-  const cargos = [-6.2, -2.1, 2.4, 6.5].map((z, index) => {
+  const cargoStops = isHorizontal ? [-8.8, -3.1, 2.9, 8.4] : [-7, -2.4, 2.2, 6.8];
+  const cargos = cargoStops.map((offset, index) => {
     const cargo = new THREE.Mesh(
       new THREE.BoxGeometry(index % 2 ? 0.62 : 0.82, 0.42, index % 2 ? 0.5 : 0.68),
       cargoMat.clone(),
     );
-    cargo.position.set(x + (index % 2 ? -0.34 : 0.28), 0.48, z);
+    cargo.position.set(
+      x + (isHorizontal ? offset : index % 2 ? -0.22 : 0.22),
+      0.48,
+      z + (isHorizontal ? index % 2 ? -0.18 : 0.18 : offset),
+    );
     cargo.castShadow = true;
     cargo.receiveShadow = true;
     cargo.userData = {
       gameplayRole: "conveyor-cargo",
-      laneX: cargo.position.x,
+      orientation,
       direction,
       speed: 1.08 + laneIndex * 0.18,
     };
@@ -126,19 +123,21 @@ function createConveyorLine(THREE, scene, x, laneIndex) {
   return { belt, rails, rollers, cargos, direction };
 }
 
-function addFactoryLight(THREE, scene, x, z) {
-  const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 0.06, 0.7),
-    new THREE.MeshBasicMaterial({ color: 0xf8fafc }),
-  );
-  panel.position.set(x, 4.95, z);
-  panel.userData.gameplayRole = "factory-light-panel";
-  scene.add(panel);
+function addFactoryMarkers(THREE, scene) {
+  [-11, 11].forEach((x) => {
+    addBox(THREE, scene, [0.18, 0.18, 16.5], 0x64748b, [x, 0.82, 0], "factory-pipe");
+  });
+  [-8.2, -2.7, 2.7, 8.2].forEach((x, index) => {
+    addBox(THREE, scene, [1.45, 0.035, 0.18], index % 2 ? 0x111827 : 0xfacc15, [x, 0.08, -10.2], "hazard-stripe");
+    addBox(THREE, scene, [1.45, 0.035, 0.18], index % 2 ? 0xfacc15 : 0x111827, [x, 0.08, 9.8], "hazard-stripe");
+  });
+}
 
+function addFactoryLight(THREE, scene, x, z) {
   const light = new THREE.PointLight(0xffffff, 0.95, 9);
   light.position.set(x, 3.7, z);
   scene.add(light);
-  return { panel, light };
+  return { light };
 }
 
 function createMachine(THREE, scene, x, z, index, debtKind, registerObstacle) {
@@ -176,25 +175,34 @@ export function createWorld(world) {
   const factoryFloor = addBox(THREE, scene, [25.6, 0.03, 22.6], 0xb9c9d8, [0, 0.018, -0.2], "factory-floor");
   factoryFloor.receiveShadow = true;
   const lights = [
-    [-6, -5.7],
-    [0, 0],
-    [6, 5.7],
+    [-7.8, -8.2],
+    [7.8, -8.2],
+    [-7.8, 8.1],
+    [7.8, 8.1],
   ].map(([x, z]) => addFactoryLight(THREE, scene, x, z));
 
   [-10.6, -3.6, 3.6, 10.6].forEach((x) => {
     addBox(THREE, scene, [0.34, 4.4, 0.34], 0x6f8298, [x, 2.2, -8.8], "factory-column");
+  });
+  [-10.6, 10.6].forEach((x) => {
     addBox(THREE, scene, [0.34, 4.4, 0.34], 0x6f8298, [x, 2.2, 8.4], "factory-column");
   });
   [-7.1, 0, 7.1].forEach((x) => {
     addBox(THREE, scene, [5.8, 0.22, 0.28], 0x8ca4bd, [x, 4.65, -8.8], "factory-beam");
-    addBox(THREE, scene, [5.8, 0.22, 0.28], 0x8ca4bd, [x, 4.65, 8.4], "factory-beam");
   });
   const collector = addBox(THREE, scene, [2.4, 0.22, 0.72], 0xd69e10, [0, 0.2, -8.4], "coin-collector");
   const collectorGlow = new THREE.PointLight(0xfacc15, 1.35, 7);
   collectorGlow.position.set(0, 1.2, -8.4);
   scene.add(collectorGlow);
+  addFactoryMarkers(THREE, scene);
 
-  const conveyors = [-6, 0, 6].map((x, index) => createConveyorLine(THREE, scene, x, index));
+  const conveyors = [
+    { x: 0, z: -9.15, orientation: "horizontal" },
+    { x: 0, z: 8.95, orientation: "horizontal" },
+    { x: -10.65, z: 0, orientation: "vertical" },
+    { x: 10.65, z: 0, orientation: "vertical" },
+  ].map((config, index) => createConveyorLine(THREE, scene, config, index));
+  const playBounds = { minX: -9.2, maxX: 9.2, minZ: -7.4, maxZ: 7.4 };
 
   const machines = [
     [-7.5, -3.8, "car-loan"],
@@ -205,20 +213,6 @@ export function createWorld(world) {
     createMachine(THREE, scene, x, z, index, debtKind, registerObstacle));
 
   function createCoinBurst({ position, debtType, coins }) {
-    const labelText = `${DEBT_LABELS[debtType] ?? "债务"} +${coins}`;
-    const label = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.8, 0.68),
-      createLabelMaterial(THREE, labelText),
-    );
-    label.position.set(position.x, 2.35, position.z);
-    label.rotation.x = -0.35;
-    label.userData = {
-      gameplayRole: "debt-reveal-label",
-      labelText,
-      life: 1.2,
-    };
-    scene.add(label);
-
     const coinMaterial = new THREE.MeshStandardMaterial({
       color: 0xfacc15,
       emissive: 0x8a5a00,
@@ -227,7 +221,6 @@ export function createWorld(world) {
       roughness: 0.42,
     });
     const burst = {
-      label,
       coins: Array.from({ length: coins }, (_, index) => {
         const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.055, 12), coinMaterial.clone());
         const angle = (index / Math.max(1, coins)) * Math.PI * 2;
@@ -255,11 +248,6 @@ export function createWorld(world) {
     const target = collector.position;
     for (let burstIndex = coinBursts.length - 1; burstIndex >= 0; burstIndex -= 1) {
       const burst = coinBursts[burstIndex];
-      burst.label.userData.life -= deltaSeconds;
-      burst.label.position.y += deltaSeconds * 0.7;
-      if (burst.label.material.opacity != null) {
-        burst.label.material.opacity = Math.max(0, Math.min(1, burst.label.userData.life));
-      }
       burst.coins.forEach((coin) => {
         coin.userData.delay = Math.max(0, coin.userData.delay - deltaSeconds);
         if (coin.userData.delay > 0) return;
@@ -270,9 +258,6 @@ export function createWorld(world) {
         coin.rotation.z += deltaSeconds * 8;
         coin.visible = progress < 1;
       });
-      if (burst.label.userData.life <= 0) {
-        scene.remove(burst.label);
-      }
       if (burst.coins.every((coin) => coin.userData.collectProgress >= 1)) {
         burst.coins.forEach((coin) => scene.remove(coin));
         coinBursts.splice(burstIndex, 1);
@@ -286,9 +271,15 @@ export function createWorld(world) {
         roller.rotation.x += deltaSeconds * 5.5 * conveyor.direction;
       });
       conveyor.cargos.forEach((cargo) => {
-        cargo.position.z += cargo.userData.speed * cargo.userData.direction * deltaSeconds;
-        if (cargo.position.z > 7.6) cargo.position.z = -7.6;
-        if (cargo.position.z < -7.6) cargo.position.z = 7.6;
+        if (cargo.userData.orientation === "horizontal") {
+          cargo.position.x += cargo.userData.speed * cargo.userData.direction * deltaSeconds;
+          if (cargo.position.x > 9.8) cargo.position.x = -9.8;
+          if (cargo.position.x < -9.8) cargo.position.x = 9.8;
+        } else {
+          cargo.position.z += cargo.userData.speed * cargo.userData.direction * deltaSeconds;
+          if (cargo.position.z > 7.6) cargo.position.z = -7.6;
+          if (cargo.position.z < -7.6) cargo.position.z = 7.6;
+        }
       });
     });
   }
@@ -309,5 +300,5 @@ export function createWorld(world) {
     updateCoinBursts(deltaSeconds);
   }
 
-  return { machines, conveyors, lights, createCoinBurst, updateEnvironment };
+  return { machines, conveyors, lights, playBounds, createCoinBurst, updateEnvironment };
 }
