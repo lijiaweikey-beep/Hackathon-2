@@ -24,12 +24,18 @@ test("鹅腿夜市属于二十三岁主线", () => {
 
 test("鹅腿目标不发光而灯下鸭腿出现绿色线索", () => {
   const created = [];
+  const switchPositions = [];
   const playerPosition = position(4, -3);
   let environmentPlayerPosition = null;
+  let refreshSwitch = false;
   const context = {
     sceneData: {
       updateEnvironment(_deltaSeconds, currentPlayerPosition) {
         environmentPlayerPosition = currentPlayerPosition;
+        return refreshSwitch ? { refreshSwitch: true } : undefined;
+      },
+      placeSwitch(nextPosition) {
+        switchPositions.push({ x: nextPosition.x, z: nextPosition.z });
       },
       getLegGlow(actorPosition, isGoose) {
         return isGoose ? 0 : (actorPosition.x === 1 ? 0.8 : 0);
@@ -71,4 +77,9 @@ test("鹅腿目标不发光而灯下鸭腿出现绿色线索", () => {
   assert.equal(created[0].npc.legGlow, 0);
   assert.equal(created[1].npc.legGlow, 0.8);
   assert.equal(environmentPlayerPosition, playerPosition);
+  assert.equal(switchPositions.length, 1);
+
+  refreshSwitch = true;
+  level.update(0.1);
+  assert.equal(switchPositions.length, 2);
 });

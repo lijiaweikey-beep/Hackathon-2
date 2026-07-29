@@ -13,13 +13,17 @@ export function createGooseMarketLevel(context) {
       context.actors.addNpc(npc);
       vendors.push(npc);
     }
+    context.sceneData.placeSwitch(context.movement.randomOpenPosition());
   }
 
   function update(deltaSeconds) {
-    context.sceneData.updateEnvironment(
+    const environmentEvent = context.sceneData.updateEnvironment(
       deltaSeconds,
       context.actors.getPlayer?.()?.group.position,
     );
+    if (environmentEvent?.refreshSwitch) {
+      context.sceneData.placeSwitch(context.movement.randomOpenPosition());
+    }
     vendors.forEach((vendor) => {
       if (!vendor.alive) return;
       const glow = context.sceneData.getLegGlow(

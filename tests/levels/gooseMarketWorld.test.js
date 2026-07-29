@@ -39,33 +39,44 @@ test("玩家不踩开关时夜市不会自动熄灯", () => {
   assert.equal(resources.getLightingState().blackout, false);
 });
 
-test("玩家踩绿色开关后主灯熄灭但移动探照灯继续照明", () => {
+test("第三关只创建一个可随机放置的绿色开关", () => {
+  const { resources } = createResources();
+  const position = new THREE.Vector3(-3, 0, 2);
+
+  resources.placeSwitch(position);
+
+  assert.equal(resources.switches.length, 1);
+  assert.deepEqual(resources.switches[0].position.toArray(), [-3, 0, 2]);
+});
+
+test("玩家踩绿色开关后固定熄灯五秒且移动探照灯继续照明", () => {
   const { baseLight, resources } = createResources();
   const normalSpotIntensity = resources.spotlights[0].intensity;
   const normalPoolOpacity = resources.lightPools[0].material.opacity;
+  const switchPosition = new THREE.Vector3(-3, 0, 2);
 
-  assert.equal(resources.switches.length, 2);
-  resources.updateEnvironment(0.1, resources.switches[0].position);
-  resources.updateEnvironment(0.5, resources.switches[0].position);
+  resources.placeSwitch(switchPosition);
+  resources.updateEnvironment(0.1, switchPosition);
+  resources.updateEnvironment(0.5, switchPosition);
 
   assert.equal(resources.getLightingState().blackout, true);
+  assert.ok(resources.getLightingState().remaining > 4.3);
   assert.ok(baseLight.intensity < 0.2);
   assert.ok(resources.spotlights[0].intensity > normalSpotIntensity);
   assert.ok(resources.lightPools[0].material.opacity > normalPoolOpacity);
 });
 
-test("暗场结束后主灯恢复且开关冷却后重新可用", () => {
+test("五秒暗场结束后恢复主灯并请求随机刷新开关", () => {
   const { baseLight, resources } = createResources();
-  const switchPosition = resources.switches[0].position;
+  const switchPosition = new THREE.Vector3(-3, 0, 2);
 
+  resources.placeSwitch(switchPosition);
   resources.updateEnvironment(0.1, switchPosition);
-  resources.updateEnvironment(4.5, new THREE.Vector3(0, 0, 10));
+  const event = resources.updateEnvironment(5, new THREE.Vector3(0, 0, 10));
   resources.updateEnvironment(0.5, new THREE.Vector3(0, 0, 10));
 
+  assert.deepEqual(event, { refreshSwitch: true });
   assert.equal(resources.getLightingState().blackout, false);
   assert.ok(baseLight.intensity > 0.6);
   assert.equal(resources.getLightingState().switches[0].ready, false);
-
-  resources.updateEnvironment(5, new THREE.Vector3(0, 0, 10));
-  assert.equal(resources.getLightingState().switches[0].ready, true);
 });

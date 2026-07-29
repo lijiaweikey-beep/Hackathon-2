@@ -89,10 +89,7 @@ export function createWorld(world) {
     return { spot, baseX: position.x };
   });
 
-  const switches = [
-    new THREE.Vector3(-7.2, 0, 5.5),
-    new THREE.Vector3(7.2, 0, -5.5),
-  ].map((position) => {
+  const switches = [new THREE.Vector3()].map((position) => {
     const material = new THREE.MeshStandardMaterial({
       color: 0x22c55e,
       emissive: 0x22c55e,
@@ -108,31 +105,42 @@ export function createWorld(world) {
     mesh.userData.gameplayRole = "blackout-switch";
     scene.add(mesh);
     return {
+      mesh,
       position,
       material,
-      cooldown: 0,
+      ready: false,
       occupied: false,
     };
   });
 
-  function updateSwitches(deltaSeconds, playerPosition) {
-    switches.forEach((entry) => {
-      entry.cooldown = Math.max(0, entry.cooldown - deltaSeconds);
-      const occupied = Boolean(playerPosition)
-        && Math.hypot(
-          playerPosition.x - entry.position.x,
-          playerPosition.z - entry.position.z,
-        ) <= 0.95;
-      if (occupied && !entry.occupied && entry.cooldown <= 0 && blackoutTimer <= 0) {
-        blackoutTimer = 4;
-        entry.cooldown = 9;
-      }
-      entry.occupied = occupied;
-      const ready = entry.cooldown <= 0;
-      entry.material.color.setHex(ready ? 0x22c55e : 0x374151);
-      entry.material.emissive.setHex(ready ? 0x22c55e : 0x111827);
-      entry.material.emissiveIntensity = ready ? 1.5 : 0.2;
-    });
+  function updateSwitchAppearance(entry) {
+    entry.material.color.setHex(entry.ready ? 0x22c55e : 0x374151);
+    entry.material.emissive.setHex(entry.ready ? 0x22c55e : 0x111827);
+    entry.material.emissiveIntensity = entry.ready ? 1.5 : 0.2;
+  }
+
+  function placeSwitch(position) {
+    const entry = switches[0];
+    entry.position.copy(position);
+    entry.mesh.position.set(position.x, 0.05, position.z);
+    entry.ready = true;
+    entry.occupied = false;
+    updateSwitchAppearance(entry);
+  }
+
+  function updateSwitch(playerPosition) {
+    const entry = switches[0];
+    const occupied = Boolean(playerPosition)
+      && Math.hypot(
+        playerPosition.x - entry.position.x,
+        playerPosition.z - entry.position.z,
+      ) <= 0.95;
+    if (occupied && !entry.occupied && entry.ready && blackoutTimer <= 0) {
+      blackoutTimer = 5;
+      entry.ready = false;
+      updateSwitchAppearance(entry);
+    }
+    entry.occupied = occupied;
   }
 
   function updateLighting(deltaSeconds) {
@@ -154,8 +162,9 @@ export function createWorld(world) {
 
   function updateEnvironment(deltaSeconds, playerPosition) {
     elapsed += deltaSeconds;
+    const wasBlackout = blackoutTimer > 0;
     blackoutTimer = Math.max(0, blackoutTimer - deltaSeconds);
-    updateSwitches(deltaSeconds, playerPosition);
+    updateSwitch(playerPosition);
     lightPositions.forEach((position, index) => {
       position.x = poles[index].baseX + Math.sin(elapsed * 0.72 + index * 2.2) * 4;
       position.z = [-2, 3, -1][index] + Math.cos(elapsed * 0.46 + index) * 2.4;
@@ -164,6 +173,9 @@ export function createWorld(world) {
       lightPools[index].position.z = position.z;
     });
     updateLighting(deltaSeconds);
+    return wasBlackout && blackoutTimer <= 0
+      ? { refreshSwitch: true }
+      : undefined;
   }
 
   function getLegGlow(position, isGoose) {
@@ -178,7 +190,7 @@ export function createWorld(world) {
     return {
       blackout: blackoutTimer > 0,
       remaining: blackoutTimer,
-      switches: switches.map(({ cooldown }) => ({ ready: cooldown <= 0 })),
+      switches: switches.map(({ ready }) => ({ ready })),
     };
   }
 
@@ -187,6 +199,7 @@ export function createWorld(world) {
     lightPools,
     spotlights: poles.map(({ spot }) => spot),
     switches,
+    placeSwitch,
     updateEnvironment,
     getLegGlow,
     getLightingState,
