@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createNpc as createGamingNpc } from "../../src/levels/gaming/actors.js";
 import { createGamingLevel } from "../../src/levels/gaming/createLevel.js";
+import { createActorAnimator } from "../../src/systems/createActorAnimator.js";
 
 function createPosition(x = 0, y = 0, z = 0) {
   return {
@@ -32,7 +34,7 @@ function createPosition(x = 0, y = 0, z = 0) {
   };
 }
 
-function createFakeContext({ npcCount, openPositions } = {}) {
+function createFakeContext({ npcCount, openPositions, actorFactory } = {}) {
   const nextOpenPositions = [...(openPositions ?? [createPosition(4, 0, 4)])];
   const records = {
     created: [],
@@ -46,7 +48,6 @@ function createFakeContext({ npcCount, openPositions } = {}) {
       tutorialSteps: {
         moveTargetPos: { x: 0.4, z: 6.6 },
         moveRadius: 1.0,
-        attackTargetId: "noisy_roommate",
       },
       npcCount,
     },
@@ -68,7 +69,7 @@ function createFakeContext({ npcCount, openPositions } = {}) {
       npcCount,
       npcSpeed: 3,
       createNpc(id, flags) {
-        const npc = {
+        const npc = actorFactory?.(id, flags) ?? {
           id,
           alive: true,
           group: { position: createPosition() },
@@ -148,4 +149,21 @@ test("凌晨三点教学目标随机生成且不参与通用游走", () => {
   assert.equal(records.moveCalls, 0);
   assert.equal(records.target.markIntensity, 0.7);
   assert.equal(records.environmentUpdates, 1);
+});
+
+test("凌晨三点教学目标待机时保持可渲染坐标", () => {
+  const { context, records } = createFakeContext({
+    npcCount: 2,
+    actorFactory: createGamingNpc,
+  });
+  const level = createGamingLevel(context);
+  level.start();
+
+  const animator = createActorAnimator({
+    getPlayer: () => context.actors.getPlayer(),
+    getTotalTime: () => 1,
+  });
+  animator.animate(records.target, 1 / 60, false);
+
+  assert.equal(Number.isFinite(records.target.group.userData.visual.position.y), true);
 });

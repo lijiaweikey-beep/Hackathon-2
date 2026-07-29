@@ -128,7 +128,6 @@ export function createGamingLevel(context) {
       gamingTarget: true,
       levelTarget: true,
     });
-    target.id = steps.attackTargetId ?? "noisy_roommate";
     target.levelManaged = true;
     target.walking = false;
     target.group.position.copy(context.movement.randomOpenPosition());
