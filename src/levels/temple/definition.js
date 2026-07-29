@@ -29,6 +29,7 @@ export default {
   decoyCount: 5,
   moonDecoyCount: 3,
   sceneName: "承天寺夜游",
+  axisLabel: "就你喊张怀民起床的？",
   emoji: "🌕",
   art,
   nodes: {

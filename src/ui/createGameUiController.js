@@ -84,7 +84,7 @@ export function createGameUiController(dependencies) {
     const mainline = dependencies.levelRegistry?.mainline ?? [];
     const index = mainline.findIndex(({ id }) => id === level.id);
     if (index < 0) {
-      return { levelTag: "番外", ageTag: level.axisLabel ?? level.sceneName ?? "" };
+      return { levelTag: "番外", ageTag: (level.axisLabel ?? level.sceneName ?? "").replace(/\n/g, "") };
     }
     return {
       levelTag: `LV.${String(index + 1).padStart(2, "0")}`,
@@ -114,7 +114,7 @@ export function createGameUiController(dependencies) {
       ui.resultNodeTitle.textContent = node?.title ? `「${node.title}」` : "";
     }
     if (ui.resultUnlock) {
-      const nodeName = level.axisLabel ?? level.sceneName ?? "";
+      const nodeName = (level.axisLabel ?? level.sceneName ?? "").replace(/\n/g, "");
       ui.resultUnlock.textContent = won && nodeName
         ? `新解锁：【${rating.grade} 级 · ${nodeName}】`
         : "";

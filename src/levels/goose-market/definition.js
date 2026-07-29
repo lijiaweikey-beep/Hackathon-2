@@ -39,6 +39,7 @@ export default {
   resourceLabel: "🥊 挥拳",
   resourceInitial: "∞",
   sceneName: "以鸭戴鹅",
+  axisLabel: "鹅腿阿姨！\n你吓到我了",
   emoji: "🍗",
   art,
   nodes: {

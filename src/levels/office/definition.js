@@ -1,6 +1,7 @@
 import { OFFICE_HP_MAX } from "./constants.js";
 import { createNpc, createPlayer } from "./actors.js";
 import { createOfficeLevel } from "./createLevel.js";
+import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
 const art = {
@@ -20,7 +21,7 @@ export default {
   age: 27,
   legacy: false,
   createLevel: createOfficeLevel,
-  extensions: { createWorld, createPlayer, createNpc },
+  extensions: { createWorld, createPlayer, createNpc, createPreviewModel, renderPreview },
   worldProfile: {
     background: 0x1a2332,
     fog: { color: 0x1a2332, near: 24, far: 50 },
@@ -40,6 +41,7 @@ export default {
   resourceInitial: OFFICE_HP_MAX,
   decoyCount: 15,
   sceneName: "躲老板黑锅",
+  axisLabel: "我不要背黑锅！",
   emoji: "🍳",
   art,
   nodes: {

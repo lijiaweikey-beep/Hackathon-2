@@ -233,7 +233,7 @@ export function createHistoryTimelineController({
     card.innerHTML = `
       <span class="history-node-age">${getNodeLabel(level)}</span>
       <span class="history-node-art" aria-hidden="true">${artHtml}</span>
-      <span class="history-node-name">${hidden ? escapeHtml(level.sceneName) : level.sceneName}</span>
+      <span class="history-node-name">${escapeHtml(level.axisLabel ?? level.sceneName)}</span>
       ${hidden
         ? '<span class="history-node-badge">待解锁</span>'
         : `<span class="history-node-copy">${getNodeCopy(level, getNpcCount(level))}</span>`}

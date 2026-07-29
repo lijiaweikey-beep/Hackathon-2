@@ -27,6 +27,7 @@ export default {
   actions: ["findHitTarget"],
   decoyCount: 4,
   sceneName: "图书馆",
+  axisLabel: "图书馆禁止亲嘴",
   emoji: "📚",
   art,
   nodes: {

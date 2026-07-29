@@ -41,6 +41,7 @@ export default {
   attackComboExpires: false,
   decoyCount: 6,
   sceneName: "血月街区",
+  axisLabel: "为了你我变成狼人模样",
   emoji: "🌕",
   art,
   nodes: {

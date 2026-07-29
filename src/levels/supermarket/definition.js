@@ -6,6 +6,7 @@ export default {
   track: "extra",
   sharedLayout: true,
   sceneName: "超市取证",
+  axisLabel: "来人！捉奸！",
   emoji: "📸",
   cardStyle: {
     accent: "#22d3ee",

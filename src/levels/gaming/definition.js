@@ -40,6 +40,7 @@ export default {
   ],
   decoyCount: 0,
   sceneName: "宿舍教学",
+  axisLabel: "我要睡觉！",
   entryTitle: "凌晨三点",
   emoji: "⌨️",
   art,

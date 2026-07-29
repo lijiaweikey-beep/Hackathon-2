@@ -36,6 +36,7 @@ export default {
     floor: { texture: "gaming", roughness: 0.52 },
   },
   sceneName: "爆金币",
+  axisLabel: "结束吧！房贷车贷",
   emoji: "🪙",
   art,
   nodes: {
