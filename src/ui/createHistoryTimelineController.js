@@ -135,8 +135,14 @@ export function createHistoryTimelineController({
     `;
   }
 
+  function isExtraUnlocked() {
+    return storyProgress.isComplete?.() ?? false;
+  }
+
   function isEnterable(level) {
-    return level.track !== "mainline" || storyProgress.isUnlocked(level.id);
+    return level.track !== "mainline"
+      ? isExtraUnlocked()
+      : storyProgress.isUnlocked(level.id);
   }
 
   function getState(level) {
@@ -274,9 +280,11 @@ export function createHistoryTimelineController({
     ui.historyTrack.appendChild(axis);
 
     if (hasExtra) {
+      const extraUnlocked = isExtraUnlocked();
       const divider = document.createElement("span");
-      divider.className = "history-track-divider";
+      divider.className = `history-track-divider ${extraUnlocked ? "unlocked" : "locked"}`;
       divider.textContent = "人生之外";
+      divider.setAttribute("aria-label", extraUnlocked ? "人生之外已解锁" : "人生之外未解锁");
       divider.style.setProperty(
         "--x",
         `${TRACK_PADDING + firstExtraIndex * NODE_GAP + EXTRA_GAP / 2 + 40}px`,
@@ -284,7 +292,11 @@ export function createHistoryTimelineController({
       ui.historyTrack.appendChild(divider);
     }
 
-    levels.forEach((level, index) => {
+    const visibleLevels = isExtraUnlocked()
+      ? levels
+      : levels.filter((level) => level.track === "mainline");
+
+    visibleLevels.forEach((level, index) => {
       appendNodeCard(level, index, {
         x: TRACK_PADDING + index * NODE_GAP + shiftAt(index),
         y: NODE_ROWS[index % NODE_ROWS.length],
