@@ -118,3 +118,42 @@ test("成功结算推进主线，失败结算不改变进度", () => {
 
   assert.deepEqual(completed, ["age-19"]);
 });
+
+test("成功结算至少等待命中粒子播放完成再弹卡片", () => {
+  const timers = [];
+  const session = {
+    phase: GAME_PHASES.PLAYING,
+    levelState: {
+      level: { id: "age-19" },
+      startTime: 0,
+      attempts: 3,
+    },
+    transition(next) {
+      this.phase = next;
+    },
+    setResult() {},
+  };
+  const settlement = createRoundSettlement({
+    session,
+    timerHost: {
+      setTimeout(callback, delay) {
+        timers.push({ callback, delay });
+        return timers.length;
+      },
+      clearTimeout() {},
+    },
+    getPlayer: () => null,
+    hasScene: () => true,
+    getTotalTime: () => 2,
+    getResultStats: () => ({ attemptsLeft: 3 }),
+    calculateRating: () => ({ grade: "S", rating: 100 }),
+    showResult() {},
+    saveBestScore() {},
+    playWin() {},
+    playLose() {},
+  });
+
+  settlement.settle(true, null, 760);
+
+  assert.equal(timers[0].delay >= 1500, true);
+});

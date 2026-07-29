@@ -1,5 +1,7 @@
 import { GAME_PHASES } from "../core/gamePhase.js";
 
+const MIN_WIN_SETTLEMENT_DELAY_MS = 1600;
+
 export function createRoundSettlement(dependencies) {
   const timerHost = dependencies.timerHost ?? globalThis;
   let pendingTimer = null;
@@ -63,10 +65,13 @@ export function createRoundSettlement(dependencies) {
     if (dependencies.session.phase !== GAME_PHASES.PLAYING) return;
     dependencies.session.transition(GAME_PHASES.SETTLING);
     clearPending();
+    const settledDelayMs = won
+      ? Math.max(delayMs, MIN_WIN_SETTLEMENT_DELAY_MS)
+      : delayMs;
     pendingTimer = timerHost.setTimeout(() => {
       pendingTimer = null;
       finish(won, failMessage);
-    }, delayMs);
+    }, settledDelayMs);
   }
 
   return Object.freeze({ clearPending, finish, settle });
