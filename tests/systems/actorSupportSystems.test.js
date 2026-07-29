@@ -51,6 +51,20 @@ test("角色分离系统推开重叠的角色", () => {
   assert.ok(first.group.position.distanceTo(second.group.position) > 0.2);
 });
 
+test("角色分离系统阻止玩家穿过静止角色", () => {
+  const player = createActor(0.35, 0);
+  const npc = createActor(0, 0);
+  const separation = createActorSeparationSystem({
+    getPlayer: () => player,
+    getNpcs: () => [npc],
+    clampActorPosition: () => {},
+  });
+
+  separation.separate();
+
+  assert.ok(player.group.position.distanceTo(npc.group.position) >= 0.7);
+});
+
 test("角色导航独立判断朝向和距离", () => {
   const actor = createActor(0, 0);
   const target = createActor(0, 1);

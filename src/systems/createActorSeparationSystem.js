@@ -58,7 +58,7 @@ export function createActorSeparationSystem(dependencies) {
         if (actor.separationGroup && actor.separationGroup === other.separationGroup) return;
         pushApart(actor.group.position, other.group.position, 0.62, 0.018);
       });
-      pushApart(actor.group.position, player.group.position, 0.72, 0.012);
+      pushApart(actor.group.position, player.group.position, 0.72, 0.5);
     });
   }
 
