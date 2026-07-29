@@ -57,7 +57,7 @@ test("界面控制器回到首页时交给人生事件轴并刷新抬头信息",
   assert.equal(ui.timerText.textContent, "10");
 });
 
-test("预启动按钮会触发进入首个关卡流程", () => {
+test("预启动按钮只关闭启动页，不自动进入关卡流程", () => {
   let entered = false;
   const prelaunchScreen = { classList: createClassList() };
   const prelaunchStartButton = createButton();
@@ -78,7 +78,7 @@ test("预启动按钮会触发进入首个关卡流程", () => {
   prelaunchStartButton.click();
 
   assert.equal(prelaunchScreen.classList.contains("is-away"), true);
-  assert.equal(entered, true);
+  assert.equal(entered, false);
 });
 
 test("难度按钮只更新当前关卡人数和选中状态", () => {

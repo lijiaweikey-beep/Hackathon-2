@@ -31,7 +31,6 @@ import { createStoryProgress } from "../progression/createStoryProgress.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
 import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
-import { selectInitialLevelId } from "./selectInitialLevel.js";
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager;
@@ -263,7 +262,6 @@ export function boot() {
     onResume: resumeExperience,
     onHomeShown: () => historyTimelineFlow?.showHome(),
     onDifficultyChanged: () => historyTimelineFlow?.showHome(),
-    onPrelaunchDismissed: () => selectLevelById(selectInitialLevelId(levelRegistry.mainline, storyProgress)),
     onRetry() {
       settlement.clearPending();
       resetLevel(session.currentLevelIndex);
