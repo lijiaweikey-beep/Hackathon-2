@@ -139,7 +139,7 @@ export function createGamingLevel(context) {
 
     placeWaypoint();
     showMoveTutorial(context.ui);
-    refreshHud();
+    // HUD 刷新推迟到 classic experience start() 中，避免逐字动画被弹窗遮住
   }
 
   function update(deltaSeconds) {
