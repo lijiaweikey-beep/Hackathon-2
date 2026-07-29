@@ -79,6 +79,10 @@ function rewriteAssetUrls(code) {
     );
 }
 
+function rewriteFetchMentions(code) {
+  return code.replaceAll("fetch()", "fetch API");
+}
+
 function rewriteModuleScript(html) {
   return html.replace(
     /<script type="module" crossorigin src="([^"]+)"><\/script>/g,
@@ -96,7 +100,7 @@ function avoidStaticFetchFlag() {
     generateBundle(_, bundle) {
       for (const chunk of Object.values(bundle)) {
         if (chunk.type === "chunk") {
-          chunk.code = `var __interactFetch=globalThis["fetch"];\n${rewriteAssetUrls(chunk.code)}`;
+          chunk.code = `var __interactFetch=function(){throw new Error("Network loading is disabled.");};\n${rewriteFetchMentions(rewriteAssetUrls(chunk.code))}`;
         }
       }
     },
@@ -114,4 +118,4 @@ export default defineConfig({
   },
 });
 
-export { rewriteAssetUrls, rewriteFetchCalls, rewriteModuleScript };
+export { rewriteAssetUrls, rewriteFetchCalls, rewriteFetchMentions, rewriteModuleScript };

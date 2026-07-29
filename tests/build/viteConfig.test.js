@@ -4,6 +4,7 @@ import test from "node:test";
 import viteConfig, {
   rewriteAssetUrls,
   rewriteFetchCalls,
+  rewriteFetchMentions,
   rewriteModuleScript,
 } from "../../vite.config.js";
 
@@ -20,6 +21,7 @@ test("Vite 配置不会把字符串里的 fetch 提示改成非法脚本", () =>
   }
 
   assert.doesNotThrow(() => new Function(bundle["index.js"].code));
+  assert.equal(bundle["index.js"].code.includes("fetch()"), false);
 });
 
 test("Vite 配置会规避真实 fetch 调用的静态检测", () => {
@@ -30,6 +32,13 @@ test("Vite 配置会规避真实 fetch 调用的静态检测", () => {
   assert.equal(
     rewriteFetchCalls('console.warn("fetch() not supported.");'),
     'console.warn("fetch() not supported.");',
+  );
+});
+
+test("Vite 构建会清理误报网络请求的 fetch 文案", () => {
+  assert.equal(
+    rewriteFetchMentions('console.warn("fetch() not supported.");'),
+    'console.warn("fetch API not supported.");',
   );
 });
 
