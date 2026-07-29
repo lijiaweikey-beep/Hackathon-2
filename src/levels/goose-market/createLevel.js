@@ -1,6 +1,6 @@
 const NORMAL_PUNCH_COOLDOWN = 2;
 const MISTAKE_LOCK_SECONDS = 2.5;
-const MISTAKE_HINT_SECONDS = 1.5;
+const MISTAKE_HINT_SECONDS = 3;
 const MISTAKE_HINT = "打我鹅腿阿姨干嘛";
 
 function getVendorMix(npcCount) {
@@ -45,7 +45,13 @@ export function createGooseMarketLevel(context) {
   }
 
   function update(deltaSeconds) {
+    const prevTimer = mistakeHintTimer;
     mistakeHintTimer = Math.max(0, mistakeHintTimer - deltaSeconds);
+    // 错误提示计时结束，直接恢复长文本（不触发逐字动画）
+    if (prevTimer > 0 && mistakeHintTimer <= 0) {
+      const bar = document.getElementById("clueBar");
+      if (bar) bar.textContent = "🔍 探照灯下发绿的是鸭腿阿姨，打爆全部鸭腿才通关，踩中绿色光圈，会触发五盏探照灯";
+    }
     const environmentEvent = context.sceneData.updateEnvironment(
       deltaSeconds,
       context.actors.getPlayer?.()?.group.position,
@@ -67,9 +73,7 @@ export function createGooseMarketLevel(context) {
     return {
       resourceLabel: "剩余鸭腿",
       resourceText: String(remainingDucks),
-      clue: mistakeHintTimer > 0
-        ? MISTAKE_HINT
-        : "🔍 探照灯下发绿的是鸭腿阿姨，打爆全部鸭腿才通关",
+      clue: "🔍 探照灯下发绿的是鸭腿阿姨，打爆全部鸭腿才通关，踩中绿色光圈，会触发五盏探照灯",
       resultResource: {
         label: "剩余鸭腿",
         value: `${remainingDucks} 个`,
@@ -98,6 +102,9 @@ export function createGooseMarketLevel(context) {
     context.combat.triggerShake(0.12, 0.1);
     context.audio.playSound("miss");
     context.ui.refreshHud();
+    // 直接在 DOM 显示错误提示，绕过逐字动画系统，不影响 clue 的常驻长文本
+    const bar = document.getElementById("clueBar");
+    if (bar) bar.textContent = MISTAKE_HINT;
     return { handled: true, cooldown: MISTAKE_LOCK_SECONDS };
   }
 

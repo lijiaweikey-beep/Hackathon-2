@@ -22,7 +22,7 @@ export function createTutorialViewModel(state) {
     theme: "tutorial",
     attackLocked: state.phase === "move",
     attackPulse: state.phase === "attack",
-    joystickGuide: false,
+    joystickGuide: state.phase === "move",
     resultResource: {
       label: "出拳",
       value: "∞",

@@ -12,6 +12,7 @@ import {
   hideTutorialOverlays,
   showAttackTutorial,
   showMissHint,
+  showMoveTutorial,
 } from "./view.js";
 
 function applyTargetGlow(npc, enabled) {
@@ -141,6 +142,7 @@ export function createGamingLevel(context) {
     placeWaypoint();
     hideTutorialOverlays(context.ui);
     // HUD 刷新推迟到 classic experience start() 中，避免逐字动画被弹窗遮住
+    // 摇杆引导箭头延迟到点击屏幕 beginPlay 时再显示
   }
 
   function update(deltaSeconds) {
@@ -184,6 +186,7 @@ export function createGamingLevel(context) {
   function handleAction(action) {
     if (action.type === "beginPlay") {
       hideTutorialOverlays(context.ui);
+      showMoveTutorial(context.ui);
       refreshHud();
       return { handled: true };
     }
