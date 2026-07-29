@@ -3,6 +3,16 @@ import { createGamingLevel } from "./createLevel.js";
 import { createPreviewModel, renderPreview } from "./preview.js";
 import { createWorld } from "./world.js";
 
+const art = {
+  cover: new URL("./assets/cover.jpg", import.meta.url).href,
+  grades: {
+    S: new URL("./assets/grade-s.jpg", import.meta.url).href,
+    A: new URL("./assets/grade-a.jpg", import.meta.url).href,
+    B: new URL("./assets/grade-b.jpg", import.meta.url).href,
+    C: new URL("./assets/grade-c.jpg", import.meta.url).href,
+  },
+};
+
 export default {
   id: "gaming",
   order: 10,
@@ -31,6 +41,7 @@ export default {
   decoyCount: 0,
   sceneName: "宿舍教学",
   emoji: "⌨️",
+  art,
   cardStyle: {
     accent: "#818cf8",
     glow: "rgba(129, 140, 248, 0.28)",

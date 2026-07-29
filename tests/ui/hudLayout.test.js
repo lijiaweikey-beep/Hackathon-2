@@ -57,7 +57,18 @@ test("操作按钮在手机横屏中保留拇指安全间距", async () => {
 
   assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(56px,\s*calc\(env\(safe-area-inset-right\) \+ 44px\)\)/);
   assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(56px,\s*calc\(env\(safe-area-inset-left\) \+ 44px\)\)/);
-  assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(36px,\s*calc\(env\(safe-area-inset-bottom\) \+ 30px\)\)/);
+  assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(58px,\s*calc\(env\(safe-area-inset-bottom\) \+ 52px\)\)/);
+});
+
+test("手机横屏短高度顶部 HUD 避开平台角标", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(compactRule, /\.topbar\s*\{[\s\S]*padding-left:\s*max\(62px,\s*calc\(env\(safe-area-inset-left\) \+ 50px\)\)/);
+  assert.match(compactRule, /\.topbar\s*\{[\s\S]*padding-right:\s*max\(58px,\s*calc\(env\(safe-area-inset-right\) \+ 46px\)\)/);
+  assert.match(compactRule, /\.topbar\s*\{[\s\S]*padding-top:\s*max\(22px,\s*calc\(env\(safe-area-inset-top\) \+ 16px\)\)/);
 });
 
 test("手机横屏短高度把结算页收纳为插画和信息两区", async () => {

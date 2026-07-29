@@ -1782,6 +1782,9 @@ button {
   .topbar {
     align-items: flex-start;
     gap: 6px;
+    padding-top: max(22px, calc(env(safe-area-inset-top) + 16px));
+    padding-right: max(58px, calc(env(safe-area-inset-right) + 46px));
+    padding-left: max(62px, calc(env(safe-area-inset-left) + 50px));
   }
 
   .mission-strip {
@@ -1860,7 +1863,7 @@ button {
     padding:
       0
       max(56px, calc(env(safe-area-inset-right) + 44px))
-      max(36px, calc(env(safe-area-inset-bottom) + 30px))
+      max(58px, calc(env(safe-area-inset-bottom) + 52px))
       max(56px, calc(env(safe-area-inset-left) + 44px));
   }
 
@@ -1886,7 +1889,7 @@ button {
 
   .tutorial-joystick-guide {
     left: max(24px, calc(env(safe-area-inset-left) + 14px));
-    bottom: max(36px, calc(env(safe-area-inset-bottom) + 30px));
+    bottom: max(58px, calc(env(safe-area-inset-bottom) + 52px));
     width: 92px;
     height: 92px;
   }
