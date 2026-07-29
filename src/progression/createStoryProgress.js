@@ -12,6 +12,7 @@ export function createStoryProgress({
   levels,
   storage,
   key = "gengge-story-progress",
+  unlockAll = false,
 }) {
   const ordered = [...levels];
   const knownIds = new Set(ordered.map(({ id }) => id));
@@ -22,6 +23,8 @@ export function createStoryProgress({
     isComplete: () => ordered.length > 0
       && ordered.every(({ id }) => completed.has(id)),
     isUnlocked(id) {
+      if (!knownIds.has(id)) return false;
+      if (unlockAll) return true;
       const index = ordered.findIndex((level) => level.id === id);
       return index === 0
         || (index > 0 && (completed.has(id) || completed.has(ordered[index - 1].id)));

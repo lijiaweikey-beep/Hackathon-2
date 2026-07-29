@@ -184,7 +184,7 @@ function createClassicRuntime(definition) {
 }
 
 export function boot() {
-  storyProgress = createStoryProgress({ levels: levelRegistry.mainline, storage: window.localStorage });
+  storyProgress = createStoryProgress({ levels: levelRegistry.mainline, storage: window.localStorage, unlockAll: import.meta.env.DEV });
   rendering = createRenderingSystem({
     THREE,
     canvas,

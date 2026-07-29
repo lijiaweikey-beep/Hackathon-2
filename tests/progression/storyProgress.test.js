@@ -53,3 +53,20 @@ test("全部主线完成后人生进度进入完整通关状态", () => {
   levels.forEach(({ id }) => progress.complete(id));
   assert.equal(progress.isComplete(), true);
 });
+
+test("测试模式开放所有已注册主线但不伪造通关", () => {
+  const progress = createStoryProgress({
+    levels,
+    storage: createMemoryStorage(),
+    key: "story",
+    unlockAll: true,
+  });
+
+  assert.deepEqual(
+    levels.map(({ id }) => progress.isUnlocked(id)),
+    [true, true, true],
+  );
+  assert.equal(progress.isUnlocked("missing"), false);
+  assert.deepEqual(progress.getCompletedIds(), []);
+  assert.equal(progress.isComplete(), false);
+});
