@@ -9,6 +9,9 @@ import {
 import { GAME_PHASES } from "../core/gamePhase.js";
 import { getFacingVector } from "../utils/math.js";
 
+const HIT_VIBRATION = [16, 24, 32];
+const MISS_VIBRATION = [18];
+
 export function createCombatSystem(dependencies) {
   const facing = new THREE.Vector2();
   const toNpc = new THREE.Vector2();
@@ -68,10 +71,12 @@ export function createCombatSystem(dependencies) {
 
   function resolveHit(hit) {
     if (!hit) {
+      dependencies.vibrate?.(MISS_VIBRATION);
       const levelMiss = dependencies.dispatch({ type: "attackMiss" });
       if (!levelMiss?.handled) dependencies.playMiss();
       return;
     }
+    dependencies.vibrate?.(HIT_VIBRATION);
     const levelHit = dependencies.dispatch({ type: "hitTarget", hit });
     if (levelHit?.handled) {
       if (

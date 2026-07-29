@@ -230,6 +230,7 @@ export function boot() {
     playPunch: audio.punch,
     playHit: audio.hit,
     playMiss: audio.miss,
+    vibrate: (pattern) => navigator.vibrate?.(pattern),
     triggerHitstop,
     triggerShake,
     settleRound,

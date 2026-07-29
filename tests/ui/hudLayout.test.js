@@ -49,6 +49,17 @@ test("手机横屏短高度启用紧凑 HUD、任务弹窗和事件轴布局", a
   assert.match(compactRule, /\.tutorial-joystick-guide/);
 });
 
+test("操作按钮在手机横屏中保留拇指安全间距", async () => {
+  const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
+  const compactRule = css.match(
+    /@media\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*520px\)\s*\{([\s\S]*)\n\}/,
+  )?.[1] ?? "";
+
+  assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(56px,\s*calc\(env\(safe-area-inset-right\) \+ 44px\)\)/);
+  assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(56px,\s*calc\(env\(safe-area-inset-left\) \+ 44px\)\)/);
+  assert.match(compactRule, /\.controls\s*\{[\s\S]*max\(36px,\s*calc\(env\(safe-area-inset-bottom\) \+ 30px\)\)/);
+});
+
 test("手机横屏短高度把结算页收纳为插画和信息两区", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
   const compactRule = css.match(

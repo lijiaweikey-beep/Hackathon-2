@@ -1859,9 +1859,9 @@ button {
   .controls {
     padding:
       0
-      max(14px, env(safe-area-inset-right))
-      max(28px, calc(env(safe-area-inset-bottom) + 22px))
-      max(14px, env(safe-area-inset-left));
+      max(56px, calc(env(safe-area-inset-right) + 44px))
+      max(36px, calc(env(safe-area-inset-bottom) + 30px))
+      max(56px, calc(env(safe-area-inset-left) + 44px));
   }
 
   .joystick {
