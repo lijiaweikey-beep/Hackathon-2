@@ -15,6 +15,9 @@ import {
   showMoveTutorial,
 } from "./view.js";
 
+const EMPTY_ATTACK_HINT = "没打中！靠近发光舍友并面向他出拳！";
+const WRONG_TARGET_HINT = "打错人了！认准全身发光的舍友！";
+
 function applyTargetGlow(npc, enabled) {
   if (!npc?.group) return;
   npc.group.traverse((child) => {
@@ -227,7 +230,7 @@ export function createGamingLevel(context) {
     if (action.type === "attackMiss") {
       if (state.phase !== TUTORIAL_PHASES.ATTACK) return { handled: true };
       state.missHintTimer = TUTORIAL_MISS_HINT_SECONDS;
-      showMissHint(context.ui);
+      showMissHint(context.ui, EMPTY_ATTACK_HINT);
       context.audio.playSound("miss");
       return { handled: true };
     }
@@ -247,7 +250,7 @@ export function createGamingLevel(context) {
         return { handled: true };
       }
       state.missHintTimer = TUTORIAL_MISS_HINT_SECONDS;
-      showMissHint(context.ui);
+      showMissHint(context.ui, WRONG_TARGET_HINT);
       context.audio.playSound("miss");
       return { handled: true };
     }

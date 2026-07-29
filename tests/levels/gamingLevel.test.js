@@ -39,6 +39,8 @@ function createFakeContext({ npcCount, openPositions, actorFactory } = {}) {
   const records = {
     created: [],
     target: null,
+    player: { group: { position: createPosition(0, 0, 1) } },
+    overlays: [],
     environmentUpdates: 0,
     moveCalls: 0,
     randomOpenPositions: [],
@@ -85,7 +87,7 @@ function createFakeContext({ npcCount, openPositions, actorFactory } = {}) {
         context.actors.createNpc(id, {});
       },
       getPlayer() {
-        return { group: { position: createPosition(0, 0, 1) } };
+        return records.player;
       },
     },
     movement: {
@@ -104,9 +106,14 @@ function createFakeContext({ npcCount, openPositions, actorFactory } = {}) {
       setBlackEye(npc, intensity) {
         npc.markIntensity = intensity;
       },
-      showOverlay() {},
+      showOverlay(name, options) {
+        records.overlays.push({ name, ...options });
+      },
       hideOverlay() {},
       refreshHud() {},
+    },
+    audio: {
+      playSound() {},
     },
     random: {
       range(min) {
@@ -166,4 +173,43 @@ test("凌晨三点教学目标待机时保持可渲染坐标", () => {
   animator.animate(records.target, 1 / 60, false);
 
   assert.equal(Number.isFinite(records.target.group.userData.visual.position.y), true);
+});
+
+test("凌晨三点挥空时提示靠近并面向发光目标", () => {
+  const { context, records } = createFakeContext({
+    npcCount: 2,
+    actorFactory: createGamingNpc,
+  });
+  const level = createGamingLevel(context);
+  level.start();
+  records.player.group.position.set(0.4, 0, 6.6);
+  level.update(0.2);
+
+  level.handleAction({ type: "attackMiss" });
+
+  assert.equal(
+    records.overlays.at(-1).html,
+    '<div class="tutorial-miss-hint">没打中！靠近发光舍友并面向他出拳！</div>',
+  );
+});
+
+test("凌晨三点打到普通人物时提示认准发光目标", () => {
+  const { context, records } = createFakeContext({
+    npcCount: 2,
+    actorFactory: createGamingNpc,
+  });
+  const level = createGamingLevel(context);
+  level.start();
+  records.player.group.position.set(0.4, 0, 6.6);
+  level.update(0.2);
+
+  level.handleAction({
+    type: "hitTarget",
+    hit: { npc: records.created[1].npc, correct: false },
+  });
+
+  assert.equal(
+    records.overlays.at(-1).html,
+    '<div class="tutorial-miss-hint">打错人了！认准全身发光的舍友！</div>',
+  );
 });
