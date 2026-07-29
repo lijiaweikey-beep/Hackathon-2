@@ -2039,8 +2039,8 @@ button {
   position: absolute;
   top: 50%;
   left: 50%;
-  /* 只占约七成屏幕，完整露出漫画外围 */
-  width: min(70vw, calc(70dvh * 1376 / 768));
+  /* 只占约八成屏幕，完整露出漫画外围 */
+  width: min(80vw, calc(80dvh * 1376 / 768));
   aspect-ratio: 1376 / 768;
   object-fit: contain;
   border-radius: 10px;
