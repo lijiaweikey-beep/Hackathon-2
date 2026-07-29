@@ -28,6 +28,7 @@ import { createActorSystem } from "../systems/createActorSystem.js";
 import { createCombatSystem } from "../systems/createCombatSystem.js";
 import { createInputController } from "../systems/createInputController.js";
 import { createStoryProgress } from "../progression/createStoryProgress.js";
+import { createStoryBgm } from "../audio/createStoryBgm.js";
 import { randomRange } from "../utils/math.js";
 import { createOrientationController } from "./createOrientationController.js";
 import { createHistoryTimelineFlow } from "./createHistoryTimelineFlow.js";
@@ -38,6 +39,7 @@ let storyProgress, historyTimelineFlow;
 let totalTime = 0;
 const session = createGameSession();
 const audio = createGameAudio();
+const storyBgm = createStoryBgm();
 const levelRunner = createClassicLevelRunner({
   session,
   getServices: () => ({
@@ -86,6 +88,7 @@ function leaveLevel() {
   settlement.clearPending();
   experienceManager?.dispose();
   session.reset();
+  storyBgm.stop();
 }
 
 function selectLevelById(id) {
@@ -261,6 +264,7 @@ export function boot() {
     onStart: startExperience,
     onPause: pauseExperience,
     onResume: resumeExperience,
+    onPrelaunchDismissed: () => storyBgm.stop(),
     onHomeShown: () => historyTimelineFlow?.showHome(),
     onDifficultyChanged: () => historyTimelineFlow?.showHome(),
     onRetry() {
@@ -297,6 +301,7 @@ export function boot() {
     getResultStats: () => experienceManager.getResultStats(),
     calculateRating: calcRating,
     showResult(result) {
+      storyBgm.stop();
       if (!experienceManager.showResult(result)) uiController.showResult(result);
     },
     saveBestScore,
@@ -328,6 +333,7 @@ export function boot() {
     onResize: rendering.resize,
   }).bind();
   uiController.showHome();
+  storyBgm.playIntro();
   rendering.start((deltaSeconds) => gameLoop.tick(deltaSeconds));
 }
 function disposeClassicScene() {
@@ -343,6 +349,7 @@ function resetLevel(index, options = {}) {
   experienceManager.dispose();
 
   const level = LEVELS[index];
+  storyBgm.playForLevel(level);
   totalTime = options.elapsed ?? 0;
   inputController.reset();
   const nextLevelState = {
