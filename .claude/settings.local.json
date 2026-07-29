@@ -12,7 +12,19 @@
       "Bash(git checkout *)",
       "Bash(git push *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git stash *)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(cp \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\gaming\\\\gaming\\\\actors.js\" \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\Hackathon-2\\\\src\\\\levels\\\\gaming\\\\actors.js\")",
+      "Bash(cp \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\gaming\\\\gaming\\\\constants.js\" \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\Hackathon-2\\\\src\\\\levels\\\\gaming\\\\constants.js\")",
+      "Bash(cp \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\gaming\\\\gaming\\\\createLevel.js\" \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\Hackathon-2\\\\src\\\\levels\\\\gaming\\\\createLevel.js\")",
+      "Bash(cp \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\gaming\\\\gaming\\\\definition.js\" \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\Hackathon-2\\\\src\\\\levels\\\\gaming\\\\definition.js\")",
+      "Bash(cp \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\gaming\\\\gaming\\\\preview.js\" \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\黑客松大区赛\\\\hackathon02-01\\\\Hackathon-2\\\\src\\\\levels\\\\gaming\\\\preview.js\")",
+      "Bash(node --test --test-name-pattern=\"gaming|tutorial\")",
+      "Bash(node *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

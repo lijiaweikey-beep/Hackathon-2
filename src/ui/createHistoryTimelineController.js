@@ -3,7 +3,7 @@ const TRACK_PADDING = 130;
 const EXTRA_GAP = 150;
 const REVEAL_AUTO_DELAY = 2000;
 const REVEAL_ANIMATION_MS = 1250;
-const NODE_ROWS = [122, 42];
+const NODE_ROWS = [86, 42];
 
 function getNodeLabel(level) {
   return level.age == null ? "番外" : `${level.age} 岁`;
@@ -208,11 +208,26 @@ export function createHistoryTimelineController({
     card.style.setProperty("--x", `${x}px`);
     card.style.setProperty("--y", `${y}px`);
     card.disabled = false;
+    let artHtml;
+    if (hidden) {
+      artHtml = level.coverUrl
+        ? `<img class="history-node-cover fog-cover" src="${escapeHtml(level.coverUrl)}" alt="" loading="lazy">
+           <span class="history-node-fog-mask"></span>
+           <span class="history-node-fog-icon" aria-hidden="true">?</span>`
+        : `<span class="history-node-fog-icon" aria-hidden="true">?</span>`;
+    } else if (level.coverUrl) {
+      artHtml = `<img class="history-node-cover" src="${escapeHtml(level.coverUrl)}" alt="${escapeHtml(level.sceneName)}" loading="lazy">`;
+    } else {
+      artHtml = level.emoji;
+    }
+
     card.innerHTML = `
       <span class="history-node-age">${getNodeLabel(level)}</span>
-      <span class="history-node-art" aria-hidden="true">${hidden ? "?" : level.emoji}</span>
-      <span class="history-node-name">${hidden ? "未知历史" : level.sceneName}</span>
-      <span class="history-node-copy">${hidden ? "前置历史尚未查明" : getNodeCopy(level, getNpcCount(level))}</span>
+      <span class="history-node-art" aria-hidden="true">${artHtml}</span>
+      <span class="history-node-name">${hidden ? escapeHtml(level.sceneName) : level.sceneName}</span>
+      ${hidden
+        ? '<span class="history-node-badge">待解锁</span>'
+        : `<span class="history-node-copy">${getNodeCopy(level, getNpcCount(level))}</span>`}
       ${state === "sealed" ? seal : ""}
       ${hidden || state === "sealed" ? "" : '<span class="history-node-enter">▶ 进入关卡</span>'}
     `;
@@ -346,8 +361,9 @@ export function createHistoryTimelineController({
     if (ui.historyDetailSubtitle) ui.historyDetailSubtitle.textContent = getDetailSubtitle(level);
     if (ui.historyDetailVisual) {
       ui.historyDetailVisual.style.setProperty("--history-detail-glow", glow);
-      ui.historyDetailVisual.innerHTML = level.history?.image
-        ? `<img class="history-detail-image" src="${escapeHtml(level.history.image)}" alt="${escapeHtml(level.sceneName)}">`
+      const detailImage = level.history?.image ?? level.coverUrl ?? "";
+      ui.historyDetailVisual.innerHTML = detailImage
+        ? `<img class="history-detail-image" src="${escapeHtml(detailImage)}" alt="${escapeHtml(level.sceneName)}">`
         : `<div class="history-detail-art" aria-hidden="true">${level.emoji}</div>`;
     }
     if (ui.historyDetailLore) {

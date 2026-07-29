@@ -19,7 +19,7 @@ test("宿舍场景独立创建电脑和环境更新能力", () => {
   };
   const resources = createWorld(world);
 
-  assert.equal(resources.computers.length, 10);
+  assert.equal(resources.computers.length, 9);
   assert.equal(typeof resources.updateEnvironment, "function");
   assert.ok(scene.children.length > 20);
 });
