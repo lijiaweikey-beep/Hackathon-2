@@ -5,6 +5,16 @@ import {
 import { createLevelCardModel } from "./levelCardModel.js";
 
 const CN_ORDINALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+const FIST_ICON = new URL("../assets/ui/icon-fist.png", import.meta.url).href;
+const HEART_ICON = new URL("../assets/ui/icon-heart.png", import.meta.url).href;
+const COIN_ICON = new URL("../assets/ui/icon-coin.png", import.meta.url).href;
+
+// 资源 chip 图标按资源类型区分：生命用红心章、金币用金币章，其余用拳头。
+function getResourceIcon(resourceHtml) {
+  if (resourceHtml.includes("生命")) return HEART_ICON;
+  if (resourceHtml.includes("金币")) return COIN_ICON;
+  return FIST_ICON;
+}
 
 export function getTaskEntryTitle(level, mainlineIndex = -1) {
   const name = level.entryTitle ?? level.sceneName ?? "";
@@ -43,19 +53,16 @@ function updateTaskAttemptsChip(ui, resourceHtml) {
   const chip = document.querySelector("#taskAttemptsChip");
   if (!chip) return;
 
-  chip.innerHTML = resourceHtml;
+  // 图标走图片素材，文案里旧的拳头/爱心 emoji 去掉避免重复。
+  const text = resourceHtml.replace(/^(🥊|❤️)\s*/, "");
+  chip.innerHTML = `<img class="task-info-icon" src="${getResourceIcon(resourceHtml)}" alt="">${text}`;
   ui.taskAttempts = document.querySelector("#taskAttempts");
 }
 
 function renderTaskTraits(ui, level) {
   if (!ui.taskTraits) return;
-  ui.taskTraits.innerHTML = "";
-  getTaskTraits(level).forEach((trait) => {
-    const chip = document.createElement("strong");
-    chip.className = "task-trait-chip";
-    chip.textContent = trait;
-    ui.taskTraits.appendChild(chip);
-  });
+  // 特征标签：纯文字展示，不做标签组件。
+  ui.taskTraits.textContent = getTaskTraits(level).join(" · ");
 }
 
 export function renderTaskModal(ui, {
@@ -70,7 +77,7 @@ export function renderTaskModal(ui, {
   renderTaskTraits(ui, level);
   if (ui.taskDifficulty) {
     const { difficulty } = createLevelCardModel(level, { npcCount });
-    ui.taskDifficulty.textContent = `⚡ 难度 · ${difficulty.label || "新手"}`;
+    ui.taskDifficulty.textContent = `难度 · ${difficulty.label || "新手"}`;
   }
   if (ui.taskNpcCount) ui.taskNpcCount.textContent = model.npcCount;
   ui.taskTime.textContent = model.timeText;

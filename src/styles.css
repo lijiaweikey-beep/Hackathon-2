@@ -485,27 +485,61 @@ button {
 }
 
 
-.story-ending {
-  display: grid;
-  gap: 3px;
-  margin-top: 10px;
-  padding: 9px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 212, 71, 0.9);
-  background: rgba(255, 212, 71, 0.6);
-  box-shadow: var(--glass-shadow);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  text-align: left;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--ink);
+/* 半生通关入口：主线全通后出现在事件轴标题旁，点击查看人生线报告 */
+.history-title-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 
-.story-ending strong {
+.life-report-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 20px;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  background: url("./assets/ui/entry-halflife.jpg") center 58% / cover no-repeat;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  pointer-events: auto;
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.life-report-entry:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--shadow);
+}
+
+.life-report-entry:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+
+.life-report-entry-text {
+  color: #fff;
   font-size: 15px;
   font-weight: 900;
-  letter-spacing: 2px;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  text-shadow:
+    -1px -1px 0 var(--ink),
+    1px -1px 0 var(--ink),
+    -1px 1px 0 var(--ink),
+    1px 1px 0 var(--ink),
+    2px 2px 0 rgba(24, 22, 18, 0.4);
+}
+
+/* 未集齐全 A：入口锁定态 */
+.life-report-entry.locked {
+  filter: grayscale(0.85);
+}
+
+.life-report-entry.locked .life-report-entry-text::before {
+  content: "🔒 ";
 }
 
 .level-section-label {
@@ -1437,31 +1471,18 @@ button {
   text-shadow: 3px 3px 0 var(--sun);
 }
 
-/* 特征标签：标粗、标签化 */
+/* 特征标签：纯文字居中展示 */
 .task-traits {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  column-gap: 10px;
-  row-gap: 10px;
-  padding: 4px 0 2px;
+  padding: 8px 0 2px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--ink);
 }
 
 .task-traits:empty {
   display: none;
-}
-
-.task-trait-chip {
-  padding: 6px 16px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--paper);
-  font-size: 13px;
-  font-weight: 900;
-  line-height: 1.4;
-  letter-spacing: 0.06em;
-  box-shadow: var(--shadow-sm);
 }
 
 /* 时间 / 机会 / 难度：三项均分一行 */
@@ -1469,10 +1490,26 @@ button {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
+  margin-top: 10px;
 }
 
 .task-info-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   white-space: nowrap;
+}
+
+.task-info-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+/* 按钮区与上方内容拉开距离 */
+.task-panel .task-actions {
+  margin-top: 18px;
 }
 
 
@@ -1723,6 +1760,97 @@ button {
   color: var(--ink);
   font-size: 15px;
   font-weight: 900;
+}
+
+
+/* ---- 人生线报告：主线全通后的一次性总结卡 ---- */
+.life-report-modal {
+  z-index: 46;
+}
+
+.life-report-art {
+  height: 36%;
+}
+
+.life-report-art.is-empty {
+  background: var(--panel-2);
+}
+
+.life-report-title {
+  font-size: 24px;
+}
+
+.life-report-rows {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.life-report-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 3px 3px 0 var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.life-report-age {
+  flex: none;
+  padding: 2px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--sun);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.life-report-name {
+  flex: none;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}
+
+.life-report-node {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.life-report-grade {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.life-report-grade.grade-s { background: var(--sun); }
+.life-report-grade.grade-a { background: #b9f18d; }
+.life-report-grade.grade-b { background: #a5d8ff; }
+.life-report-grade.grade-c { background: #e9ecef; }
+.life-report-grade.grade-none { background: #fff; color: var(--muted); }
+
+.life-report-footnote {
+  color: var(--muted);
 }
 
 
@@ -2020,6 +2148,17 @@ button {
     letter-spacing: 0.1em;
   }
 
+  .life-report-entry {
+    height: 28px;
+    padding: 0 10px;
+    border-width: 2px;
+  }
+
+  .life-report-entry-text {
+    font-size: 12px;
+    letter-spacing: 0.12em;
+  }
+
   .history-build-meta {
     font-size: 10px;
   }
@@ -2239,6 +2378,15 @@ button {
     font-size: 10px;
   }
 
+  .task-info-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .task-panel .task-actions {
+    margin-top: 12px;
+  }
+
   .task-clue {
     padding: 6px 10px;
     font-size: 11px;
@@ -2269,6 +2417,17 @@ button {
   .history-kicker {
     font-size: clamp(16px, 5vh, 24px);
     letter-spacing: 0.08em;
+  }
+
+  .life-report-entry {
+    height: 28px;
+    padding: 0 10px;
+    border-width: 2px;
+  }
+
+  .life-report-entry-text {
+    font-size: 12px;
+    letter-spacing: 0.12em;
   }
 
   .history-build-meta {
@@ -2511,6 +2670,19 @@ button {
     margin-top: 6px;
     font-size: 10px;
     letter-spacing: 0;
+  }
+
+  .life-report-title {
+    font-size: 18px;
+  }
+
+  .life-report-rows {
+    gap: 4px;
+  }
+
+  .life-report-row {
+    padding: 4px 8px;
+    font-size: 11px;
   }
 
   .share-panel {

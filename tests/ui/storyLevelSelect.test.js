@@ -8,6 +8,11 @@ function createClassList() {
     add: (value) => values.add(value),
     remove: (value) => values.delete(value),
     contains: (value) => values.has(value),
+    toggle: (value, force) => {
+      if (force ?? !values.has(value)) values.add(value);
+      else values.delete(value);
+      return values.has(value);
+    },
   };
 }
 
@@ -133,10 +138,11 @@ test("人生事件轴在主线全通后展开番外并允许进入", () => {
   assert.deepEqual(entered, ["extra"]);
 });
 
-test("全部主线完成后人生事件轴展示人生终章", () => {
+test("全部主线完成后半生通关入口出现在标题旁", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement };
-  const storyEnding = { hidden: true };
+  const lifeReportEntry = { hidden: true, classList: createClassList() };
+  let opened = 0;
 
   try {
     const controller = createHistoryTimelineController({
@@ -146,7 +152,7 @@ test("全部主线完成后人生事件轴展示人生终章", () => {
         historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
         historyStatusText: { textContent: "" },
         historyNodeDetail: { innerHTML: "" },
-        storyEnding,
+        lifeReportEntry,
       },
       levels: [level("age-19", 19)],
       storyProgress: {
@@ -156,11 +162,61 @@ test("全部主线完成后人生事件轴展示人生终章", () => {
       },
       revealProgress: { isRevealed: () => true, reveal: () => true },
       timerHost: {},
+      isLifeReportReady: () => true,
+      onOpenLifeReport: () => { opened += 1; },
     });
     controller.showBrowse();
   } finally {
     globalThis.document = previousDocument;
   }
 
-  assert.equal(storyEnding.hidden, false);
+  assert.equal(lifeReportEntry.hidden, false);
+  assert.equal(lifeReportEntry.classList.contains("locked"), false);
+  assert.equal(opened, 0);
+});
+
+test("未集齐全 A 时半生通关入口呈锁定态", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement };
+  const entryListeners = new Map();
+  const lifeReportEntry = {
+    hidden: true,
+    classList: createClassList(),
+    addEventListener: (type, listener) => entryListeners.set(type, listener),
+  };
+  const historyStatusText = { textContent: "" };
+  let opened = 0;
+
+  try {
+    const controller = createHistoryTimelineController({
+      ui: {
+        historyTimelineModal: { classList: createClassList(), addEventListener() {} },
+        historyTrack: createTrack(),
+        historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
+        historyStatusText,
+        historyNodeDetail: { innerHTML: "" },
+        lifeReportEntry,
+      },
+      levels: [level("age-19", 19)],
+      storyProgress: {
+        isComplete: () => true,
+        isUnlocked: () => true,
+        isCompleted: () => true,
+      },
+      revealProgress: { isRevealed: () => true, reveal: () => true },
+      timerHost: {},
+      isLifeReportReady: () => false,
+      onOpenLifeReport: () => { opened += 1; },
+    });
+    controller.bind();
+    controller.showBrowse();
+    entryListeners.get("click")?.({ stopPropagation() {} });
+  } finally {
+    globalThis.document = previousDocument;
+  }
+
+  assert.equal(lifeReportEntry.hidden, false);
+  assert.equal(lifeReportEntry.classList.contains("locked"), true);
+  assert.equal(opened, 0);
+  assert.match(historyStatusText.textContent, /A 级/);
 });

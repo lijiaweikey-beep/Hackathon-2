@@ -111,6 +111,10 @@ export function createHistoryTimelineController({
   version = "v0.10.x.1",
   clock = () => new Date(),
   timerHost = globalThis,
+  isExtraUnlocked: isExtraUnlockedOverride,
+  onRevealComplete,
+  isLifeReportReady,
+  onOpenLifeReport,
 }) {
   let focusId = null;
   let detailId = null;
@@ -139,7 +143,10 @@ export function createHistoryTimelineController({
   }
 
   function isExtraUnlocked() {
-    return storyProgress.isComplete?.() ?? false;
+    // 允许外部注入更严的解锁条件（如：主线全通 + 看过人生线报告）。
+    return isExtraUnlockedOverride
+      ? Boolean(isExtraUnlockedOverride())
+      : storyProgress.isComplete?.() ?? false;
   }
 
   function isEnterable(level) {
@@ -259,7 +266,10 @@ export function createHistoryTimelineController({
     });
 
     ui.historyTrack.appendChild(card);
-    if (state === "unlocked") appendLoreButton(level, x, y);
+    // 有结算记录（含失败）就给历史记录入口；封印/迷雾状态除外。
+    if (state === "unlocked" || (state === "open" && getBestScore(level.id))) {
+      appendLoreButton(level, x, y);
+    }
   }
 
   function renderTimeline() {
@@ -306,8 +316,13 @@ export function createHistoryTimelineController({
   function renderHeader() {
     if (ui.historyVersionText) ui.historyVersionText.textContent = version;
     if (ui.historyStampText) ui.historyStampText.textContent = formatStamp(clock());
-    if (ui.storyEnding) {
-      ui.storyEnding.hidden = !(storyProgress.isComplete?.() ?? false);
+    if (ui.lifeReportEntry) {
+      // 半生通关入口：主线全通后常驻标题旁；未集齐全 A 时呈锁定态。
+      ui.lifeReportEntry.hidden = !(storyProgress.isComplete?.() ?? false);
+      ui.lifeReportEntry.classList?.toggle(
+        "locked",
+        !(isLifeReportReady?.() ?? true),
+      );
     }
   }
 
@@ -375,7 +390,7 @@ export function createHistoryTimelineController({
     const payload = {
       level,
       result: {
-        won: true,
+        won: best?.won !== false,
         timeUsed: best?.time,
         rating: { grade: best?.grade ?? "C", rating: best?.rating ?? 0 },
       },
@@ -395,7 +410,8 @@ export function createHistoryTimelineController({
   function renderDetailLore(level, best) {
     if (!ui.historyDetailLore) return;
     const highlights = getLoreHighlights(level);
-    const gradeNode = best ? level.nodes?.[best.grade] : null;
+    // 失败记录没有等级结局，只展示背景剧情。
+    const gradeNode = best && best.won !== false ? level.nodes?.[best.grade] : null;
     const parts = [];
     if (gradeNode?.title) {
       parts.push(`<p class="history-detail-grade-title">「${escapeHtml(gradeNode.title)}」</p>`);
@@ -415,11 +431,14 @@ export function createHistoryTimelineController({
       ui.historyDetailStats.innerHTML = '<p class="history-detail-stats-empty">暂无历史数据</p>';
       return;
     }
+    const failed = best.won === false;
     const rows = [
-      ["🏅 最佳评级", `${best.grade} 级`],
-      best.time != null ? ["⏱ 完成用时", `${best.time} 秒`] : null,
+      ["🏅 最佳评级", failed ? "未通关" : `${best.grade} 级`],
+      best.time != null ? [failed ? "⏱ 坚持用时" : "⏱ 完成用时", `${best.time} 秒`] : null,
       best.attemptsLeft != null ? ["🥊 剩余出拳", `${best.attemptsLeft} 次`] : null,
-      best.completedAt != null ? ["📅 完成时间", formatStamp(new Date(best.completedAt))] : null,
+      best.completedAt != null
+        ? [failed ? "📅 结算时间" : "📅 完成时间", formatStamp(new Date(best.completedAt))]
+        : null,
     ].filter(Boolean);
     ui.historyDetailStats.innerHTML = rows
       .map(([label, value]) =>
@@ -456,7 +475,10 @@ export function createHistoryTimelineController({
 
   function openDetail(levelId) {
     const level = levels.find(({ id }) => id === levelId);
-    if (!level || getState(level) !== "unlocked") return;
+    if (!level) return;
+    // 已解锁的历史节点或留有结算记录（含失败）的关卡都能看详情。
+    const state = getState(level);
+    if (state !== "unlocked" && !(state === "open" && getBestScore(level.id))) return;
     detailId = level.id;
     renderDetail(level);
     ui.historyDetailModal?.classList.add("visible");
@@ -497,6 +519,7 @@ export function createHistoryTimelineController({
       if (shouldOpenDetail) {
         timerHost.setTimeout(() => openDetail(level.id), 240);
       }
+      onRevealComplete?.(level);
     }, REVEAL_ANIMATION_MS);
   }
 
@@ -544,6 +567,14 @@ export function createHistoryTimelineController({
   }
 
   function bind() {
+    ui.lifeReportEntry?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (isLifeReportReady?.() ?? true) {
+        onOpenLifeReport?.();
+        return;
+      }
+      setStatus("五关全部拿到 A 级以上，才能解锁人生线报告");
+    });
     ui.historyTimelineModal?.addEventListener("click", () => {
       if (ui.historyDetailModal?.classList.contains("visible")) return;
       if (lastPointerMoved) return;

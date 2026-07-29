@@ -1,5 +1,8 @@
 import { createHistoryRevealProgress } from "../progression/createHistoryRevealProgress.js";
 import { createHistoryTimelineController } from "../ui/createHistoryTimelineController.js";
+import { createLifeReportController } from "../ui/createLifeReportController.js";
+
+const LIFE_REPORT_DELAY = 520;
 
 export function createHistoryTimelineFlow({
   ui,
@@ -11,6 +14,8 @@ export function createHistoryTimelineFlow({
   timerHost = globalThis,
 }) {
   const revealProgress = createHistoryRevealProgress({ levels, storage });
+  const mainline = levels.filter((level) => level.track === "mainline");
+  const lifeReport = createLifeReportController({ ui, levels: mainline, storage });
   const controller = createHistoryTimelineController({
     ui,
     levels,
@@ -19,8 +24,21 @@ export function createHistoryTimelineFlow({
     onEnterLevel,
     getNpcCount,
     timerHost,
+    onRevealComplete: () => {
+      maybeShowLifeReport();
+    },
+    // 半生通关入口：全 A 解锁后点击可随时重看报告。
+    isLifeReportReady: () => lifeReport.isQualified(),
+    onOpenLifeReport: () => lifeReport.show(),
   });
   let pendingRevealId = null;
+
+  function maybeShowLifeReport() {
+    // 报告独立于通关/番外：只有五关全部 A 级及以上且没看过时才弹。
+    if (lifeReport.hasSeen() || !lifeReport.isQualified()) return false;
+    timerHost.setTimeout(() => lifeReport.maybeShow(), LIFE_REPORT_DELAY);
+    return true;
+  }
 
   function onLevelCompleted(level) {
     if (level.track !== "mainline") return false;
@@ -44,11 +62,18 @@ export function createHistoryTimelineFlow({
 
   function showHome() {
     controller.showBrowse();
-    return showPendingReveal();
+    if (showPendingReveal()) return true;
+    // 兼容刷分场景：回到事件轴时若已达成全 A 且没看过报告，补弹一次。
+    return maybeShowLifeReport();
+  }
+
+  function bind() {
+    controller.bind();
+    lifeReport.bind();
   }
 
   return Object.freeze({
-    bind: controller.bind,
+    bind,
     onLevelCompleted,
     showPendingReveal,
     showHome,
