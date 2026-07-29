@@ -657,7 +657,7 @@ button {
   position: absolute;
   left: 64px;
   right: 64px;
-  top: min(58vh, 336px);
+  top: min(66vh, 430px);
   height: 48px;
 }
 
@@ -703,7 +703,7 @@ button {
 .history-diamond {
   position: absolute;
   left: var(--x);
-  top: calc(min(58vh, 336px) + 18px);
+  top: calc(min(66vh, 430px) + 18px);
   width: 12px;
   height: 12px;
   transform: rotate(45deg);
@@ -720,13 +720,13 @@ button {
   position: absolute;
   left: var(--x);
   top: var(--y);
-  width: 176px;
-  min-height: 212px;
+  width: 228px;
+  min-height: 276px;
   display: grid;
   align-content: start;
-  gap: 8px;
-  padding: 14px 13px 16px;
-  border-radius: 18px;
+  gap: 10px;
+  padding: 18px 17px 20px;
+  border-radius: 22px;
   border: 1px solid var(--glass-line);
   background: var(--glass-strong);
   box-shadow: 0 10px 26px rgba(37, 36, 42, 0.18);
@@ -776,13 +776,13 @@ button {
 .history-node-enter {
   justify-self: start;
   margin-top: 2px;
-  padding: 4px 12px;
+  padding: 6px 16px;
   border-radius: 999px;
   border: 2px solid var(--ink);
   background: var(--sun);
   box-shadow: 2px 2px 0 var(--ink);
   color: var(--ink);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
   letter-spacing: 0.06em;
 }
@@ -790,15 +790,15 @@ button {
 .history-node-lore {
   position: absolute;
   z-index: 2;
-  left: calc(var(--x) + 132px);
-  top: calc(var(--y) + 10px);
-  width: 34px;
-  height: 34px;
+  left: calc(var(--x) + 178px);
+  top: calc(var(--y) + 12px);
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 2px solid var(--ink);
   background: var(--paper);
   box-shadow: 2px 2px 0 var(--ink);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
   pointer-events: auto;
 }
@@ -855,11 +855,11 @@ button {
 
 .history-node-age {
   display: inline-block;
-  padding: 1px 8px;
+  padding: 2px 10px;
   border-radius: 999px;
   background: var(--sun);
   color: var(--ink);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.08em;
   justify-self: start;
@@ -879,12 +879,12 @@ button {
   position: relative;
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(37, 36, 42, 0.12);
-  font-size: 34px;
+  font-size: 44px;
   overflow: hidden;
 }
 
@@ -892,7 +892,7 @@ button {
 .history-node-fog-mask {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
+  border-radius: 20px;
   background: rgba(18, 20, 28, 0.72);
   z-index: 1;
 }
@@ -932,11 +932,11 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 18px;
+  border-radius: 20px;
 }
 
 .history-node-name {
-  font-size: 17px;
+  font-size: 21px;
   font-weight: 900;
 }
 
@@ -946,9 +946,9 @@ button {
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .history-chain {
@@ -1160,60 +1160,40 @@ button {
 .history-detail-body {
   position: relative;
   display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) 54px;
-  grid-template-rows: minmax(180px, 320px) minmax(90px, auto);
+  grid-template-columns: 54px minmax(0, 0.92fr) minmax(0, 1.08fr) 54px;
   gap: 14px;
-  align-items: center;
+  align-items: stretch;
   min-height: 0;
 }
 
-.history-detail-visual {
+/* 左侧：分享卡 */
+.history-detail-share {
   grid-column: 2;
-  position: relative;
-  min-height: 100%;
-  margin: 0;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  border-radius: 20px;
-  border: 2px solid var(--ink);
-  background:
-    radial-gradient(
-      circle at 50% 40%,
-      var(--history-detail-glow, rgba(255, 212, 71, 0.55)),
-      transparent 46%
-    ),
-    var(--panel-2);
-  box-shadow: var(--shadow-sm);
+  min-height: 0;
 }
 
-.history-detail-visual::after {
-  content: "占位视觉";
-  position: absolute;
-  right: 16px;
-  bottom: 12px;
-  color: rgba(37, 36, 42, 0.34);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-}
-
-.history-detail-art {
-  display: grid;
-  place-items: center;
-  width: clamp(104px, 18vw, 156px);
-  height: clamp(104px, 18vw, 156px);
-  border-radius: 28px;
-  border: 2px solid var(--ink);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: var(--shadow-sm);
-  font-size: clamp(54px, 9vw, 86px);
-}
-
-.history-detail-image {
-  width: 100%;
+.history-detail-share-canvas {
+  width: auto;
   height: 100%;
-  object-fit: cover;
+  max-height: min(430px, 56vh);
+  max-width: 100%;
+  aspect-ratio: 540 / 960;
+  border: var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+  image-rendering: pixelated;
+}
+
+/* 右侧：上剧情、下历史数据 */
+.history-detail-side {
+  grid-column: 3;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
 }
 
 .history-detail-nav {
@@ -1239,11 +1219,13 @@ button {
 .history-detail-nav.prev {
   grid-column: 1;
   grid-row: 1;
+  align-self: center;
 }
 
 .history-detail-nav.next {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1;
+  align-self: center;
 }
 
 .history-detail-nav[hidden] {
@@ -1251,22 +1233,30 @@ button {
 }
 
 .history-detail-lore {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  max-height: 150px;
+  min-height: 0;
   overflow-y: auto;
-  padding: 0 10px 2px;
+  padding: 12px 14px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--panel-2);
   color: var(--text);
   font-size: clamp(13px, 2.1vw, 16px);
   font-weight: 700;
   line-height: 1.8;
-  text-align: center;
+  text-align: left;
   scrollbar-width: thin;
   scrollbar-color: rgba(37, 36, 42, 0.35) transparent;
 }
 
 .history-detail-lore p {
   margin: 0 0 8px;
+}
+
+.history-detail-grade-title {
+  color: var(--ink);
+  font-size: clamp(15px, 2.4vw, 19px);
+  font-weight: 900;
+  text-shadow: 2px 2px 0 var(--sun);
 }
 
 .history-lore-highlight {
@@ -1276,19 +1266,65 @@ button {
   font-weight: 900;
 }
 
+/* 历史数据行 */
+.history-detail-stats {
+  display: grid;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.history-detail-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.history-detail-stat-row + .history-detail-stat-row {
+  border-top: 2px solid var(--ink);
+}
+
+.history-detail-stat-row strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.history-detail-stats-empty {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .history-detail-footer {
   display: grid;
   justify-items: center;
   gap: 12px;
 }
 
-.history-detail-close {
+.history-detail-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.history-detail-button {
   min-width: 118px;
   min-height: 46px;
   padding: 0 24px;
   border: var(--line);
   border-radius: var(--radius);
-  background: var(--pop);
+  background: var(--sun);
   box-shadow: var(--shadow-sm);
   color: var(--ink);
   font-size: 16px;
@@ -1296,7 +1332,15 @@ button {
   letter-spacing: 0.14em;
 }
 
-.history-detail-close:active {
+.history-detail-button.ghost {
+  background: var(--paper);
+}
+
+.history-detail-button.accent {
+  background: var(--pop);
+}
+
+.history-detail-button:active {
   transform: translate(3px, 3px);
   box-shadow: 0 0 0 var(--ink);
 }
@@ -1354,9 +1398,8 @@ button {
   overflow-y: auto;
 }
 
-.task-emoji {
-  font-size: 42px;
-  line-height: 1;
+.task-entry-title {
+  letter-spacing: 0.06em;
 }
 
 .target-preview-wrap {
@@ -1367,8 +1410,8 @@ button {
 }
 
 .target-preview-canvas {
-  width: 150px;
-  height: 165px;
+  width: 180px;
+  height: 198px;
   border: var(--line);
   border-radius: var(--radius);
   background: var(--panel-2);
@@ -1376,46 +1419,113 @@ button {
   image-rendering: pixelated;
 }
 
-.target-label {
-  padding: 2px 12px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--sun);
+/* “认准这个目标！！”大字提示 */
+.target-callout {
   color: var(--ink);
-  font-size: 12px;
+  font-size: clamp(26px, 5.4vw, 34px);
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  text-shadow: 3px 3px 0 var(--sun);
 }
 
-.task-mission {
-  font-weight: 800;
-}
-
-.task-clue {
-  padding: 8px 14px;
-  border: 2px solid var(--ink);
-  border-radius: var(--radius);
-  background: var(--ink);
-  color: var(--paper);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.5;
-}
-
-.task-info-row {
+/* 特征标签：标粗、标签化 */
+.task-traits {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
+  column-gap: 10px;
+  row-gap: 10px;
+  padding: 4px 0 2px;
+}
+
+.task-traits:empty {
+  display: none;
+}
+
+.task-trait-chip {
+  padding: 6px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 时间 / 机会 / 难度：三项均分一行 */
+.task-info-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
 }
 
 .task-info-chip {
-  padding: 3px 11px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--panel-2);
-  font-size: 12px;
+  white-space: nowrap;
+}
+
+
+/* ---- 打字机剧情弹窗 ---- */
+.story-intro-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  background: rgba(37, 36, 42, 0.92);
+  cursor: pointer;
+}
+
+.story-intro-modal.visible {
+  display: grid;
+}
+
+.story-intro-stage {
+  display: grid;
+  justify-items: center;
+  gap: 34px;
+  width: min(640px, 92vw);
+  text-align: center;
+}
+
+.story-intro-text {
+  display: grid;
+  gap: 18px;
+  min-height: 160px;
+  align-content: center;
+}
+
+.story-intro-line {
+  margin: 0;
+  color: var(--paper);
+  font-size: clamp(19px, 3.4vw, 28px);
   font-weight: 900;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+}
+
+.story-intro-line:last-child {
+  color: var(--sun);
+}
+
+.story-intro-hint {
+  color: rgba(255, 246, 223, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  animation: storyIntroHintPulse 1.4s ease-in-out infinite;
+}
+
+.story-intro-hint[hidden] {
+  display: none;
+}
+
+@keyframes storyIntroHintPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 /* ---- 结算：等级插画铺满全屏 ---- */
@@ -1699,8 +1809,8 @@ button {
   }
 
   .target-preview-canvas {
-    width: 110px;
-    height: 121px;
+    width: 132px;
+    height: 145px;
   }
 
   .prelaunch-screen {
@@ -1748,14 +1858,30 @@ button {
 
   .history-detail-body {
     grid-template-columns: 44px minmax(0, 1fr) 44px;
-    grid-template-rows: minmax(150px, 1fr) minmax(80px, auto);
     gap: 10px;
+  }
+
+  .history-detail-share {
+    grid-column: 2;
+  }
+
+  .history-detail-share-canvas {
+    max-height: 34vh;
+  }
+
+  .history-detail-side {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .history-detail-nav {
     width: 44px;
     height: 78px;
     font-size: 34px;
+  }
+
+  .history-detail-nav.next {
+    grid-column: 3;
   }
 
   .history-detail-panel {

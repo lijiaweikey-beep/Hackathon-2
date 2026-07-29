@@ -9,6 +9,7 @@ import {
   saveDifficultySetting,
 } from "../utils/storage.js";
 import { renderShareCard } from "./shareCard.js";
+import { createStoryIntroPlayer } from "./storyIntro.js";
 import { renderTargetPreview } from "./targetPreview.js";
 import { renderTaskModal } from "./taskModal.js";
 
@@ -18,6 +19,7 @@ export function createGameUiController(dependencies) {
     session,
     levelViewHost = { clear() {}, setTheme() {} },
   } = dependencies;
+  const storyIntro = createStoryIntroPlayer({ ui });
   let difficulty = DEFAULT_DIFFICULTY;
   let lastResult = null;
 
@@ -66,9 +68,12 @@ export function createGameUiController(dependencies) {
   }
 
   function showTask(level = session.levelState.level) {
+    const mainline = dependencies.levelRegistry?.mainline ?? [];
+    const mainlineIndex = mainline.findIndex(({ id }) => id === level.id);
     renderTaskModal(ui, {
       level,
       npcCount: getActiveNpcCount(level),
+      mainlineIndex,
     });
     syncDifficultyUi();
     renderTargetPreview(ui.targetPreviewCanvas, level);
@@ -260,10 +265,15 @@ export function createGameUiController(dependencies) {
     bindDifficultyButtons();
     bindPrelaunch();
     bindShareCard();
+    storyIntro.bind();
     ui.startButton?.addEventListener("click", () => {
       if (session.phase !== GAME_PHASES.BRIEFING) return;
-      dependencies.onStart?.();
       ui.taskModal.classList.remove("visible");
+      // 打字机剧情播完、玩家点击任意处后才真正开局。
+      storyIntro.play(session.levelState?.level, () => {
+        if (session.phase !== GAME_PHASES.BRIEFING) return;
+        dependencies.onStart?.();
+      });
     });
     ui.backFromTaskButton?.addEventListener("click", () => {
       if (session.phase === GAME_PHASES.BRIEFING) showHome();

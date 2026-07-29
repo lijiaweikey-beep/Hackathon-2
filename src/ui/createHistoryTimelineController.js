@@ -1,9 +1,12 @@
-const NODE_GAP = 268;
+import { getBestScore } from "../utils/storage.js";
+import { renderShareCard } from "./shareCard.js";
+
+const NODE_GAP = 330;
 const TRACK_PADDING = 130;
 const EXTRA_GAP = 150;
 const REVEAL_AUTO_DELAY = 2000;
 const REVEAL_ANIMATION_MS = 1250;
-const NODE_ROWS = [86, 42];
+const NODE_ROWS = [96, 44];
 
 function getNodeLabel(level) {
   return level.age == null ? "番外" : `${level.age} 岁`;
@@ -203,7 +206,7 @@ export function createHistoryTimelineController({
 
     const tick = document.createElement("span");
     tick.className = `history-diamond ${state === "unlocked" ? "lit" : ""}`;
-    tick.style.setProperty("--x", `${x + 82}px`);
+    tick.style.setProperty("--x", `${x + 108}px`);
     tick.setAttribute("aria-hidden", "true");
     ui.historyTrack.appendChild(tick);
 
@@ -267,7 +270,7 @@ export function createHistoryTimelineController({
     const shiftAt = (index) => (hasExtra && index >= firstExtraIndex ? EXTRA_GAP : 0);
     ui.historyTrack.style.width = `${TRACK_PADDING * 2
       + Math.max(0, levels.length - 1) * NODE_GAP
-      + 190
+      + 244
       + (hasExtra ? EXTRA_GAP : 0)}px`;
 
     const axis = document.createElement("div");
@@ -357,30 +360,96 @@ export function createHistoryTimelineController({
     ui.historyTimelineModal?.classList.remove("visible");
   }
 
+  function getMainlineProgress() {
+    const mainline = levels.filter((level) => level.track === "mainline");
+    return {
+      total: mainline.length,
+      unlocked: mainline.filter((level) => storyProgress.isCompleted(level.id)).length,
+    };
+  }
+
+  // 左侧分享卡：先出手绘版，等级贴图加载完成后再重绘一次。
+  function renderDetailShareCard(level, best) {
+    const canvas = ui.historyDetailShareCanvas;
+    if (!canvas?.getContext) return;
+    const payload = {
+      level,
+      result: {
+        won: true,
+        timeUsed: best?.time,
+        rating: { grade: best?.grade ?? "C", rating: best?.rating ?? 0 },
+      },
+      progress: getMainlineProgress(),
+    };
+    renderShareCard(canvas, payload);
+    const artSrc = level.art?.grades?.[best?.grade];
+    if (!artSrc || typeof Image !== "function") return;
+    const image = new Image();
+    image.onload = () => {
+      if (detailId === level.id) renderShareCard(canvas, { ...payload, art: image });
+    };
+    image.src = artSrc;
+  }
+
+  // 右上：对应等级的剧情文案。
+  function renderDetailLore(level, best) {
+    if (!ui.historyDetailLore) return;
+    const highlights = getLoreHighlights(level);
+    const gradeNode = best ? level.nodes?.[best.grade] : null;
+    const parts = [];
+    if (gradeNode?.title) {
+      parts.push(`<p class="history-detail-grade-title">「${escapeHtml(gradeNode.title)}」</p>`);
+    }
+    if (gradeNode?.verdict) {
+      parts.push(`<p>${renderHighlightedText(gradeNode.verdict, highlights)}</p>`);
+    }
+    parts.push(...getLoreParagraphs(level)
+      .map((paragraph) => `<p>${renderHighlightedText(paragraph, highlights)}</p>`));
+    ui.historyDetailLore.innerHTML = parts.join("");
+  }
+
+  // 右下：历史数据（最佳评级、完成用时、剩余出拳、完成时间）。
+  function renderDetailStats(best) {
+    if (!ui.historyDetailStats) return;
+    if (!best) {
+      ui.historyDetailStats.innerHTML = '<p class="history-detail-stats-empty">暂无历史数据</p>';
+      return;
+    }
+    const rows = [
+      ["🏅 最佳评级", `${best.grade} 级`],
+      best.time != null ? ["⏱ 完成用时", `${best.time} 秒`] : null,
+      best.attemptsLeft != null ? ["🥊 剩余出拳", `${best.attemptsLeft} 次`] : null,
+      best.completedAt != null ? ["📅 完成时间", formatStamp(new Date(best.completedAt))] : null,
+    ].filter(Boolean);
+    ui.historyDetailStats.innerHTML = rows
+      .map(([label, value]) =>
+        `<div class="history-detail-stat-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
+      .join("");
+  }
+
+  function saveDetailShareCard() {
+    const canvas = ui.historyDetailShareCanvas;
+    if (!canvas?.toDataURL || !detailId) return;
+    const level = levels.find(({ id }) => id === detailId);
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `梗哥的半生-${level?.sceneName ?? "历史节点"}.png`;
+    link.click();
+  }
+
   function renderDetail(level) {
     const detailLevels = getUnlockedDetailLevels();
     const detailIndex = detailLevels.findIndex(({ id }) => id === level.id);
     const globalIndex = levels.findIndex(({ id }) => id === level.id);
-    const glow = level.cardStyle?.glow ?? "rgba(251, 146, 60, 0.36)";
+    const best = getBestScore(level.id);
     const title = level.history?.title ?? `第${globalIndex + 1}章 - ${level.sceneName}`;
-    const rewardText = getRewardText(level);
 
     if (ui.historyDetailTitle) ui.historyDetailTitle.textContent = title;
     if (ui.historyDetailSubtitle) ui.historyDetailSubtitle.textContent = getDetailSubtitle(level);
-    if (ui.historyDetailVisual) {
-      ui.historyDetailVisual.style.setProperty("--history-detail-glow", glow);
-      const detailImage = level.history?.image ?? level.coverUrl ?? "";
-      ui.historyDetailVisual.innerHTML = detailImage
-        ? `<img class="history-detail-image" src="${escapeHtml(detailImage)}" alt="${escapeHtml(level.sceneName)}">`
-        : `<div class="history-detail-art" aria-hidden="true">${level.emoji}</div>`;
-    }
-    if (ui.historyDetailLore) {
-      const highlights = getLoreHighlights(level);
-      ui.historyDetailLore.innerHTML = getLoreParagraphs(level)
-        .map((paragraph) => `<p>${renderHighlightedText(paragraph, highlights)}</p>`)
-        .join("");
-    }
-    if (ui.historyDetailReward) ui.historyDetailReward.textContent = rewardText;
+    renderDetailShareCard(level, best);
+    renderDetailLore(level, best);
+    renderDetailStats(best);
+    if (ui.historyDetailReward) ui.historyDetailReward.textContent = getRewardText(level);
     if (ui.historyDetailPrev) ui.historyDetailPrev.hidden = detailIndex <= 0;
     if (ui.historyDetailNext) ui.historyDetailNext.hidden = detailIndex < 0 || detailIndex >= detailLevels.length - 1;
   }
@@ -489,6 +558,17 @@ export function createHistoryTimelineController({
     ui.historyDetailClose?.addEventListener("click", (event) => {
       event.stopPropagation();
       closeDetail();
+    });
+    ui.historyDetailSave?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      saveDetailShareCard();
+    });
+    ui.historyDetailReplay?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const levelId = detailId;
+      if (!levelId) return;
+      closeDetail();
+      onEnterLevel?.(levelId);
     });
     ui.historyDetailPrev?.addEventListener("click", (event) => {
       event.stopPropagation();
