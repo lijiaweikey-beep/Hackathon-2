@@ -39,18 +39,20 @@ test("经典体验保留关卡、角色、界面和特效更新顺序", () => {
   ]);
 });
 
-test("经典体验在顿帧期间只更新震动", () => {
+test("经典体验在顿帧期间继续更新粒子和震动", () => {
   const calls = [];
   const experience = createClassicExperience({
     consumeHitstop: () => true,
+    updateLevel: () => calls.push("level"),
     updateActors: () => calls.push("actors"),
+    updateEffects: () => calls.push("effects"),
     updateShake: () => calls.push("shake"),
     render: () => {},
   });
 
   experience.update(0.016);
 
-  assert.deepEqual(calls, ["shake"]);
+  assert.deepEqual(calls, ["effects", "shake"]);
 });
 
 test("经典体验适配器把输入和规则动作转发给现有系统", () => {
