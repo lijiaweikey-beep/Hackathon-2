@@ -5,7 +5,7 @@ import {
 
 export function createTaskModalModel({ level, npcCount }) {
   return {
-    npcCount,
+    npcCount: level.npcCountText ?? npcCount,
     timeText: level.timeLimit === null
       ? "∞"
       : String(level.timeLimit ?? ROUND_SECONDS),

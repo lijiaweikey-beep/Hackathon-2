@@ -60,3 +60,15 @@ test("关卡可以复用任务弹窗并声明自己的操作说明", () => {
   assert.equal(model.actionIcon, "📸");
   assert.equal(model.actionGuide, "相机按钮/空格 拍照");
 });
+
+test("关卡可以覆盖简报中的场上人数", () => {
+  const model = createTaskModalModel({
+    level: {
+      npcCountText: "4–6",
+      targetDesc: "卖鸭腿的阿姨",
+    },
+    npcCount: 20,
+  });
+
+  assert.equal(model.npcCount, "4–6");
+});

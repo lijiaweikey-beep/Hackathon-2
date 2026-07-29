@@ -5,7 +5,8 @@ export function createPreviewModel() {
 }
 
 export function renderPreview({ scene }) {
-  const target = createNpc(0, { gooseVendor: true, levelTarget: true });
+  const target = createNpc(0, { gooseVendor: false, levelTarget: true });
+  target.setLegGlow(0.9);
   target.group.rotation.y = -0.35;
   scene.add(target.group);
 }
