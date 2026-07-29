@@ -3,8 +3,7 @@ import { createSupermarketExperience } from "./createExperience.js";
 export default {
   id: "supermarket",
   order: 40,
-  track: "mainline",
-  age: 25,
+  track: "extra",
   sharedLayout: true,
   sceneName: "超市取证",
   emoji: "📸",
@@ -21,11 +20,11 @@ export default {
   actionIcon: "📸",
   actionGuide: "相机按钮/空格 拍照",
   difficulty: 4,
-  success: "四张证据到手。二十五岁的真相，终于不用再自我怀疑。",
+  success: "四张证据到手。番外里的真相，终于不用再自我怀疑。",
   failure: "超市打烊前，你没能拍齐四张有效证据。",
   transition: {
-    intro: "二十五岁，有些真相藏在日常货架之间，越靠近越不敢相信。",
-    success: "四张证据拍下。两年后，职场又把另一口锅扔向了梗哥。",
+    intro: "番外事件里，有些真相藏在日常货架之间，越靠近越不敢相信。",
+    success: "四张证据拍下。超市里的疑点终于有了答案。",
   },
   extensions: {
     createExperience: createSupermarketExperience,

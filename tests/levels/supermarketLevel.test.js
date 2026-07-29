@@ -3,9 +3,9 @@ import test from "node:test";
 import * as THREE from "three";
 import definition from "../../src/levels/supermarket/definition.js";
 
-test("超市取证属于二十五岁独立主线关卡", () => {
-  assert.equal(definition.track, "mainline");
-  assert.equal(definition.age, 25);
+test("超市取证属于无年龄番外独立关卡", () => {
+  assert.equal(definition.track, "extra");
+  assert.equal(definition.age, undefined);
   assert.equal(definition.createLevel, undefined);
   assert.equal(typeof definition.extensions.createExperience, "function");
 });

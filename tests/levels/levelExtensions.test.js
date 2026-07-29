@@ -7,6 +7,7 @@ import gaming from "../../src/levels/gaming/definition.js";
 import gooseMarket from "../../src/levels/goose-market/definition.js";
 import library from "../../src/levels/library/definition.js";
 import office from "../../src/levels/office/definition.js";
+import stagedDirector from "../../src/levels/staged-director/definition.js";
 import supermarket from "../../src/levels/supermarket/definition.js";
 import temple from "../../src/levels/temple/definition.js";
 import { createLevelRegistry } from "../../src/levels/createLevelRegistry.js";
@@ -27,12 +28,30 @@ test("现有关卡按年龄主线和番外正确归类", () => {
     ["mainline", 19, "mainline", 21],
   );
   assert.deepEqual(
-    [temple.track, temple.age, bloodmoon.track, bloodmoon.age],
-    ["extra", undefined, "extra", undefined],
+    [
+      supermarket.track,
+      supermarket.age,
+      temple.track,
+      temple.age,
+      bloodmoon.track,
+      bloodmoon.age,
+      stagedDirector.track,
+      stagedDirector.age,
+    ],
+    [
+      "extra",
+      undefined,
+      "extra",
+      undefined,
+      "extra",
+      undefined,
+      "extra",
+      undefined,
+    ],
   );
 });
 
-test("注册中心组成六段年龄主线并保留两个番外", () => {
+test("注册中心组成五段年龄主线并保留四个番外", () => {
   const definitions = [
     gaming,
     library,
@@ -42,6 +61,7 @@ test("注册中心组成六段年龄主线并保留两个番外", () => {
     debtSmasher,
     temple,
     bloodmoon,
+    stagedDirector,
   ];
   const registry = createLevelRegistry(
     definitions.map((definition) => [definition.id, definition]),
@@ -53,10 +73,14 @@ test("注册中心组成六段年龄主线并保留两个番外", () => {
       ["gaming", 19],
       ["library", 21],
       ["goose-market", 23],
-      ["supermarket", 25],
       ["office", 27],
       ["debt-smasher", 30],
     ],
   );
-  assert.deepEqual(registry.extra.map(({ id }) => id), ["temple", "bloodmoon"]);
+  assert.deepEqual(registry.extra.map(({ id }) => id), [
+    "supermarket",
+    "temple",
+    "bloodmoon",
+    "staged-director",
+  ]);
 });
