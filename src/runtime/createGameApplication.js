@@ -34,8 +34,7 @@ import { createPlayerFeedback } from "./createPlayerFeedback.js";
 let scene, player, fx, levelViewHost;
 let actorSystem, combatSystem, inputController, worldRuntime;
 let uiController, gameLoop, rendering, settlement, experienceManager;
-let storyProgress, historyTimelineFlow;
-let totalTime = 0;
+let storyProgress, historyTimelineFlow, totalTime = 0;
 const session = createGameSession();
 const playerFeedback = createPlayerFeedback();
 const { audio, storyBgm } = playerFeedback;
@@ -79,9 +78,7 @@ function triggerShake(intensity, duration) { fx.triggerShake(intensity, duration
 
 function updateShake(dt) { fx.updateShake(dt, rendering.camera); }
 
-function settleRound(won, failMessage, delayMs = won ? 500 : 400) {
-  settlement.settle(won, failMessage, delayMs);
-}
+function settleRound(won, failMessage, delayMs = won ? 500 : 400) { settlement.settle(won, failMessage, delayMs); }
 
 function leaveLevel() {
   settlement.clearPending();
@@ -347,9 +344,7 @@ function resetLevel(index, options = {}) {
   inputController.reset();
   const nextLevelState = {
     level,
-    remaining: level.timeLimit === null
-      ? 9999
-      : (level.timeLimit ?? ROUND_SECONDS),
+    remaining: level.timeLimit === null ? 9999 : (level.timeLimit ?? ROUND_SECONDS),
     attempts: ATTEMPTS,
     startTime: 0,
     obstacles: [],

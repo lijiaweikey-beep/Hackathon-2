@@ -43,14 +43,16 @@ export function createRoundSettlement(dependencies) {
       rating,
     });
 
+    // 胜负都落结算记录（失败记录带 won:false，永不覆盖胜利记录）。
+    dependencies.saveBestScore(session.levelState.level.id, {
+      won,
+      grade: rating.grade,
+      rating: rating.rating,
+      time: timeUsed,
+      attemptsLeft,
+      completedAt: Date.now(),
+    });
     if (won) {
-      dependencies.saveBestScore(session.levelState.level.id, {
-        grade: rating.grade,
-        rating: rating.rating,
-        time: timeUsed,
-        attemptsLeft,
-        completedAt: Date.now(),
-      });
       dependencies.onLevelCompleted?.(session.levelState.level);
       return;
     }

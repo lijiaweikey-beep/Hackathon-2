@@ -74,11 +74,25 @@ export function getBestScore(levelId) {
   } catch { return null; }
 }
 
+// 旧存档没有 won 字段，默认视为通关记录。
+function isWonRecord(record) {
+  return record.won !== false;
+}
+
+// 胜利记录永远优先于失败记录；失败之间保留最近一次结算；
+// 胜利之间评级更好（rating 更小）或用时更短才替换。
+function shouldReplaceBestScore(prev, next) {
+  if (!prev) return true;
+  if (isWonRecord(prev) !== isWonRecord(next)) return isWonRecord(next);
+  if (!isWonRecord(next)) return true;
+  return next.rating < prev.rating
+    || (next.rating === prev.rating && next.time < prev.time);
+}
+
 export function saveBestScore(levelId, score) {
   try {
     const data = JSON.parse(localStorage.getItem(BEST_SCORE_STORAGE_KEY) || "{}");
-    const prev = data[levelId];
-    if (!prev || score.rating < prev.rating || (score.rating === prev.rating && score.time < prev.time)) {
+    if (shouldReplaceBestScore(data[levelId], score)) {
       data[levelId] = score;
       localStorage.setItem(BEST_SCORE_STORAGE_KEY, JSON.stringify(data));
     }

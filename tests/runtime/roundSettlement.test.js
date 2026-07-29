@@ -86,6 +86,7 @@ test("独立玩法没有经典玩家对象也可以失败结算", () => {
 
 test("成功结算推进主线，失败结算不改变进度", () => {
   const completed = [];
+  const saved = [];
   const session = {
     phase: GAME_PHASES.PLAYING,
     levelState: {
@@ -106,7 +107,7 @@ test("成功结算推进主线，失败结算不改变进度", () => {
     getResultStats: () => ({ attemptsLeft: 3 }),
     calculateRating: () => ({ grade: "S", rating: 100 }),
     showResult() {},
-    saveBestScore() {},
+    saveBestScore: (levelId, score) => saved.push({ levelId, won: score.won }),
     onLevelCompleted: (level) => completed.push(level.id),
     playWin() {},
     playLose() {},
@@ -117,6 +118,11 @@ test("成功结算推进主线，失败结算不改变进度", () => {
   settlement.finish(false);
 
   assert.deepEqual(completed, ["age-19"]);
+  // 胜负都要留下结算记录，失败记录带 won:false。
+  assert.deepEqual(saved, [
+    { levelId: "age-19", won: true },
+    { levelId: "age-19", won: false },
+  ]);
 });
 
 test("成功结算等待几秒让命中粒子完整播放再弹卡片", () => {

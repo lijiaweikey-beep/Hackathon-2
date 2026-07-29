@@ -67,7 +67,13 @@
     <section id="historyTimelineModal" class="modal history-timeline-modal" aria-label="人生事件轴">
       <div class="history-cosmos">
         <header class="history-header">
-          <div class="history-kicker">人生事件轴</div>
+          <div class="history-title-group">
+            <div class="history-kicker">人生事件轴</div>
+            <!-- 半生通关入口：主线全通后出现，点击查看人生线报告（未全 A 时锁定） -->
+            <button id="lifeReportEntry" class="life-report-entry" type="button" hidden aria-label="查看人生线报告">
+              <span class="life-report-entry-text">半生通关</span>
+            </button>
+          </div>
           <div class="history-header-actions">
             <div class="history-build-meta">
               <span id="historyVersionText">v0.10.x.1</span>
@@ -125,10 +131,6 @@
         <footer class="history-footer">
           <div id="historyStatusText" class="history-status-text">历史仍在等待记录……</div>
           <div id="historyNodeDetail" class="history-node-detail" aria-live="polite"></div>
-          <div id="storyEnding" class="story-ending" hidden>
-            <strong>半生通关</strong>
-            <span>人生是旷野，不是轨道。下一拳，打向你自己选的方向。</span>
-          </div>
         </footer>
 
         <section id="historyDetailModal" class="history-detail-modal" aria-label="历史节点详情">
@@ -172,9 +174,9 @@
         </div>
         <div id="taskTraits" class="task-traits"></div>
         <div class="task-info-row">
-          <div class="task-info-chip">⏱ <span id="taskTime">90</span> 秒</div>
-          <div class="task-info-chip" id="taskAttemptsChip">❤️ <span id="taskAttempts">❤️❤️❤️</span></div>
-          <div class="task-info-chip" id="taskDifficulty">⚡ 难度 · 新手</div>
+          <div class="task-info-chip"><img class="task-info-icon" src="/src/assets/ui/icon-clock.png" alt=""> <span id="taskTime">90</span> 秒</div>
+          <div class="task-info-chip" id="taskAttemptsChip"><img class="task-info-icon" src="/src/assets/ui/icon-fist.png" alt=""> <span id="taskAttempts">--</span></div>
+          <div class="task-info-chip"><img class="task-info-icon" src="/src/assets/ui/icon-bolt.png" alt=""> <span id="taskDifficulty">难度 · 新手</span></div>
         </div>
         <div class="task-actions">
           <button id="backFromTaskButton" class="secondary-button" type="button">返回坐标轴</button>
@@ -213,6 +215,26 @@
             <button id="retryButton" class="primary-button" type="button">再来一局</button>
             <button id="shareButton" class="secondary-button share-button" type="button">生成分享卡</button>
             <button id="backToSelectButton" class="secondary-button" type="button">返回坐标轴</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 人生线报告：五关全部 A 级及以上时弹出一次，独立于历史节点与番外解锁 -->
+    <section id="lifeReportModal" class="modal result-modal life-report-modal" aria-label="人生线报告">
+      <div class="result-stage life-report-card">
+        <div id="lifeReportArt" class="result-art life-report-art" aria-hidden="true"></div>
+        <div class="result-slug">
+          <span class="result-slug-item">人生线报告</span>
+          <span id="lifeReportProgress" class="result-slug-item">5/5</span>
+        </div>
+        <div class="result-brief life-report-brief">
+          <div class="result-outcome">五关全优 · 半生高光</div>
+          <div class="result-node-title life-report-title">妈妈，人生是旷野！</div>
+          <div id="lifeReportRows" class="life-report-rows"></div>
+          <p class="result-verdict life-report-footnote">每一关都拿下 A 级以上——这半生，梗哥走得漂亮。</p>
+          <div class="result-actions">
+            <button id="lifeReportConfirmButton" class="primary-button" type="button">收下这份人生 ▶</button>
           </div>
         </div>
       </div>
