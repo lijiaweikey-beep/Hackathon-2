@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import viteConfig, {
+import {
+  createViteConfig,
   rewriteAssetUrls,
   rewriteFetchCalls,
   rewriteFetchMentions,
   rewriteModuleScript,
 } from "../../vite.config.js";
+
+const viteConfig = createViteConfig({ command: "build" });
+const devViteConfig = createViteConfig({ command: "serve" });
 
 test("Vite 配置不会把字符串里的 fetch 提示改成非法脚本", () => {
   const bundle = {
@@ -62,4 +66,9 @@ test("Vite 构建输出普通脚本入口以兼容扫码容器", () => {
     rewriteModuleScript('<script type="module" crossorigin src="./assets/index.js"></script>'),
     '<script defer src="./assets/index.js"></script>',
   );
+});
+
+test("Vite 开发模式不替换浏览器原生 fetch", () => {
+  assert.equal(viteConfig.define?.fetch, "__interactFetch");
+  assert.equal(devViteConfig.define?.fetch, undefined);
 });

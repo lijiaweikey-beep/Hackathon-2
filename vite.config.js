@@ -107,15 +107,23 @@ function avoidStaticFetchFlag() {
   };
 }
 
-export default defineConfig({
-  base: "./",
-  define: {
-    fetch: "__interactFetch",
-  },
-  plugins: [avoidStaticFetchFlag()],
-  build: {
-    modulePreload: false,
-  },
-});
+function createViteConfig({ command = "build" } = {}) {
+  return {
+    base: "./",
+    define: command === "build" ? { fetch: "__interactFetch" } : {},
+    plugins: [avoidStaticFetchFlag()],
+    build: {
+      modulePreload: false,
+    },
+  };
+}
 
-export { rewriteAssetUrls, rewriteFetchCalls, rewriteFetchMentions, rewriteModuleScript };
+export default defineConfig(createViteConfig);
+
+export {
+  createViteConfig,
+  rewriteAssetUrls,
+  rewriteFetchCalls,
+  rewriteFetchMentions,
+  rewriteModuleScript,
+};
