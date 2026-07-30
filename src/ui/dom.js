@@ -54,6 +54,7 @@ export const ui = {
   taskAttempts: document.querySelector("#taskAttempts"),
   taskAttemptsChip: document.querySelector("#taskAttempts")?.parentElement,
   targetPreviewCanvas: document.querySelector("#targetPreviewCanvas"),
+  targetCallout: document.querySelector("#targetCallout"),
   attackIcon: document.querySelector("#attackButton span"),
   startButton: document.querySelector("#startButton"),
   resultModal: document.querySelector("#resultModal"),

@@ -8,6 +8,7 @@ const CN_ORDINALS = ["一", "二", "三", "四", "五", "六", "七", "八", "�
 const FIST_ICON = new URL("../assets/ui/icon-fist.png", import.meta.url).href;
 const HEART_ICON = new URL("../assets/ui/icon-heart.png", import.meta.url).href;
 const COIN_ICON = new URL("../assets/ui/icon-coin.png", import.meta.url).href;
+const DEFAULT_TARGET_CALLOUT = "认准这个目标！！";
 
 // 资源 chip 图标按资源类型区分：生命用红心章、金币用金币章，其余用拳头。
 function getResourceIcon(resourceHtml) {
@@ -39,6 +40,7 @@ export function createTaskModalModel({ level, npcCount, npcCountText }) {
       ? `${level.resourceLabel} <span id="taskAttempts">${level.resourceInitial}</span>`
       : `🥊 <span id="taskAttempts">${ATTEMPTS}</span> 次机会`,
     targetLabel: level.targetDesc,
+    targetCallout: level.targetCallout ?? DEFAULT_TARGET_CALLOUT,
     briefingText: [
       level.transition?.intro,
       level.mission,
@@ -75,6 +77,7 @@ export function renderTaskModal(ui, {
   const model = createTaskModalModel({ level, npcCount, npcCountText });
   // 标题直接用目标 NPC 名，和预览图保持同一目标。
   ui.taskTitle.textContent = model.targetLabel || getTaskEntryTitle(level, mainlineIndex);
+  if (ui.targetCallout) ui.targetCallout.textContent = model.targetCallout;
   renderTaskTraits(ui, level);
   if (ui.taskDifficulty) {
     // 难度徽章跟随玩家在难度选择器里选中的档位（易/中/难）。
