@@ -60,6 +60,9 @@ test("手机横屏短高度启用紧凑 HUD、任务弹窗和事件轴布局", a
   assert.match(compactRule, /\.topbar/);
   assert.match(compactRule, /\.task-panel/);
   assert.match(compactRule, /\.history-footer/);
+  assert.match(compactRule, /\.clue-bar\s*\{/);
+  assert.match(compactRule, /font-size:\s*clamp\(16px,\s*2\.6vw,\s*22px\)/);
+  assert.match(compactRule, /\.clue-bar\.floated\s*\{/);
 });
 
 test("操作按钮在手机横屏中保留拇指安全间距", async () => {
