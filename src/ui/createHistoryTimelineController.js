@@ -519,7 +519,7 @@ export function createHistoryTimelineController({
     setDetail(level, "新节点已解锁");
     const card = [...(ui.historyTrack?.querySelectorAll(".history-node-card") ?? [])]
       .find((node) => node.dataset.historyNode === levelId);
-    card?.classList.add("revealing");
+    card?.classList.add("unlocking");
     return Boolean(card);
   }
 
