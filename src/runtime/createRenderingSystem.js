@@ -3,6 +3,9 @@ export function createRenderingSystem({
   canvas,
   windowTarget = window,
   isCachedTexture = () => false,
+  now = () => performance.now(),
+  frameTimeoutMs = 1500,
+  watchdogIntervalMs = 1000,
 }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(windowTarget.devicePixelRatio ?? 1, 1.5));
@@ -11,6 +14,10 @@ export function createRenderingSystem({
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const clock = new THREE.Clock();
+  let tickCallback = null;
+  let lastFrameAt = 0;
+  let contextLost = false;
+  let watchdogId = null;
 
   function createCamera({
     left = -8,
@@ -61,6 +68,23 @@ export function createRenderingSystem({
     renderer.render(scene, targetCamera);
   }
 
+  function installLoop() {
+    if (!tickCallback) return;
+    lastFrameAt = now();
+    clock.start?.();
+    renderer.setAnimationLoop(() => {
+      lastFrameAt = now();
+      tickCallback(clock.getDelta());
+    });
+  }
+
+  function ensureRunning(timeoutMs = frameTimeoutMs) {
+    if (!tickCallback || contextLost) return false;
+    if (now() - lastFrameAt <= timeoutMs) return false;
+    installLoop();
+    return true;
+  }
+
   function disposeScene(scene, fx) {
     if (!scene) return;
     fx?.clearParticles();
@@ -77,9 +101,25 @@ export function createRenderingSystem({
   }
 
   function start(tick) {
+    tickCallback = tick;
     resize();
     windowTarget.addEventListener("resize", resize);
-    renderer.setAnimationLoop(() => tick(clock.getDelta()));
+    canvas?.addEventListener?.("webglcontextlost", (event) => {
+      event.preventDefault?.();
+      contextLost = true;
+    });
+    canvas?.addEventListener?.("webglcontextrestored", () => {
+      contextLost = false;
+      resize();
+      installLoop();
+    });
+    installLoop();
+    if (!watchdogId && windowTarget.setInterval) {
+      watchdogId = windowTarget.setInterval(() => ensureRunning(), watchdogIntervalMs);
+    }
+    ["focus", "pageshow", "orientationchange"].forEach((type) => {
+      windowTarget.addEventListener?.(type, () => ensureRunning(0));
+    });
   }
 
   return Object.freeze({
@@ -91,5 +131,12 @@ export function createRenderingSystem({
     render,
     disposeScene,
     start,
+    ensureRunning,
+    getHealth: () => Object.freeze({
+      contextLost,
+      lastFrameAt,
+      running: Boolean(tickCallback && !contextLost),
+      staleForMs: tickCallback ? Math.max(0, now() - lastFrameAt) : 0,
+    }),
   });
 }
