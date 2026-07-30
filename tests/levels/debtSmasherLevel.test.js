@@ -8,6 +8,7 @@ test("爆金币属于三十岁经典主线终局关卡", () => {
   assert.equal(definition.timeLimit, 100);
   assert.equal(definition.actionIcon, "🦵");
   assert.equal(definition.actionGuide, "踢按钮/空格 按当前朝向踢送");
+  assert.equal(definition.targetDesc, "全场账单怪都是目标！！");
   assert.equal(definition.legacy, false);
   assert.equal(typeof definition.createLevel, "function");
   assert.equal(definition.extensions.createExperience, undefined);
