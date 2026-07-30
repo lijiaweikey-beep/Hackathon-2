@@ -202,6 +202,46 @@ test("摇杆以触摸起点作为本次拖动中心", () => {
   );
 });
 
+test("手指拖出摇杆热区后仍按窗口移动事件更新方向", () => {
+  const windowTarget = new EventTarget();
+  const joystick = new EventTarget();
+  joystick.setPointerCapture = () => {};
+  joystick.getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 100,
+    height: 100,
+  });
+  const input = createInputController({
+    isActive: () => true,
+    now: () => 1000,
+    windowTarget,
+    joystick,
+    joystickKnob: { style: {} },
+  });
+  const direction = new THREE.Vector2();
+  input.bind();
+
+  const pointerDown = new Event("pointerdown");
+  Object.defineProperties(pointerDown, {
+    pointerId: { value: 7 },
+    clientX: { value: 50 },
+    clientY: { value: 50 },
+  });
+  joystick.dispatchEvent(pointerDown);
+  const pointerMove = new Event("pointermove");
+  Object.defineProperties(pointerMove, {
+    pointerId: { value: 7 },
+    clientX: { value: 150 },
+    clientY: { value: 50 },
+  });
+  windowTarget.dispatchEvent(pointerMove);
+  input.readDirection(direction);
+
+  assert.equal(direction.x > 0.95, true);
+  assert.equal(Math.abs(direction.y) < Number.EPSILON, true);
+});
+
 test("摇杆快速反向不会沿用旧方向锁", () => {
   const input = createInputController({
     isActive: () => true,

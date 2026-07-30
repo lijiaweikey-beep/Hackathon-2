@@ -54,6 +54,7 @@ export function createInputController(dependencies) {
 
   function updateJoystick(event, joystick) {
     if (!isActive()) return;
+    event.preventDefault?.();
     const rect = joystick.getBoundingClientRect();
     const originX = joystickOrigin?.x ?? rect.left + rect.width / 2;
     const originY = joystickOrigin?.y ?? rect.top + rect.height / 2;
@@ -86,14 +87,17 @@ export function createInputController(dependencies) {
     windowTarget.addEventListener("keydown", primeAudio, { once: true });
     hitArea.addEventListener("pointerdown", (event) => {
       if (!isActive()) return;
+      event.preventDefault?.();
       pointerId = event.pointerId;
       joystickOrigin = { x: event.clientX, y: event.clientY };
-      hitArea.setPointerCapture(event.pointerId);
+      hitArea.setPointerCapture?.(event.pointerId);
       updateJoystick(event, joystick);
     });
-    hitArea.addEventListener("pointermove", (event) => {
+    const moveJoystick = (event) => {
       if (event.pointerId === pointerId) updateJoystick(event, joystick);
-    });
+    };
+    hitArea.addEventListener("pointermove", moveJoystick);
+    windowTarget.addEventListener("pointermove", moveJoystick);
     ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
       hitArea.addEventListener(type, releaseJoystick);
     });
