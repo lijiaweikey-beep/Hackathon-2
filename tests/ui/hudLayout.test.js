@@ -42,14 +42,14 @@ test("浏览器标签页使用新游戏名", async () => {
   assert.match(html, /<title>别让我逮到你!!<\/title>/);
 });
 
-test("下一关解锁使用黄色动画", async () => {
+test("下一关解锁复用封印揭晓动画", async () => {
   const css = await readFile(new URL("../../src/styles.css", import.meta.url), "utf8");
-  const unlockingRule = css.match(/\.history-node-card\.unlocking\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
-  const keyframes = css.match(/@keyframes\s+historyCardUnlock\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const revealingRule = css.match(/\.history-node-card\.revealing\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const keyframes = css.match(/@keyframes\s+historyCardReveal\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-  assert.match(unlockingRule, /historyCardUnlock/);
-  assert.match(keyframes, /var\(--sun\)/);
-  assert.match(keyframes, /rgba\(255,\s*212,\s*71,\s*0\.75\)/);
+  assert.match(revealingRule, /historyCardReveal/);
+  assert.match(keyframes, /rotateY\(180deg\)/);
+  assert.doesNotMatch(css, /\.history-node-card\.unlocking/);
 });
 
 test("隐藏弹窗不拦截互动内按钮", async () => {

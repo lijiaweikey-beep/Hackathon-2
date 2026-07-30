@@ -814,10 +814,6 @@ button {
   animation: historyCardReveal 1.25s ease forwards;
 }
 
-.history-node-card.unlocking {
-  animation: historyCardUnlock 1.25s ease both;
-}
-
 /* ---- 节点入口与二级入口 ---- */
 .history-node-enter {
   justify-self: center;
@@ -1368,23 +1364,6 @@ button {
   100% {
     transform: translateY(-50%) rotateY(180deg) scale(1.05);
     opacity: 0.1;
-  }
-}
-
-@keyframes historyCardUnlock {
-  0% {
-    transform: translateY(-50%) scale(0.96);
-    box-shadow: 0 10px 26px rgba(37, 36, 42, 0.18);
-  }
-  38% {
-    transform: translateY(-50%) scale(1.08);
-    border-color: var(--sun);
-    box-shadow:
-      0 0 0 8px rgba(255, 212, 71, 0.75),
-      0 0 42px rgba(255, 136, 77, 0.55);
-  }
-  100% {
-    transform: translateY(-50%) scale(1);
   }
 }
 

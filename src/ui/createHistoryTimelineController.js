@@ -89,6 +89,8 @@ export function createHistoryTimelineController({
   let focusId = null;
   let detailId = null;
   let revealTimer = null;
+  let unlockRevealTimer = null;
+  let unlockRevealId = null;
   let revealLocked = false;
   let lastPointerMoved = false;
   let dragState = null;
@@ -97,6 +99,14 @@ export function createHistoryTimelineController({
     if (!revealTimer) return;
     timerHost.clearTimeout(revealTimer);
     revealTimer = null;
+  }
+
+  function clearUnlockReveal() {
+    if (unlockRevealTimer) {
+      timerHost.clearTimeout?.(unlockRevealTimer);
+      unlockRevealTimer = null;
+    }
+    unlockRevealId = null;
   }
 
   function setStatus(text) {
@@ -175,6 +185,8 @@ export function createHistoryTimelineController({
     const { x } = geometry;
     const state = getState(level);
     const hidden = state === "fog";
+    const unlockSealed = level.id === unlockRevealId;
+    const sealedVisual = state === "sealed" || unlockSealed;
     const seal = '<span class="history-seal-eye" aria-hidden="true"></span>'
       + '<span class="history-chain chain-a" aria-hidden="true"></span>'
       + '<span class="history-chain chain-b" aria-hidden="true"></span>';
@@ -187,7 +199,7 @@ export function createHistoryTimelineController({
 
     const card = document.createElement("button");
     card.type = "button";
-    card.className = `history-node-card ${state}`;
+    card.className = `history-node-card ${state}${unlockSealed ? " sealed" : ""}`;
     card.dataset.historyNode = level.id;
     card.style.setProperty("--x", `${x}px`);
     card.disabled = false;
@@ -211,11 +223,12 @@ export function createHistoryTimelineController({
       ${hidden
         ? '<span class="history-node-badge">待解锁</span>'
         : `<span class="history-node-copy">${getNodeCopy(level, getNpcCount(level))}</span>`}
-      ${state === "sealed" ? seal : ""}
-      ${hidden || state === "sealed" ? "" : '<span class="history-node-enter">▶ 进入关卡</span>'}
+      ${sealedVisual ? seal : ""}
+      ${hidden || sealedVisual ? "" : '<span class="history-node-enter">▶ 进入关卡</span>'}
     `);
     card.addEventListener("click", (event) => {
       event.stopPropagation();
+      if (unlockSealed) return;
       if (state === "sealed") {
         startReveal();
         return;
@@ -337,6 +350,7 @@ export function createHistoryTimelineController({
 
   function hide() {
     clearRevealTimer();
+    clearUnlockReveal();
     closeDetail();
     ui.historyTimelineModal?.classList.remove("visible");
   }
@@ -514,12 +528,24 @@ export function createHistoryTimelineController({
   function showUnlock(levelId) {
     const level = levels.find(({ id }) => id === levelId);
     if (!level) return false;
+    clearUnlockReveal();
+    unlockRevealId = levelId;
     show({ mode: "browse", focusId: levelId });
     setStatus(`新节点已解锁：${level.sceneName}`);
     setDetail(level, "新节点已解锁");
     const card = [...(ui.historyTrack?.querySelectorAll(".history-node-card") ?? [])]
       .find((node) => node.dataset.historyNode === levelId);
-    card?.classList.add("unlocking");
+    card?.classList.add("revealing");
+    if (card) {
+      unlockRevealTimer = timerHost.setTimeout(() => {
+        unlockRevealTimer = null;
+        unlockRevealId = null;
+        render({ mode: "browse" });
+        setStatus(`新节点已解锁：${level.sceneName}`);
+        setDetail(level, "新节点已解锁");
+        centerOn(level.id, "smooth");
+      }, REVEAL_ANIMATION_MS);
+    }
     return Boolean(card);
   }
 

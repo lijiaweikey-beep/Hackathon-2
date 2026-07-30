@@ -95,8 +95,10 @@ test("通关后当前关静默记录并给下一关播放解锁动画", () => {
     assert.match(cards[1].className, /open/);
     assert.equal(cards[0].classList.contains("revealing"), false);
     assert.equal(cards[0].classList.contains("unlocking"), false);
-    assert.equal(cards[1].classList.contains("revealing"), false);
-    assert.equal(cards[1].classList.contains("unlocking"), true);
+    assert.equal(cards[1].classList.contains("revealing"), true);
+    assert.equal(cards[1].classList.contains("unlocking"), false);
+    assert.match(cards[1].textContent, /history-chain chain-a/);
+    assert.match(cards[1].textContent, /history-chain chain-b/);
   } finally {
     globalThis.document = previousDocument;
     globalThis.localStorage = previousStorage;
