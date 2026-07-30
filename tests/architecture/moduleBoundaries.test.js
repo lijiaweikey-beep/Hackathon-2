@@ -56,6 +56,11 @@ test("预启动手势不停止入场音乐", async () => {
   assert.doesNotMatch(source, /onPrelaunchDismissed:\s*\(\)\s*=>\s*storyBgm\.stop\(\)/);
 });
 
+test("电脑本地启动不自动进入测试模式", async () => {
+  const source = await readSource("runtime/createGameApplication.js");
+  assert.doesNotMatch(source, /unlockAll:\s*import\.meta\.env\.DEV/);
+});
+
 test("不同关卡目录之间不能互相导入", async () => {
   const entries = (await readdir(levelsRoot, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory());
