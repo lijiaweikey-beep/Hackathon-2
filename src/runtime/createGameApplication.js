@@ -293,12 +293,12 @@ export function boot() {
     getTotalTime: () => totalTime,
     getResultStats: () => experienceManager.getResultStats(),
     calculateRating: calcRating,
-    showResult(result) {
-      storyBgm.stop();
-      if (!experienceManager.showResult(result)) uiController.showResult(result);
-    },
     saveBestScore,
     onLevelCompleted: (level) => historyTimelineFlow?.onLevelCompleted(level),
+    onRoundSettled() {
+      storyBgm.stop();
+      uiController.showHome();
+    },
     ...audio.settlement,
   });
   gameLoop = createGameLoop({

@@ -199,10 +199,7 @@ export function createGameUiController(dependencies) {
       ui.resultNodeTitle.textContent = node?.title ? `「${node.title}」` : "";
     }
     if (ui.resultUnlock) {
-      const nodeName = (level.axisLabel ?? level.sceneName ?? "").replace(/\n/g, "");
-      ui.resultUnlock.textContent = won && nodeName
-        ? `新解锁：【${rating.grade} 级 · ${nodeName}】`
-        : "";
+      ui.resultUnlock.textContent = "";
     }
     if (ui.resultArt) {
       const artUrl = level.art?.grades?.[rating.grade] ?? level.art?.cover ?? "";

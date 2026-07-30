@@ -32,16 +32,9 @@ export function createRoundSettlement(dependencies) {
     const attemptsLeft = resultResource?.attemptsLeft
       ?? session.levelState.attempts;
     const rating = dependencies.calculateRating(won, timeUsed, attemptsLeft);
-    session.setResult({ won, failMessage, timeUsed, attemptsLeft, rating });
+    const result = { won, failMessage, timeUsed, attemptsLeft, rating };
+    session.setResult(result);
     session.transition(GAME_PHASES.RESULT);
-    dependencies.showResult({
-      won,
-      failMessage,
-      resultResource,
-      timeUsed,
-      attemptsLeft,
-      rating,
-    });
 
     // 胜负都落结算记录（失败记录带 won:false，永不覆盖胜利记录）。
     dependencies.saveBestScore(session.levelState.level.id, {
@@ -54,13 +47,16 @@ export function createRoundSettlement(dependencies) {
     });
     if (won) {
       dependencies.onLevelCompleted?.(session.levelState.level);
+      dependencies.onRoundSettled?.(result);
       return;
     }
     const data = player?.group?.userData;
-    if (!data) return;
-    data.visual.position.y = 0;
-    data.leftArm.rotation.z = 0.9;
-    data.rightArm.rotation.z = -0.9;
+    if (data) {
+      data.visual.position.y = 0;
+      data.leftArm.rotation.z = 0.9;
+      data.rightArm.rotation.z = -0.9;
+    }
+    dependencies.onRoundSettled?.(result);
   }
 
   function settle(won, failMessage, delayMs = won ? 500 : 400) {

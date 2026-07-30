@@ -173,6 +173,7 @@ test("结算页使用关卡等级贴图和节点文案", () => {
   assert.equal(ui.resultAgeTag.textContent, "19岁");
   assert.equal(ui.resultNodeTitle.textContent, "「作息纠察队长」");
   assert.equal(ui.resultCopy.textContent, "宿舍安静了。");
+  assert.equal(ui.resultUnlock.textContent, "");
   assert.equal(background.image, 'url("grade-s.jpg")');
 });
 

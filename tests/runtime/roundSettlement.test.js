@@ -3,8 +3,9 @@ import test from "node:test";
 import { GAME_PHASES } from "../../src/core/gamePhase.js";
 import { createRoundSettlement } from "../../src/runtime/createRoundSettlement.js";
 
-test("回合结算统一生成结果并通知界面", () => {
+test("回合结算统一生成结果但不打开结算页", () => {
   const resultCalls = [];
+  const settled = [];
   const session = {
     phase: GAME_PHASES.PLAYING,
     levelState: {
@@ -37,6 +38,7 @@ test("回合结算统一生成结果并通知界面", () => {
     calculateRating: () => ({ grade: "A", rating: 90 }),
     showResult: (result) => resultCalls.push(result),
     saveBestScore: () => {},
+    onRoundSettled: (result) => settled.push(result),
     playWin: () => {},
     playLose: () => {},
   });
@@ -46,10 +48,13 @@ test("回合结算统一生成结果并通知界面", () => {
   assert.equal(session.phase, GAME_PHASES.RESULT);
   assert.equal(session.result.timeUsed, 5);
   assert.equal(session.result.attemptsLeft, 1);
-  assert.equal(resultCalls.length, 1);
+  assert.equal(resultCalls.length, 0);
+  assert.equal(settled.length, 1);
+  assert.equal(settled[0].won, true);
 });
 
 test("独立玩法没有经典玩家对象也可以失败结算", () => {
+  let settled = false;
   const session = {
     phase: GAME_PHASES.PLAYING,
     levelState: {
@@ -73,6 +78,7 @@ test("独立玩法没有经典玩家对象也可以失败结算", () => {
     calculateRating: () => ({ grade: "C", rating: 0 }),
     showResult: () => {},
     saveBestScore: () => {},
+    onRoundSettled: () => { settled = true; },
     playWin: () => {},
     playLose: () => {},
   });
@@ -82,6 +88,7 @@ test("独立玩法没有经典玩家对象也可以失败结算", () => {
   assert.equal(session.phase, GAME_PHASES.RESULT);
   assert.equal(session.result.failMessage, "失败");
   assert.equal(session.result.attemptsLeft, 7);
+  assert.equal(settled, true);
 });
 
 test("成功结算推进主线，失败结算不改变进度", () => {
@@ -125,7 +132,7 @@ test("成功结算推进主线，失败结算不改变进度", () => {
   ]);
 });
 
-test("成功结算等待几秒让命中粒子完整播放再弹卡片", () => {
+test("成功结算等待几秒让命中粒子完整播放再回历史轴", () => {
   const timers = [];
   const session = {
     phase: GAME_PHASES.PLAYING,

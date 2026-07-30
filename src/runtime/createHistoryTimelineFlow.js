@@ -57,7 +57,7 @@ export function createHistoryTimelineFlow({
     const levelId = pendingRevealId;
     pendingRevealId = null;
     timerHost.setTimeout(() => {
-      controller.showReveal(levelId, { openDetailAfterReveal: true });
+      controller.showReveal(levelId);
     }, 120);
     return true;
   }

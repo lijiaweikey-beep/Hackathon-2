@@ -217,3 +217,69 @@ test("未集齐全 A 时半生通关入口呈锁定态", () => {
   assert.equal(opened, 0);
   assert.match(historyStatusText.textContent, /A 级/);
 });
+
+test("历史节点自动揭晓后不主动弹出详情窗口", () => {
+  const previousDocument = globalThis.document;
+  const previousFrame = globalThis.requestAnimationFrame;
+  const previousStorage = globalThis.localStorage;
+  const timers = [];
+  globalThis.document = { createElement };
+  globalThis.requestAnimationFrame = (callback) => callback();
+  globalThis.localStorage = { getItem: () => "{}" };
+  const historyTrack = createTrack();
+  const historyDetailModal = { classList: createClassList() };
+  const revealed = new Set();
+
+  try {
+    const controller = createHistoryTimelineController({
+      ui: {
+        historyTimelineModal: { classList: createClassList(), addEventListener() {} },
+        historyTrack,
+        historyViewport: { addEventListener() {}, scrollTo() {}, clientWidth: 600 },
+        historyStatusText: { textContent: "" },
+        historyNodeDetail: { innerHTML: "" },
+        historyDetailModal,
+        historyDetailArt: { style: {}, classList: createClassList() },
+        historyDetailLevelTag: { textContent: "" },
+        historyDetailAgeTag: { textContent: "", hidden: false },
+        historyDetailRating: { textContent: "", className: "" },
+        historyDetailCopy: { textContent: "" },
+        historyDetailStats: { innerHTML: "" },
+        historyDetailReward: { textContent: "" },
+        historyDetailPrev: {},
+        historyDetailNext: {},
+      },
+      levels: [level("age-19", 19)],
+      storyProgress: {
+        isComplete: () => false,
+        isUnlocked: () => true,
+        isCompleted: () => true,
+      },
+      revealProgress: {
+        isRevealed: (id) => revealed.has(id),
+        reveal: (id) => {
+          revealed.add(id);
+          return true;
+        },
+      },
+      timerHost: {
+        setTimeout(callback, delay) {
+          timers.push({ callback, delay });
+          return timers.length;
+        },
+        clearTimeout() {},
+        requestAnimationFrame: (callback) => callback(),
+      },
+    });
+    controller.showReveal("age-19");
+    while (timers.length > 0) {
+      timers.shift().callback();
+    }
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.requestAnimationFrame = previousFrame;
+    globalThis.localStorage = previousStorage;
+  }
+
+  assert.equal(historyDetailModal.classList.contains("visible"), false);
+});

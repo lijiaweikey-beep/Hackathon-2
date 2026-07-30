@@ -89,7 +89,6 @@ export function createHistoryTimelineController({
   let detailId = null;
   let revealTimer = null;
   let revealLocked = false;
-  let openDetailAfterReveal = false;
   let lastPointerMoved = false;
   let dragState = null;
 
@@ -324,11 +323,9 @@ export function createHistoryTimelineController({
     mode = "browse",
     focusId: nextFocusId = null,
     autoReveal = false,
-    openDetailAfterReveal: shouldOpenDetail = false,
   } = {}) {
     clearRevealTimer();
     revealLocked = false;
-    openDetailAfterReveal = mode === "reveal" && shouldOpenDetail;
     focusId = nextFocusId;
     ui.historyTimelineModal?.classList.add("visible");
     render({ mode });
@@ -339,7 +336,6 @@ export function createHistoryTimelineController({
 
   function hide() {
     clearRevealTimer();
-    openDetailAfterReveal = false;
     closeDetail();
     ui.historyTimelineModal?.classList.remove("visible");
   }
@@ -493,16 +489,11 @@ export function createHistoryTimelineController({
     card?.classList.add("revealing");
 
     timerHost.setTimeout(() => {
-      const shouldOpenDetail = openDetailAfterReveal;
-      openDetailAfterReveal = false;
       revealLocked = false;
       render({ mode: "browse" });
       setStatus(`历史节点已记录：${level.sceneName}`);
       setDetail(level, "历史节点已记录");
       centerOn(level.id, "smooth");
-      if (shouldOpenDetail) {
-        timerHost.setTimeout(() => openDetail(level.id), 240);
-      }
       onRevealComplete?.(level);
     }, REVEAL_ANIMATION_MS);
   }
@@ -511,12 +502,11 @@ export function createHistoryTimelineController({
     show({ mode: "browse" });
   }
 
-  function showReveal(levelId, options = {}) {
+  function showReveal(levelId) {
     show({
       mode: "reveal",
       focusId: levelId,
       autoReveal: true,
-      openDetailAfterReveal: Boolean(options.openDetailAfterReveal),
     });
   }
 
