@@ -3,7 +3,7 @@ import test from "node:test";
 import { GAME_PHASES } from "../../src/core/gamePhase.js";
 import { createRoundSettlement } from "../../src/runtime/createRoundSettlement.js";
 
-test("回合结算统一生成结果但不打开结算页", () => {
+test("回合结算统一生成结果并打开结算页", () => {
   const resultCalls = [];
   const settled = [];
   const session = {
@@ -48,7 +48,9 @@ test("回合结算统一生成结果但不打开结算页", () => {
   assert.equal(session.phase, GAME_PHASES.RESULT);
   assert.equal(session.result.timeUsed, 5);
   assert.equal(session.result.attemptsLeft, 1);
-  assert.equal(resultCalls.length, 0);
+  assert.equal(resultCalls.length, 1);
+  assert.equal(resultCalls[0].timeUsed, 5);
+  assert.equal(resultCalls[0].attemptsLeft, 1);
   assert.equal(settled.length, 1);
   assert.equal(settled[0].won, true);
 });

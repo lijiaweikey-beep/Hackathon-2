@@ -47,6 +47,10 @@ export function createRoundSettlement(dependencies) {
     });
     if (won) {
       dependencies.onLevelCompleted?.(session.levelState.level);
+      dependencies.showResult?.({
+        ...result,
+        resultResource,
+      });
       dependencies.onRoundSettled?.(result);
       return;
     }
@@ -56,6 +60,10 @@ export function createRoundSettlement(dependencies) {
       data.leftArm.rotation.z = 0.9;
       data.rightArm.rotation.z = -0.9;
     }
+    dependencies.showResult?.({
+      ...result,
+      resultResource,
+    });
     dependencies.onRoundSettled?.(result);
   }
 

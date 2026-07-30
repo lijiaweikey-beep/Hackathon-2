@@ -294,11 +294,11 @@ export function boot() {
     getResultStats: () => experienceManager.getResultStats(),
     calculateRating: calcRating,
     saveBestScore,
-    onLevelCompleted: (level) => historyTimelineFlow?.onLevelCompleted(level),
-    onRoundSettled() {
+    showResult(result) {
       storyBgm.stop();
-      uiController.showHome();
+      if (!experienceManager.showResult(result)) uiController.showResult(result);
     },
+    onLevelCompleted: (level) => historyTimelineFlow?.onLevelCompleted(level),
     ...audio.settlement,
   });
   gameLoop = createGameLoop({
