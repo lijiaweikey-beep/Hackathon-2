@@ -42,7 +42,7 @@ test("独立关卡界面使用隔离根节点并随资源域销毁", () => {
   surface.setStyles("button { color: red; }");
 
   assert.equal(parent.children.length, 1);
-  assert.equal(surface.root.innerHTML, "<button>开始</button>");
+  assert.equal(surface.root.textContent, "<button>开始</button>");
   assert.equal(surface.style.textContent, "button { color: red; }");
   assert.equal(parent.classList.contains("standalone-active"), true);
   scope.dispose();

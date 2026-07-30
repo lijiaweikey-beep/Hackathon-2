@@ -1,3 +1,5 @@
+import { appendTrustedMarkup } from "./domWrite.js";
+
 export function createLevelViewHost({ root, themedElements = [], onAction }) {
   const overlays = new Map();
   let styleElement = null;
@@ -36,7 +38,7 @@ export function createLevelViewHost({ root, themedElements = [], onAction }) {
     showOverlay(key, options) {
       const overlay = getOrCreateOverlay(key, options);
       overlay.className = options.className;
-      overlay.innerHTML = options.html;
+      appendTrustedMarkup(overlay, options.html);
       overlay.setAttribute("aria-live", options.ariaLive ?? "polite");
       overlay.classList.remove("visible");
       void overlay.offsetWidth;

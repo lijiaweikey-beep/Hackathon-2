@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -71,4 +73,23 @@ test("Vite 构建输出普通脚本入口以兼容扫码容器", () => {
 test("Vite 开发模式不替换浏览器原生 fetch", () => {
   assert.equal(viteConfig.define?.fetch, "__interactFetch");
   assert.equal(devViteConfig.define?.fetch, undefined);
+});
+
+test("生产代码不使用会触发互动空间 XSS 预检的 DOM 写入 API", () => {
+  function collectJavaScriptFiles(dir) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) return collectJavaScriptFiles(path);
+      return entry.isFile() && entry.name.endsWith(".js") ? [path] : [];
+    });
+  }
+
+  const files = collectJavaScriptFiles(join(process.cwd(), "src"));
+  const forbidden = /\b(?:innerHTML|outerHTML|insertAdjacentHTML)\b|document\.write(?:ln)?\b/;
+
+  const offenders = files.filter((file) =>
+    forbidden.test(readFileSync(file, "utf8"))
+  );
+
+  assert.deepEqual(offenders, []);
 });

@@ -3,6 +3,7 @@ import {
   ROUND_SECONDS,
 } from "../config/constants.js";
 import { getDifficultyLabel } from "../core/difficulty.js";
+import { clearChildren } from "./domWrite.js";
 
 const CN_ORDINALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 const FIST_ICON = new URL("../assets/ui/icon-fist.png", import.meta.url).href;
@@ -57,7 +58,26 @@ function updateTaskAttemptsChip(ui, resourceHtml) {
 
   // 图标走图片素材，文案里旧的拳头/爱心 emoji 去掉避免重复。
   const text = resourceHtml.replace(/^(🥊|❤️)\s*/, "");
-  chip.innerHTML = `<img class="task-info-icon" src="${getResourceIcon(resourceHtml)}" alt="">${text}`;
+  const attemptsMatch = text.match(/^(.*?)\s*<span id="taskAttempts">([^<]*)<\/span>(.*)$/);
+  clearChildren(chip);
+
+  const icon = document.createElement("img");
+  icon.className = "task-info-icon";
+  icon.src = getResourceIcon(resourceHtml);
+  icon.alt = "";
+  chip.appendChild(icon);
+
+  if (attemptsMatch) {
+    const [, prefix, attempts, suffix] = attemptsMatch;
+    if (prefix) chip.appendChild(document.createTextNode(prefix.trimEnd() + " "));
+    const attemptsNode = document.createElement("span");
+    attemptsNode.id = "taskAttempts";
+    attemptsNode.textContent = attempts;
+    chip.appendChild(attemptsNode);
+    if (suffix) chip.appendChild(document.createTextNode(suffix));
+  } else {
+    chip.appendChild(document.createTextNode(text));
+  }
   ui.taskAttempts = document.querySelector("#taskAttempts");
 }
 

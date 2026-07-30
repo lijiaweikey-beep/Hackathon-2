@@ -120,7 +120,7 @@ test("未全 A 时报告不弹出，历史记录不受影响", () => {
   const ui = {
     lifeReportModal: modal,
     lifeReportProgress: { textContent: "" },
-    lifeReportRows: { innerHTML: "" },
+    lifeReportRows: { textContent: "" },
   };
   const controller = createLifeReportController({
     ui,
@@ -142,7 +142,7 @@ test("报告只弹一次并把已读写进存储", () => {
   const ui = {
     lifeReportModal: modal,
     lifeReportProgress: { textContent: "" },
-    lifeReportRows: { innerHTML: "" },
+    lifeReportRows: { textContent: "" },
   };
   const controller = createLifeReportController({
     ui,
@@ -155,7 +155,7 @@ test("报告只弹一次并把已读写进存储", () => {
   assert.equal(controller.maybeShow(), true);
   assert.equal(modal.classList.contains("visible"), true);
   assert.equal(ui.lifeReportProgress.textContent, "2/2");
-  assert.match(ui.lifeReportRows.innerHTML, /作息纠察队长/);
+  assert.match(ui.lifeReportRows.textContent, /作息纠察队长/);
 
   storage.setItem("gengge-life-report-seen", "1");
   modal.classList.remove("visible");

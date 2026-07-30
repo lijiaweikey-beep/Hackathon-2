@@ -1,4 +1,5 @@
 import { buildLifeReportModel } from "./lifeReportModel.js";
+import { appendTrustedMarkup } from "./domWrite.js";
 
 const SEEN_KEY = "gengge-life-report-seen";
 
@@ -63,7 +64,7 @@ export function createLifeReportController({ ui, levels, storage, getBest }) {
       ui.lifeReportArt.classList.toggle("is-empty", !model.heroArt);
     }
     if (ui.lifeReportRows) {
-      ui.lifeReportRows.innerHTML = model.rows.map(rowHtml).join("");
+      appendTrustedMarkup(ui.lifeReportRows, model.rows.map(rowHtml).join(""));
     }
   }
 

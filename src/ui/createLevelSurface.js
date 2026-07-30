@@ -1,3 +1,5 @@
+import { appendTrustedMarkup, clearChildren } from "./domWrite.js";
+
 export function createLevelSurface({
   documentTarget = document,
   parent,
@@ -23,7 +25,7 @@ export function createLevelSurface({
   if (sharedLayout) parent.classList.add("shared-layout-active");
 
   function setContent(html = "") {
-    root.innerHTML = html;
+    appendTrustedMarkup(root, html);
   }
 
   function setStyles(cssText = "") {
@@ -31,7 +33,7 @@ export function createLevelSurface({
   }
 
   function clear() {
-    root.innerHTML = "";
+    clearChildren(root);
     style.textContent = "";
   }
 

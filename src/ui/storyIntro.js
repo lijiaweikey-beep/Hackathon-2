@@ -1,3 +1,5 @@
+import { clearChildren } from "./domWrite.js";
+
 const TYPE_INTERVAL_MS = 72;
 const LINE_PAUSE_MS = 380;
 
@@ -79,7 +81,7 @@ export function createStoryIntroPlayer({ ui, timerHost = globalThis }) {
     typingDone = false;
     onDone = nextOnDone;
     lines = getStoryIntroLines(level);
-    ui.storyIntroText.innerHTML = "";
+    clearChildren(ui.storyIntroText);
     lineElements = lines.map(() => {
       const element = document.createElement("p");
       element.className = "story-intro-line";

@@ -19,6 +19,7 @@ import { renderShareCard } from "./shareCard.js";
 import { createStoryIntroPlayer } from "./storyIntro.js";
 import { renderTargetPreview } from "./targetPreview.js";
 import { renderTaskModal } from "./taskModal.js";
+import { appendTrustedMarkup, clearChildren } from "./domWrite.js";
 
 export function createGameUiController(dependencies) {
   const {
@@ -276,7 +277,9 @@ export function createGameUiController(dependencies) {
         "visible",
         Boolean(mechanicHintHtml) || mechanicVisible,
       );
-      ui.mechanicHint.innerHTML = viewModel?.mechanicHtml || mechanicHintHtml;
+      const mechanicMarkup = viewModel?.mechanicHtml || mechanicHintHtml;
+      if (mechanicMarkup) appendTrustedMarkup(ui.mechanicHint, mechanicMarkup);
+      else clearChildren(ui.mechanicHint);
     }
     // 教学关：摇杆引导高亮
     if (ui.joystick) {

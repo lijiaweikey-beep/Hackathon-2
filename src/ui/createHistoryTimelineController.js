@@ -1,4 +1,5 @@
 import { getBestScore } from "../utils/storage.js";
+import { appendTrustedMarkup, clearChildren } from "./domWrite.js";
 import { renderShareCard } from "./shareCard.js";
 
 const NODE_GAP = 260;
@@ -104,10 +105,10 @@ export function createHistoryTimelineController({
 
   function setDetail(level, prefix = "历史节点") {
     if (!ui.historyNodeDetail || !level) return;
-    ui.historyNodeDetail.innerHTML = `
+    appendTrustedMarkup(ui.historyNodeDetail, `
       <strong>${prefix}：${getNodeTitle(level)}</strong>
       <span>${getNodeCopy(level, getNpcCount(level))}</span>
-    `;
+    `);
   }
 
   function isExtraUnlocked() {
@@ -203,7 +204,7 @@ export function createHistoryTimelineController({
       artHtml = level.emoji;
     }
 
-    card.innerHTML = `
+    appendTrustedMarkup(card, `
       <span class="history-node-age">${getNodeLabel(level)}</span>
       <span class="history-node-art" aria-hidden="true">${artHtml}</span>
       <span class="history-node-name">${escapeHtml(level.axisLabel ?? level.sceneName)}</span>
@@ -212,7 +213,7 @@ export function createHistoryTimelineController({
         : `<span class="history-node-copy">${getNodeCopy(level, getNpcCount(level))}</span>`}
       ${state === "sealed" ? seal : ""}
       ${hidden || state === "sealed" ? "" : '<span class="history-node-enter">▶ 进入关卡</span>'}
-    `;
+    `);
     card.addEventListener("click", (event) => {
       event.stopPropagation();
       if (state === "sealed") {
@@ -240,7 +241,7 @@ export function createHistoryTimelineController({
 
   function renderTimeline() {
     if (!ui.historyTrack) return;
-    ui.historyTrack.innerHTML = "";
+    clearChildren(ui.historyTrack);
     const firstExtraIndex = levels.findIndex((level) => level.track !== "mainline");
     const hasExtra = firstExtraIndex >= 0;
     const shiftAt = (index) => (hasExtra && index >= firstExtraIndex ? EXTRA_GAP : 0);
@@ -251,11 +252,11 @@ export function createHistoryTimelineController({
 
     const axis = document.createElement("div");
     axis.className = "history-axis";
-    axis.innerHTML = `
+    appendTrustedMarkup(axis, `
       <span class="history-axis-glyph start" aria-hidden="true">∞</span>
       <span class="history-axis-line" aria-hidden="true"></span>
       <span class="history-axis-glyph end" aria-hidden="true">☁</span>
-    `;
+    `);
     ui.historyTrack.appendChild(axis);
 
     if (hasExtra) {
@@ -406,7 +407,7 @@ export function createHistoryTimelineController({
   function renderDetailStats(best) {
     if (!ui.historyDetailStats) return;
     if (!best) {
-      ui.historyDetailStats.innerHTML = "";
+      clearChildren(ui.historyDetailStats);
       return;
     }
     const failed = best.won === false;
@@ -418,10 +419,10 @@ export function createHistoryTimelineController({
         ? [failed ? "📅 结算时间" : "📅 完成时间", formatStamp(new Date(best.completedAt))]
         : null,
     ].filter(Boolean);
-    ui.historyDetailStats.innerHTML = rows
+    appendTrustedMarkup(ui.historyDetailStats, rows
       .map(([label, value]) =>
         `<div class="stat-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`)
-      .join("");
+      .join(""));
   }
 
   function saveDetailShareCard() {
