@@ -33,6 +33,12 @@ export function createHistoryTimelineFlow({
     isLifeReportReady: () => lifeReport.isQualified(),
     onOpenLifeReport: () => lifeReport.show(),
   });
+  let pendingUnlockId = null;
+
+  function getNextMainlineLevel(level) {
+    const index = mainline.findIndex(({ id }) => id === level.id);
+    return index >= 0 ? mainline[index + 1] ?? null : null;
+  }
 
   function maybeShowLifeReport() {
     // 报告独立于通关/番外：只有五关全部 A 级及以上且没看过时才弹。
@@ -45,16 +51,33 @@ export function createHistoryTimelineFlow({
     if (level.track !== "mainline") return false;
     const alreadyCompleted = storyProgress.isCompleted(level.id);
     const completed = storyProgress.complete(level.id);
-    if (!alreadyCompleted) revealProgress.reveal(level.id);
+    if (!alreadyCompleted) {
+      revealProgress.reveal(level.id);
+      const nextLevel = getNextMainlineLevel(level);
+      if (
+        nextLevel
+        && storyProgress.isUnlocked(nextLevel.id)
+        && !storyProgress.isCompleted(nextLevel.id)
+      ) {
+        pendingUnlockId = nextLevel.id;
+      }
+    }
     return completed;
   }
 
   function showPendingReveal() {
-    return false;
+    if (!pendingUnlockId) return false;
+    const levelId = pendingUnlockId;
+    pendingUnlockId = null;
+    timerHost.setTimeout(() => {
+      controller.showUnlock(levelId);
+    }, 120);
+    return true;
   }
 
   function showHome() {
     controller.showBrowse();
+    if (showPendingReveal()) return true;
     // 兼容刷分场景：回到事件轴时若已达成全 A 且没看过报告，补弹一次。
     return maybeShowLifeReport();
   }

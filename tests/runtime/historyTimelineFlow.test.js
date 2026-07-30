@@ -45,13 +45,14 @@ function createTrack() {
   return track;
 }
 
-test("通关后不再把当前关排进自动揭晓动画", () => {
+test("通关后当前关静默记录并给下一关播放解锁动画", () => {
   const previousDocument = globalThis.document;
   const previousStorage = globalThis.localStorage;
   globalThis.document = { createElement };
   globalThis.localStorage = createMemoryStorage({ "gengge-best-score": "{}" });
   const completed = new Set();
   const historyTrack = createTrack();
+  const timers = [];
   const levels = [
     { id: "age-19", age: 19, track: "mainline", sceneName: "第一关" },
     { id: "age-21", age: 21, track: "mainline", sceneName: "第二关" },
@@ -77,16 +78,23 @@ test("通关后不再把当前关排进自动揭晓动画", () => {
           return true;
         },
       },
-      timerHost: { setTimeout: (callback) => callback() },
+      timerHost: {
+        setTimeout(callback, delay) {
+          timers.push({ callback, delay });
+          return timers.length;
+        },
+      },
     });
 
     flow.onLevelCompleted(levels[0]);
 
-    assert.equal(flow.showPendingReveal(), false);
-    flow.showHome();
+    assert.equal(flow.showPendingReveal(), true);
+    timers.shift().callback();
     const cards = historyTrack.querySelectorAll(".history-node-card");
     assert.match(cards[0].className, /unlocked/);
     assert.match(cards[1].className, /open/);
+    assert.equal(cards[0].classList.contains("unlocking"), false);
+    assert.equal(cards[1].classList.contains("unlocking"), true);
   } finally {
     globalThis.document = previousDocument;
     globalThis.localStorage = previousStorage;

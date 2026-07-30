@@ -510,6 +510,18 @@ export function createHistoryTimelineController({
     });
   }
 
+  function showUnlock(levelId) {
+    const level = levels.find(({ id }) => id === levelId);
+    if (!level) return false;
+    show({ mode: "browse", focusId: levelId });
+    setStatus(`新节点已解锁：${level.sceneName}`);
+    setDetail(level, "新节点已解锁");
+    const card = [...(ui.historyTrack?.querySelectorAll(".history-node-card") ?? [])]
+      .find((node) => node.dataset.historyNode === levelId);
+    card?.classList.add("unlocking");
+    return Boolean(card);
+  }
+
   function bindDrag() {
     const viewport = ui.historyViewport;
     if (!viewport) return;
@@ -583,6 +595,7 @@ export function createHistoryTimelineController({
     show,
     showBrowse,
     showReveal,
+    showUnlock,
     hide,
     isRevealPending: (id) => storyProgress.isCompleted(id) && !revealProgress.isRevealed(id),
     getPendingReveal: () => findFirstPending(levels, storyProgress, revealProgress),
